@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY
+-- BEHIND THE DARK : CORE UI LIBRARY (ANIME GLINT & BOUNCE)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -12,37 +12,76 @@ local playerGui = player:WaitForChild("PlayerGui")
 local Library = {}
 Library.__index = Library
 
-local tweenFast = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+-- ระบบ Tween เด้งดึ๋งและแสงสะท้อน
+local springBounce = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local pressSquish = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local glintTween = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-local function attachEffects(btn: GuiButton, origPos: UDim2?)
+function Library.AttachInteractiveEffects(btn: GuiButton, origPos: UDim2?)
     local originalSize = btn.Size
     local basePos = origPos or btn.Position
     local isHovered = false
 
+    btn.ClipsDescendants = true
+
+    -- ประกายแสงสะท้อนแว่นอนิเมะ (Glint Sheen)
+    local glint = Instance.new("Frame")
+    glint.Name = "AnimeGlint"
+    glint.Size = UDim2.new(0.28, 0, 2.6, 0)
+    glint.Position = UDim2.new(-0.7, 0, -0.8, 0)
+    glint.Rotation = 22
+    glint.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    glint.BackgroundTransparency = 0.52
+    glint.BorderSizePixel = 0
+    glint.ZIndex = 8
+    glint.Parent = btn
+    Instance.new("UICorner", glint).CornerRadius = UDim.new(1, 0)
+
+    -- แสงวาบเส้นที่สอง (ประกายแหลม)
+    local sharpLine = Instance.new("Frame")
+    sharpLine.Size = UDim2.new(0.2, 0, 1, 0)
+    sharpLine.Position = UDim2.new(1.15, 0, 0, 0)
+    sharpLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    sharpLine.BackgroundTransparency = 0.3
+    sharpLine.BorderSizePixel = 0
+    sharpLine.ZIndex = 9
+    sharpLine.Parent = glint
+
+    -- เมื่อชี้เมาส์ (Hover): ขยายเล็กน้อย + แสงสะท้อนแว่นวิ่งวาบจากซ้ายไปขวา
     btn.MouseEnter:Connect(function()
         isHovered = true
-        TweenService:Create(btn, tweenFast, {
-            Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 1.025, originalSize.Y.Scale, originalSize.Y.Offset * 1.025),
-            Position = UDim2.new(basePos.X.Scale, basePos.X.Offset, basePos.Y.Scale, basePos.Y.Offset - 1)
+        TweenService:Create(btn, springBounce, {
+            Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 1.028, originalSize.Y.Scale, originalSize.Y.Offset * 1.028),
+            Position = UDim2.new(basePos.X.Scale, basePos.X.Offset, basePos.Y.Scale, basePos.Y.Offset - 1.5)
+        }):Play()
+
+        -- ปล่อยแสงวาบ
+        glint.Position = UDim2.new(-0.7, 0, -0.8, 0)
+        glint.BackgroundTransparency = 0.52
+        TweenService:Create(glint, glintTween, {
+            Position = UDim2.new(1.5, 0, -0.8, 0),
+            BackgroundTransparency = 0.8
         }):Play()
     end)
 
     btn.MouseLeave:Connect(function()
         isHovered = false
-        TweenService:Create(btn, tweenFast, { Size = originalSize, Position = basePos }):Play()
+        TweenService:Create(btn, springBounce, { Size = originalSize, Position = basePos }):Play()
     end)
 
+    -- เมื่อคลิกค้าง (ยุบตัวลง)
     btn.MouseButton1Down:Connect(function()
-        TweenService:Create(btn, tweenFast, {
-            Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 0.96, originalSize.Y.Scale, originalSize.Y.Offset * 0.96),
-            Position = UDim2.new(basePos.X.Scale, basePos.X.Offset, basePos.Y.Scale, basePos.Y.Offset + 1.5)
+        TweenService:Create(btn, pressSquish, {
+            Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 0.92, originalSize.Y.Scale, originalSize.Y.Offset * 0.88),
+            Position = UDim2.new(basePos.X.Scale, basePos.X.Offset, basePos.Y.Scale, basePos.Y.Offset + 2.5)
         }):Play()
     end)
 
+    -- เมื่อปล่อยคลิก (เด้งดึ๋งสปริงตัวกลับ)
     btn.MouseButton1Up:Connect(function()
-        local targetSize = isHovered and UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 1.025, originalSize.Y.Scale, originalSize.Y.Offset * 1.025) or originalSize
-        local targetPos = isHovered and UDim2.new(basePos.X.Scale, basePos.X.Offset, basePos.Y.Scale, basePos.Y.Offset - 1) or basePos
-        TweenService:Create(btn, tweenFast, { Size = targetSize, Position = targetPos }):Play()
+        local targetSize = isHovered and UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 1.028, originalSize.Y.Scale, originalSize.Y.Offset * 1.028) or originalSize
+        local targetPos = isHovered and UDim2.new(basePos.X.Scale, basePos.X.Offset, basePos.Y.Scale, basePos.Y.Offset - 1.5) or basePos
+        TweenService:Create(btn, springBounce, { Size = targetSize, Position = targetPos }):Play()
     end)
 end
 
@@ -89,7 +128,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     cardStroke.Color = Color3.fromRGB(42, 12, 70)
     self.MainCard = card
 
-    -- ระบบ Drag
+    -- ระบบลากหน้าต่าง
     local dragging, dragStart, startPos = false, nil, nil
     card.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -136,14 +175,13 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     titleStroke.Thickness = 3
     titleStroke.Color = Color3.fromRGB(35, 10, 55)
 
-    -- Hotkey ซ่อน/แสดง GUI
+    -- Hotkey RightShift
     UserInputService.InputBegan:Connect(function(input, gpe)
         if not gpe and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.RightShift then
             card.Visible = not card.Visible
         end
     end)
 
-    -- คอลัมน์จัดวาง
     if config.SingleColumn then
         local col = Instance.new("Frame")
         col.Size = UDim2.new(1, -28, 1, -66)
@@ -229,7 +267,7 @@ function Library:CreateToggle(side: string, text: string, yPos: number, colors: 
     ts.Thickness = 2.5
     ts.Color = Color3.fromRGB(40, 10, 60)
 
-    attachEffects(btn, UDim2.fromOffset(1, 1))
+    Library.AttachInteractiveEffects(btn, UDim2.fromOffset(1, 1))
 
     local function setVisual(val: boolean)
         state = val
@@ -274,6 +312,8 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
     selectBtn.ZIndex = zBase + 1
     selectBtn.Parent = card
 
+    Library.AttachInteractiveEffects(selectBtn)
+
     local scroll = Instance.new("ScrollingFrame")
     scroll.Size = UDim2.new(1, 0, 0, 78)
     scroll.Position = UDim2.fromOffset(0, 42)
@@ -309,6 +349,7 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
             optBtn.ZIndex = zBase + 21
             optBtn.Parent = scroll
             Instance.new("UICorner", optBtn).CornerRadius = UDim.new(0, 6)
+            Library.AttachInteractiveEffects(optBtn)
 
             optBtn.Activated:Connect(function()
                 selected = opt
@@ -345,7 +386,7 @@ function Library:Create3DRenderToggle(side: string)
     bs.Thickness = 2
     bs.Color = Color3.fromRGB(35, 10, 55)
 
-    attachEffects(btn)
+    Library.AttachInteractiveEffects(btn)
 
     local originalCamType = Enum.CameraType.Custom
     local originalCamCFrame = nil
