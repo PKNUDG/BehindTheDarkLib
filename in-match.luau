@@ -233,7 +233,18 @@ local Library = libChunk()
 
 local Window = Library:CreateWindow({
     Title = "BEHIND THE DARK",
-    Name = "CandyTD_BehindTheDarkHub"
+    Name = "CandyTD_BehindTheDarkHub",
+    OnUnload = function()
+        Controller.Running = false
+        -- คืนค่ากล้องกรณีปิด 3D ค้างไว้
+        pcall(function()
+            local cam = workspace.CurrentCamera
+            if cam then
+                cam.CameraType = Enum.CameraType.Custom
+            end
+        end)
+        _G.CandyTD_InMatchInstance = nil
+    end
 })
 Controller.Gui = Window.Gui
 
