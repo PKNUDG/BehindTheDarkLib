@@ -346,7 +346,6 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CandyTD_BehindTheDarkHub"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
--- ตั้งค่า DisplayOrder ให้สูงกว่า UI ของเกม (เพื่อให้ม่านดำบัง UI เกมได้)
 screenGui.DisplayOrder = 999 
 Controller.Gui = screenGui
 
@@ -361,10 +360,9 @@ blackoutFrame.Name = "BlackoutFrame"
 blackoutFrame.Size = UDim2.fromScale(1, 1)
 blackoutFrame.Position = UDim2.fromScale(0, 0)
 blackoutFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
--- ปรับเป็น 0.07 เพื่อให้ฉากมืดสนิท แต่แสงจาก UI เกมยังพอมองเห็นลางๆ
 blackoutFrame.BackgroundTransparency = 0.07 
 blackoutFrame.BorderSizePixel = 0
-blackoutFrame.ZIndex = 1 -- อยู่บน UI เกม แต่อยู่ใต้ mainCard
+blackoutFrame.ZIndex = 1
 blackoutFrame.Visible = false
 blackoutFrame.Active = false
 blackoutFrame.Parent = screenGui
@@ -376,33 +374,7 @@ mainCard.Position = UDim2.new(0.5, -330, 0.5, -220)
 mainCard.BackgroundColor3 = Color3.fromRGB(152, 114, 203)
 mainCard.BorderSizePixel = 0
 mainCard.Active = true
-mainCard.ZIndex = 2 -- อยู่เหนือกราฟิกม่านดำ แสดงผลชัดเจน 100%
-mainCard.Parent = screenGui
-Instance.new("UICorner", mainCard).CornerRadius = UDim.new(0, 22)
-local mainStroke = Instance.new("UIStroke", mainCard)
-mainStroke.Thickness = 5
-mainStroke.Color = Color3.fromRGB(42, 12, 70)
-
--- Blackout Frame
-local blackoutFrame = Instance.new("Frame")
-blackoutFrame.Name = "BlackoutFrame"
-blackoutFrame.Size = UDim2.fromScale(1, 1)
-blackoutFrame.Position = UDim2.fromScale(0, 0)
-blackoutFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-blackoutFrame.BackgroundTransparency = 0.15
-blackoutFrame.BorderSizePixel = 0
-blackoutFrame.ZIndex = 0
-blackoutFrame.Visible = false
-blackoutFrame.Active = false
-blackoutFrame.Parent = screenGui
-
-local mainCard = Instance.new("Frame")
-mainCard.Name = "MainCard"
-mainCard.Size = UDim2.fromOffset(660, 440)
-mainCard.Position = UDim2.new(0.5, -330, 0.5, -220)
-mainCard.BackgroundColor3 = Color3.fromRGB(152, 114, 203)
-mainCard.BorderSizePixel = 0
-mainCard.Active = true
+mainCard.ZIndex = 2
 mainCard.Parent = screenGui
 Instance.new("UICorner", mainCard).CornerRadius = UDim.new(0, 22)
 local mainStroke = Instance.new("UIStroke", mainCard)
@@ -436,7 +408,7 @@ titlePlate.Size = UDim2.new(1, -28, 0, 42)
 titlePlate.Position = UDim2.fromOffset(14, 14)
 titlePlate.BackgroundColor3 = Color3.fromRGB(75, 30, 115)
 titlePlate.BorderSizePixel = 0
-titlePlate.ZIndex = 2
+titlePlate.ZIndex = 3
 titlePlate.Parent = mainCard
 Instance.new("UICorner", titlePlate).CornerRadius = UDim.new(0, 12)
 local tpStroke = Instance.new("UIStroke", titlePlate)
@@ -450,7 +422,7 @@ titleLabel.Text = "BEHIND THE DARK"
 titleLabel.TextColor3 = Color3.fromRGB(255, 235, 120)
 titleLabel.TextSize = 17
 titleLabel.Font = Enum.Font.FredokaOne
-titleLabel.ZIndex = 3
+titleLabel.ZIndex = 4
 titleLabel.Parent = titlePlate
 local titleStroke = Instance.new("UIStroke", titleLabel)
 titleStroke.Thickness = 3
@@ -470,12 +442,14 @@ local leftColumn = Instance.new("Frame")
 leftColumn.Size = UDim2.new(0.5, -20, 1, -72)
 leftColumn.Position = UDim2.fromOffset(14, 66)
 leftColumn.BackgroundTransparency = 1
+leftColumn.ZIndex = 3
 leftColumn.Parent = mainCard
 
 local rightColumn = Instance.new("Frame")
 rightColumn.Size = UDim2.new(0.5, -20, 1, -72)
 rightColumn.Position = UDim2.new(0.5, 6, 0, 66)
 rightColumn.BackgroundTransparency = 1
+rightColumn.ZIndex = 3
 rightColumn.Parent = mainCard
 
 -- ========================================================
@@ -526,7 +500,7 @@ local function createSolidCandyButton(parentObj: Frame, text: string, yPos: numb
     btnBase.Position = UDim2.fromOffset(0, yPos)
     btnBase.BackgroundColor3 = Color3.fromRGB(35, 10, 55)
     btnBase.BorderSizePixel = 0
-    btnBase.ZIndex = 2
+    btnBase.ZIndex = 4
     btnBase.Parent = parentObj
     Instance.new("UICorner", btnBase).CornerRadius = UDim.new(1, 0)
     local bs = Instance.new("UIStroke", btnBase)
@@ -541,7 +515,7 @@ local function createSolidCandyButton(parentObj: Frame, text: string, yPos: numb
     btnTop.AutoButtonColor = false
     btnTop.Text = ""
     btnTop.ClipsDescendants = true
-    btnTop.ZIndex = 3
+    btnTop.ZIndex = 5
     btnTop.Parent = btnBase
     Instance.new("UICorner", btnTop).CornerRadius = UDim.new(1, 0)
 
@@ -551,7 +525,7 @@ local function createSolidCandyButton(parentObj: Frame, text: string, yPos: numb
     gloss.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     gloss.BackgroundTransparency = 0.72
     gloss.BorderSizePixel = 0
-    gloss.ZIndex = 4
+    gloss.ZIndex = 6
     gloss.Parent = btnTop
     Instance.new("UICorner", gloss).CornerRadius = UDim.new(1, 0)
 
@@ -563,7 +537,7 @@ local function createSolidCandyButton(parentObj: Frame, text: string, yPos: numb
     btnText.TextSize = 14
     btnText.Font = Enum.Font.FredokaOne
     btnText.TextXAlignment = Enum.TextXAlignment.Left
-    btnText.ZIndex = 5
+    btnText.ZIndex = 7
     btnText.Text = text .. " : OFF"
     btnText.Parent = btnTop
     local ts = Instance.new("UIStroke", btnText)
@@ -621,6 +595,7 @@ configBox.Size = UDim2.new(1, 0, 0, 38)
 configBox.Position = UDim2.fromOffset(0, 190)
 configBox.BackgroundColor3 = Color3.fromRGB(80, 35, 120)
 configBox.BorderSizePixel = 0
+configBox.ZIndex = 4
 configBox.Parent = leftColumn
 Instance.new("UICorner", configBox).CornerRadius = UDim.new(0, 10)
 local cbs = Instance.new("UIStroke", configBox)
@@ -636,6 +611,7 @@ cfgLabel.TextColor3 = Color3.fromRGB(255, 235, 120)
 cfgLabel.TextSize = 13
 cfgLabel.Font = Enum.Font.FredokaOne
 cfgLabel.TextXAlignment = Enum.TextXAlignment.Left
+cfgLabel.ZIndex = 5
 cfgLabel.Parent = configBox
 
 local roundCountLabel = Instance.new("TextLabel")
@@ -646,6 +622,7 @@ roundCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 roundCountLabel.TextSize = 13
 roundCountLabel.Font = Enum.Font.FredokaOne
 roundCountLabel.Text = tostring(states.TargetRounds)
+roundCountLabel.ZIndex = 5
 roundCountLabel.Parent = configBox
 Instance.new("UICorner", roundCountLabel).CornerRadius = UDim.new(0, 6)
 
@@ -658,6 +635,7 @@ btnMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnMinus.TextSize = 16
 btnMinus.Font = Enum.Font.FredokaOne
 btnMinus.BorderSizePixel = 0
+btnMinus.ZIndex = 5
 btnMinus.Parent = configBox
 Instance.new("UICorner", btnMinus).CornerRadius = UDim.new(0, 6)
 
@@ -670,6 +648,7 @@ btnPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnPlus.TextSize = 16
 btnPlus.Font = Enum.Font.FredokaOne
 btnPlus.BorderSizePixel = 0
+btnPlus.ZIndex = 5
 btnPlus.Parent = configBox
 Instance.new("UICorner", btnPlus).CornerRadius = UDim.new(0, 6)
 
@@ -678,6 +657,7 @@ roundStatusBox.Size = UDim2.new(1, 0, 0, 52)
 roundStatusBox.Position = UDim2.fromOffset(0, 236)
 roundStatusBox.BackgroundColor3 = Color3.fromRGB(45, 18, 72)
 roundStatusBox.BorderSizePixel = 0
+roundStatusBox.ZIndex = 4
 roundStatusBox.Parent = leftColumn
 Instance.new("UICorner", roundStatusBox).CornerRadius = UDim.new(0, 12)
 local rsbs = Instance.new("UIStroke", roundStatusBox)
@@ -691,6 +671,7 @@ roundStatus.Text = "Round " .. states.CurrentRounds .. "/" .. states.TargetRound
 roundStatus.TextColor3 = Color3.fromRGB(255, 225, 80)
 roundStatus.TextSize = 17
 roundStatus.Font = Enum.Font.FredokaOne
+roundStatus.ZIndex = 5
 roundStatus.Parent = roundStatusBox
 
 btnMinus.Activated:Connect(function()
@@ -837,7 +818,6 @@ render3dBtn.Activated:Connect(function()
     local cam = workspace.CurrentCamera
 
     if not states.Render3DEnabled then
-        -- สลับมุมกล้องหนีฉาก 3D ไปส่องที่ว่างเปล่า (ลดการประมวลผล GPU โดยไม่ทำให้ GUI พัง)
         pcall(function()
             if cam then
                 originalCameraType = cam.CameraType
@@ -850,7 +830,6 @@ render3dBtn.Activated:Connect(function()
         render3dBtn.BackgroundColor3 = Color3.fromRGB(190, 50, 50)
         render3dBtn.Text = "[ 3D: OFF ]"
     else
-        -- คืนค่ากล้องกลับมามองแมพตามปกติ
         pcall(function()
             if cam then
                 cam.CameraType = originalCameraType or Enum.CameraType.Custom
@@ -894,7 +873,6 @@ local function runAutoPlaceSequence()
             end
         end
 
-        -- ปรับเป้าหมายการโจมตี (Targeting)
         if ok and item.setTarget and targetId then
             task.wait(0.25)
             pcall(function()
@@ -1042,7 +1020,6 @@ task.spawn(function()
             local overlay = candyTD:FindFirstChild("Overlay")
             local isOverlayOpen = overlay and overlay.Visible
 
-            -- ตรวจสอบว่าอยู่ในช่วงรอกดเริ่ม Wave 1 หรือไม่
             local isPreMatch = false
             local startWaveBtn = candyTD:FindFirstChild("StartWave")
             if startWaveBtn and startWaveBtn.Visible then
@@ -1053,7 +1030,6 @@ task.spawn(function()
                 end
             end
 
-            -- ทำงานเฉพาะตอนที่เกมเริ่มเวฟไปแล้ว (ไม่ใช่ PreMatch) และหน้าต่างจบเกมไม่ได้เปิดอยู่
             if not isPreMatch and not isOverlayOpen then
                 local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
                 local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
