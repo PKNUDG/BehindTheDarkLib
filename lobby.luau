@@ -520,14 +520,38 @@ r3dStroke.Color = Color3.fromRGB(35, 10, 55)
 
 attachInteractiveEffects(render3dBtn, render3dBtn.BackgroundColor3)
 
+local originalCameraType = Enum.CameraType.Custom
+local originalCameraCFrame = nil
+
 render3dBtn.Activated:Connect(function()
     states.Render3DEnabled = not states.Render3DEnabled
-    pcall(function()
-        RunService:Set3dRenderingEnabled(states.Render3DEnabled)
-    end)
-    blackoutFrame.Visible = not states.Render3DEnabled
-    render3dBtn.BackgroundColor3 = states.Render3DEnabled and Color3.fromRGB(55, 140, 65) or Color3.fromRGB(190, 50, 50)
-    render3dBtn.Text = states.Render3DEnabled and "[ 3D: ON ]" or "[ 3D: OFF ]"
+    local cam = workspace.CurrentCamera
+
+    if not states.Render3DEnabled then
+        pcall(function()
+            if cam then
+                originalCameraType = cam.CameraType
+                originalCameraCFrame = cam.CFrame
+                cam.CameraType = Enum.CameraType.Scriptable
+                cam.CFrame = CFrame.new(0, 50000, 0)
+            end
+        end)
+        blackoutFrame.Visible = true
+        render3dBtn.BackgroundColor3 = Color3.fromRGB(190, 50, 50)
+        render3dBtn.Text = "[ 3D: OFF ]"
+    else
+        pcall(function()
+            if cam then
+                cam.CameraType = originalCameraType or Enum.CameraType.Custom
+                if originalCameraCFrame then
+                    cam.CFrame = originalCameraCFrame
+                end
+            end
+        end)
+        blackoutFrame.Visible = false
+        render3dBtn.BackgroundColor3 = Color3.fromRGB(55, 140, 65)
+        render3dBtn.Text = "[ 3D: ON ]"
+    end
 end)
 
 -- ========================================================
