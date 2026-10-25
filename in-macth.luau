@@ -13,7 +13,7 @@ if queueOnTeleport then
         queueOnTeleport([[
             repeat task.wait() until game:IsLoaded()
             if not _G.CandyTD_InMatchInstance then
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/YourRepo/CandyTD/main/in-match.lua"))()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/in-match.luau"))()
             end
         ]])
     end)
