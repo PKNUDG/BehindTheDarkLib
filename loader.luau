@@ -2,10 +2,28 @@ repeat task.wait() until game:IsLoaded()
 
 local placeId = game.PlaceId
 
--- ใส่ PlaceId ของเกม Candy TD (เช็คว่าอยู่ล็อบบี้หรือในแมตช์)
--- ถ้า PlaceId ของ Lobby และ Match แยกกัน
-if placeId == 1234567890 then -- ใส่ PlaceId ของห้อง Lobby ตรงนี้
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/lobby.luau"))()
+local function runRemoteScript(url: string)
+    local success, content = pcall(function()
+        return game:HttpGet(url)
+    end)
+
+    if not success or not content or content == "" or content:find("404: Not Found") then
+        warn("[Loader] โหลดไฟล์ไม่สำเร็จ URL ผิดพลาด: " .. url)
+        return
+    end
+
+    local func, err = loadstring(content)
+    if not func then
+        warn("[Loader] Syntax Error ในสคริปต์ปลายทาง: " .. tostring(err))
+        return
+    end
+
+    func()
+end
+
+-- ตรวจสอบ PlaceId เพื่อเลือกรัน (เปลี่ยน PlaceId ของ Lobby ให้ตรงกับเกมของคุณ)
+if placeId == 1234567890 then
+    runRemoteScript("https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/lobby.luau")
 else
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/in-match.luau"))()
+    runRemoteScript("https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/in-match.luau")
 end
