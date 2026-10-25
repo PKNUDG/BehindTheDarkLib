@@ -1,5 +1,12 @@
--- ดึง Library ผ่าน Loadstring (หรือ require)
-local Library = loadstring(game:HttpGet("ลิงก์_GITHUB_ของ_LIBRARY_คุณ"))()
+local libUrl = "https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/BehindTheDarkLib.luau"
+local libRaw = game:HttpGet(libUrl)
+local libChunk, libErr = loadstring(libRaw)
+
+if not libChunk then
+    error("[BehindTheDark] โหลด Library ล้มเหลว: " .. tostring(libErr))
+end
+
+local Library = libChunk()
 
 -- 1. สร้างหน้าต่างหลัก
 local Window = Library:CreateWindow({
