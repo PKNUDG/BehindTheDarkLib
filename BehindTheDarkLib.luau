@@ -6,13 +6,9 @@ local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
 local Library = {}
 Library.__index = Library
 
--- ระบบ Tween เด้งดึ๋งและแสงสะท้อน
 local springBounce = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local pressSquish = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local glintTween = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -24,7 +20,6 @@ function Library.AttachInteractiveEffects(btn: GuiButton, origPos: UDim2?)
 
     btn.ClipsDescendants = true
 
-    -- ประกายแสงสะท้อนแว่นอนิเมะ (Glint Sheen)
     local glint = Instance.new("Frame")
     glint.Name = "AnimeGlint"
     glint.Size = UDim2.new(0.28, 0, 2.6, 0)
@@ -37,7 +32,6 @@ function Library.AttachInteractiveEffects(btn: GuiButton, origPos: UDim2?)
     glint.Parent = btn
     Instance.new("UICorner", glint).CornerRadius = UDim.new(1, 0)
 
-    -- แสงวาบเส้นที่สอง (ประกายแหลม)
     local sharpLine = Instance.new("Frame")
     sharpLine.Size = UDim2.new(0.2, 0, 1, 0)
     sharpLine.Position = UDim2.new(1.15, 0, 0, 0)
@@ -47,7 +41,6 @@ function Library.AttachInteractiveEffects(btn: GuiButton, origPos: UDim2?)
     sharpLine.ZIndex = 9
     sharpLine.Parent = glint
 
-    -- เมื่อชี้เมาส์ (Hover): ขยายเล็กน้อย + แสงสะท้อนแว่นวิ่งวาบจากซ้ายไปขวา
     btn.MouseEnter:Connect(function()
         isHovered = true
         TweenService:Create(btn, springBounce, {
@@ -55,7 +48,6 @@ function Library.AttachInteractiveEffects(btn: GuiButton, origPos: UDim2?)
             Position = UDim2.new(basePos.X.Scale, basePos.X.Offset, basePos.Y.Scale, basePos.Y.Offset - 1.5)
         }):Play()
 
-        -- ปล่อยแสงวาบ
         glint.Position = UDim2.new(-0.7, 0, -0.8, 0)
         glint.BackgroundTransparency = 0.52
         TweenService:Create(glint, glintTween, {
@@ -69,7 +61,6 @@ function Library.AttachInteractiveEffects(btn: GuiButton, origPos: UDim2?)
         TweenService:Create(btn, springBounce, { Size = originalSize, Position = basePos }):Play()
     end)
 
-    -- เมื่อคลิกค้าง (ยุบตัวลง)
     btn.MouseButton1Down:Connect(function()
         TweenService:Create(btn, pressSquish, {
             Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 0.92, originalSize.Y.Scale, originalSize.Y.Offset * 0.88),
@@ -77,7 +68,6 @@ function Library.AttachInteractiveEffects(btn: GuiButton, origPos: UDim2?)
         }):Play()
     end)
 
-    -- เมื่อปล่อยคลิก (เด้งดึ๋งสปริงตัวกลับ)
     btn.MouseButton1Up:Connect(function()
         local targetSize = isHovered and UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 1.028, originalSize.Y.Scale, originalSize.Y.Offset * 1.028) or originalSize
         local targetPos = isHovered and UDim2.new(basePos.X.Scale, basePos.X.Offset, basePos.Y.Scale, basePos.Y.Offset - 1.5) or basePos
@@ -85,7 +75,7 @@ function Library.AttachInteractiveEffects(btn: GuiButton, origPos: UDim2?)
     end)
 end
 
-function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?, SingleColumn: boolean?})
+function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?, SingleColumn: boolean?, OnUnload: (() -> ())?})
     local self = setmetatable({}, Library)
     local width = config.Size and config.Size.X.Offset or (config.SingleColumn and 340 or 660)
     local height = config.Size and config.Size.Y.Offset or (config.SingleColumn and 230 or 440)
@@ -97,10 +87,12 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     screenGui.DisplayOrder = 999
 
     local success = pcall(function() screenGui.Parent = CoreGui end)
-    if not success then screenGui.Parent = playerGui end
+    if not success then
+        local p = Players.LocalPlayer
+        screenGui.Parent = p and p:FindFirstChild("PlayerGui")
+    end
     self.Gui = screenGui
 
-    -- ม่านจอดำ
     local blackout = Instance.new("Frame")
     blackout.Name = "BlackoutFrame"
     blackout.Size = UDim2.fromScale(1, 1)
@@ -112,7 +104,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     blackout.Parent = screenGui
     self.BlackoutFrame = blackout
 
-    -- การ์ดหน้าต่างหลัก
     local card = Instance.new("Frame")
     card.Name = "MainCard"
     card.Size = UDim2.fromOffset(width, height)
@@ -128,7 +119,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     cardStroke.Color = Color3.fromRGB(42, 12, 70)
     self.MainCard = card
 
-    -- ระบบลากหน้าต่าง
     local dragging, dragStart, startPos = false, nil, nil
     card.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -163,17 +153,44 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     tpStroke.Color = Color3.fromRGB(42, 12, 70)
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.fromScale(1, 1)
+    titleLabel.Size = UDim2.new(1, -44, 1, 0)
+    titleLabel.Position = UDim2.fromOffset(12, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = config.Title or "BEHIND THE DARK"
     titleLabel.TextColor3 = Color3.fromRGB(255, 235, 120)
     titleLabel.TextSize = 16
     titleLabel.Font = Enum.Font.FredokaOne
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.ZIndex = 4
     titleLabel.Parent = titlePlate
     local titleStroke = Instance.new("UIStroke", titleLabel)
     titleStroke.Thickness = 3
     titleStroke.Color = Color3.fromRGB(35, 10, 55)
+
+    -- ปุ่มปิดระบบถาวร (Unload Button)
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.fromOffset(28, 28)
+    closeBtn.Position = UDim2.new(1, -34, 0.5, -14)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.TextSize = 15
+    closeBtn.Font = Enum.Font.FredokaOne
+    closeBtn.BorderSizePixel = 0
+    closeBtn.ZIndex = 5
+    closeBtn.Parent = titlePlate
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
+    local cbStroke = Instance.new("UIStroke", closeBtn)
+    cbStroke.Thickness = 1.5
+    cbStroke.Color = Color3.fromRGB(42, 12, 70)
+    Library.AttachInteractiveEffects(closeBtn)
+
+    closeBtn.Activated:Connect(function()
+        if config.OnUnload then
+            pcall(config.OnUnload)
+        end
+        screenGui:Destroy()
+    end)
 
     -- Hotkey RightShift
     UserInputService.InputBegan:Connect(function(input, gpe)
