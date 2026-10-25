@@ -4,7 +4,7 @@ local placeId = game.PlaceId
 
 local function runRemoteScript(url: string)
     local success, content = pcall(function()
-        return game:HttpGet(url)
+        return game:HttpGet(url .. "?v=" .. os.time())
     end)
 
     if not success or not content or content == "" or content:find("404: Not Found") then
@@ -21,7 +21,7 @@ local function runRemoteScript(url: string)
     func()
 end
 
--- ตรวจสอบ PlaceId เพื่อเลือกรัน (เปลี่ยน PlaceId ของ Lobby ให้ตรงกับเกมของคุณ)
+-- ตรวจสอบ PlaceId เพื่อเลือกรัน (Lobby vs Match)
 if placeId == 111053011787075 then
     runRemoteScript("https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/lobby.luau")
 else
