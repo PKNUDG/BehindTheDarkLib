@@ -476,14 +476,12 @@ local function runEndMatchSequence(choice: string)
 
         -- 2. กรณีเลือกเล่นซ้ำ (AGAIN) หรือจ่ายเงินเล่นต่อใน Raid (ชั้น 3 / Game Over)
         if choice == "AGAIN" and not hasNextButton then
-            -- สั่งขอข้อมูลค่าใช้จ่ายและรอเซิร์ฟเวอร์สร้าง Session
             if replayRemote and replayRemote:IsA("RemoteFunction") then
                 pcall(function() replayRemote:InvokeServer("info") end)
-                task.wait(0.4) -- เพิ่มช่วงหน่วงเวลาเพื่อรอเซิร์ฟเวอร์ตอบรับ
+                task.wait(0.4)
                 pcall(function() replayRemote:InvokeServer("pay") end)
             end
 
-            -- สั่งเล่นซ้ำในโหมดปกติ
             if actRemote and actRemote:IsA("RemoteFunction") then
                 pcall(function() actRemote:InvokeServer("again") end)
             end
