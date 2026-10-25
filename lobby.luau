@@ -37,7 +37,7 @@ end
 -- ========================================================
 -- ANTI-AFK & RECONNECT
 -- ========================================================
-GuiService.ErrorMessageChanged:Connect(function(errorMessage)
+local connError = GuiService.ErrorMessageChanged:Connect(function(errorMessage)
     if Controller.Running and errorMessage and errorMessage ~= "" then
         task.wait(2)
         pcall(function() TeleportService:Teleport(game.PlaceId, player) end)
@@ -46,7 +46,7 @@ end)
 
 local bbVirtualUser = nil
 pcall(function() bbVirtualUser = game:GetService("VirtualUser") end)
-player.Idled:Connect(function()
+local connIdle = player.Idled:Connect(function()
     if Controller.Running then
         pcall(function()
             if bbVirtualUser then
@@ -86,6 +86,15 @@ local function setServerAutoDelete(rarity: string, enable: boolean)
     end
 end
 
+local function syncAllAutoDelete()
+    for rarity, isDel in pairs(states.AutoDelete) do
+        if isDel then
+            setServerAutoDelete(rarity, true)
+            task.wait(0.1)
+        end
+    end
+end
+
 local function buyItemFromTeller(itemId: string, amount: number)
     local tellerRemotes = ReplicatedStorage:FindFirstChild("TellerRemotes")
     local buyRemote = tellerRemotes and tellerRemotes:FindFirstChild("Buy")
@@ -109,7 +118,13 @@ local Library = libChunk()
 
 local Window = Library:CreateWindow({
     Title = "BEHIND THE DARK - LOBBY",
-    Name = "CandyTD_BehindTheDarkLobby"
+    Name = "CandyTD_BehindTheDarkLobby",
+    OnUnload = function()
+        Controller.Running = false
+        if connError then connError:Disconnect() end
+        if connIdle then connIdle:Disconnect() end
+        _G.CandyTD_LobbyInstance = nil
+    end
 })
 Controller.Gui = Window.Gui
 
@@ -118,6 +133,9 @@ Controller.Gui = Window.Gui
 -- ========================================================
 Window:CreateToggle("Left", "Auto Summon", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
     states.AutoSummon = v
+    if v then
+        syncAllAutoDelete()
+    end
 end)
 
 Window:CreateDropdown("Left", "Banner", 46, { "Standard", "Event" }, states.BannerType, 20, function(selected)
@@ -201,12 +219,10 @@ local function createInstantBuyButton(text: string, yPos: number, btnColor: Colo
     btn.Activated:Connect(callback)
 end
 
--- 1. ปุ่มซื้อ Trait Crystal 10 ชิ้น
 createInstantBuyButton("Buy Trait Crystal x10", 0, Color3.fromRGB(60, 210, 140), function()
     buyItemFromTeller("crystal", 10)
 end)
 
--- 2. ปุ่มซื้อ Unit of Juice 10 ชิ้น
 createInstantBuyButton("Buy Unit of Juice x10", 46, Color3.fromRGB(255, 140, 40), function()
     buyItemFromTeller("statroll", 10)
 end)
