@@ -1,15 +1,20 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (ANIMATED & SETTINGS)
+-- BEHIND THE DARK : CARTOON CANDY THEME UI LIBRARY
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
 
 local Library = {}
 Library.__index = Library
 
--- การตั้งค่าเอฟเฟกต์ภาพ (Global Visual Settings)
+-- ========================================================
+-- PERSISTENT SETTINGS ENGINE (บันทึกและจำค่าลงไฟล์)
+-- ========================================================
+local SETTINGS_FILE = "BehindTheDark_Settings.json"
+
 Library.Settings = {
     MovingAurora = true,
     BreathingBorder = true,
@@ -17,14 +22,46 @@ Library.Settings = {
     AnimeGlint = true
 }
 
--- ข้อมูล Tween
+local function loadSavedSettings()
+    pcall(function()
+        local readFunc = (rawget(getgenv and getgenv() or _G, "readfile") or readfile)
+        local isFileFunc = (rawget(getgenv and getgenv() or _G, "isfile") or isfile)
+        if type(readFunc) == "function" and (not isFileFunc or isFileFunc(SETTINGS_FILE)) then
+            local raw = readFunc(SETTINGS_FILE)
+            if raw and raw ~= "" then
+                local decoded = HttpService:JSONDecode(raw)
+                if type(decoded) == "table" then
+                    for k, v in pairs(decoded) do
+                        if Library.Settings[k] ~= nil then
+                            Library.Settings[k] = v
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function saveCurrentSettings()
+    pcall(function()
+        local writeFunc = (rawget(getgenv and getgenv() or _G, "writefile") or writefile)
+        if type(writeFunc) == "function" then
+            writeFunc(SETTINGS_FILE, HttpService:JSONEncode(Library.Settings))
+        end
+    end)
+end
+
+loadSavedSettings()
+
+-- ========================================================
+-- ANIMATIONS & ASSETS
+-- ========================================================
 local springBounce = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local pressSquish = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local glintTween = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local rippleTween = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local toggleSlide = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
--- ฟังก์ชัน Click Ripple Effect สไตล์การ์ตูน
 local function spawnClickRipple(btn: GuiButton, inputPos: Vector3)
     if not Library.Settings.ClickRipple then return end
     
@@ -61,7 +98,7 @@ function Library.AttachInteractiveEffects(btn: GuiButton, origPos: UDim2?)
 
     btn.ClipsDescendants = true
 
-    -- ประกายแสงสะท้อนแว่นอนิเมะ
+    -- แสงประกายสะท้อนแว่นอนิเมะ
     local glint = Instance.new("Frame")
     glint.Name = "AnimeGlint"
     glint.Size = UDim2.new(0.28, 0, 2.6, 0)
@@ -142,6 +179,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     end
     self.Gui = screenGui
 
+    -- ม่านดำประหยัดพลังงาน
     local blackout = Instance.new("Frame")
     blackout.Name = "BlackoutFrame"
     blackout.Size = UDim2.fromScale(1, 1)
@@ -153,41 +191,54 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     blackout.Parent = screenGui
     self.BlackoutFrame = blackout
 
-    -- การ์ดหลัก
+    -- การ์ดหน้าต่างหลัก (Candy Kingdom Theme โค้งมนหนาพิเศษ)
     local card = Instance.new("Frame")
     card.Name = "MainCard"
     card.Size = UDim2.fromOffset(width, height)
     card.Position = UDim2.new(0.5, -width / 2, 0.5, -height / 2)
-    card.BackgroundColor3 = Color3.fromRGB(130, 90, 185)
+    card.BackgroundColor3 = Color3.fromRGB(146, 92, 214) -- สีม่วงลาเวนเดอร์สดใสตามรูป
     card.BorderSizePixel = 0
     card.Active = true
     card.ZIndex = 2
+    card.ClipsDescendants = true
     card.Parent = screenGui
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 22)
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 24)
 
-    -- Dynamic Moving Aurora Gradient
-    local bgGradient = Instance.new("UIGradient")
-    bgGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(165, 115, 225)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(95, 50, 145)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(45, 15, 75))
-    })
-    bgGradient.Rotation = 45
-    bgGradient.Parent = card
-
-    local auroraTween = TweenService:Create(bgGradient, TweenInfo.new(12, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), { Rotation = 405 })
-    auroraTween:Play()
-
-    -- Breathing Neon Border
+    -- เส้นขอบการ์ตูนหนาพิเศษ (Thick Cartoon Stroke)
     local cardStroke = Instance.new("UIStroke", card)
-    cardStroke.Thickness = 4.5
-    cardStroke.Color = Color3.fromRGB(50, 15, 80)
-    local borderTween = TweenService:Create(cardStroke, TweenInfo.new(2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Color = Color3.fromRGB(185, 95, 255) })
-    borderTween:Play()
+    cardStroke.Thickness = 5.5
+    cardStroke.Color = Color3.fromRGB(40, 16, 68) -- สีขอบม่วงเข้มทึบแบบขอบการ์ตูน
+
+    local borderTween = TweenService:Create(cardStroke, TweenInfo.new(2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+        Color = Color3.fromRGB(180, 110, 255)
+    })
+    if Library.Settings.BreathingBorder then
+        borderTween:Play()
+    end
+
+    -- พื้นหลังลวดลาย Polka Dots สไลด์ขยับตัว
+    local dotTexture = Instance.new("ImageLabel")
+    dotTexture.Name = "PolkaDotPattern"
+    dotTexture.Size = UDim2.new(2, 0, 2, 0)
+    dotTexture.Position = UDim2.new(-0.5, 0, -0.5, 0)
+    dotTexture.BackgroundTransparency = 1
+    dotTexture.Image = "rbxassetid://2151741365" -- ลายจุดการ์ตูนโปร่งแสง
+    dotTexture.ImageTransparency = 0.91
+    dotTexture.TileSize = UDim2.fromOffset(26, 26)
+    dotTexture.ScaleType = Enum.ScaleType.Tile
+    dotTexture.ZIndex = 2
+    dotTexture.Parent = card
+
+    local dotTween = TweenService:Create(dotTexture, TweenInfo.new(15, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1), {
+        Position = UDim2.new(0, 0, 0, 0)
+    })
+    if Library.Settings.MovingAurora then
+        dotTween:Play()
+    end
 
     self.MainCard = card
 
-    -- ระบบ Drag หน้าต่าง
+    -- ระบบ Drag Window
     local dragging, dragStart, startPos = false, nil, nil
     card.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -208,47 +259,58 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    -- Title Bar
+    -- Title Bar สไตล์ Candy Bar (ลายทางริ้ว Candy Stripes)
     local titlePlate = Instance.new("Frame")
-    titlePlate.Size = UDim2.new(1, -28, 0, 42)
+    titlePlate.Size = UDim2.new(1, -28, 0, 44)
     titlePlate.Position = UDim2.fromOffset(14, 14)
-    titlePlate.BackgroundColor3 = Color3.fromRGB(65, 20, 100)
+    titlePlate.BackgroundColor3 = Color3.fromRGB(115, 65, 175)
     titlePlate.BorderSizePixel = 0
     titlePlate.ZIndex = 3
+    titlePlate.ClipsDescendants = true
     titlePlate.Parent = card
-    Instance.new("UICorner", titlePlate).CornerRadius = UDim.new(0, 12)
+    Instance.new("UICorner", titlePlate).CornerRadius = UDim.new(0, 14)
     local tpStroke = Instance.new("UIStroke", titlePlate)
-    tpStroke.Thickness = 2.5
-    tpStroke.Color = Color3.fromRGB(35, 10, 55)
+    tpStroke.Thickness = 3
+    tpStroke.Color = Color3.fromRGB(40, 16, 68)
+
+    local stripeGrad = Instance.new("UIGradient", titlePlate)
+    stripeGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(130, 80, 195)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(98, 48, 155))
+    })
+    stripeGrad.Rotation = 90
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -80, 1, 0)
-    titleLabel.Position = UDim2.fromOffset(12, 0)
+    titleLabel.Size = UDim2.new(1, -85, 1, 0)
+    titleLabel.Position = UDim2.fromOffset(14, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = config.Title or "BEHIND THE DARK"
-    titleLabel.TextColor3 = Color3.fromRGB(255, 235, 120)
-    titleLabel.TextSize = 16
+    titleLabel.TextColor3 = Color3.fromRGB(255, 245, 175)
+    titleLabel.TextSize = 17
     titleLabel.Font = Enum.Font.FredokaOne
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.ZIndex = 4
     titleLabel.Parent = titlePlate
     local titleStroke = Instance.new("UIStroke", titleLabel)
-    titleStroke.Thickness = 3
-    titleStroke.Color = Color3.fromRGB(35, 10, 55)
+    titleStroke.Thickness = 3.5
+    titleStroke.Color = Color3.fromRGB(38, 12, 62)
 
-    -- 1. ปุ่มปิดระบบสีแดง (Close/Unload Button)
+    -- 1. ปุ่มปิดสีแดงอมชมพูการ์ตูน (ตามปุ่มปิดมุมขวาบนในภาพ)
     local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.fromOffset(28, 28)
-    closeBtn.Position = UDim2.new(1, -34, 0.5, -14)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(225, 55, 55)
-    closeBtn.Text = ""
+    closeBtn.Size = UDim2.fromOffset(30, 30)
+    closeBtn.Position = UDim2.new(1, -36, 0.5, -15)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(245, 95, 105)
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.TextSize = 17
+    closeBtn.Font = Enum.Font.FredokaOne
     closeBtn.BorderSizePixel = 0
     closeBtn.ZIndex = 5
     closeBtn.Parent = titlePlate
-    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 10)
     local cbStroke = Instance.new("UIStroke", closeBtn)
-    cbStroke.Thickness = 1.5
-    cbStroke.Color = Color3.fromRGB(42, 12, 70)
+    cbStroke.Thickness = 2.5
+    cbStroke.Color = Color3.fromRGB(50, 15, 30)
     Library.AttachInteractiveEffects(closeBtn)
 
     closeBtn.Activated:Connect(function()
@@ -256,45 +318,45 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         screenGui:Destroy()
     end)
 
-    -- 2. ปุ่ม Settings สีเหลืองว่างเปล่า (วางข้างปุ่มปิด)
+    -- 2. ปุ่ม Settings สีเหลืองการ์ตูน (ไม่มีตัวอักษร/ไอคอน วางติดปุ่มปิด)
     local settingsBtn = Instance.new("TextButton")
-    settingsBtn.Size = UDim2.fromOffset(28, 28)
-    settingsBtn.Position = UDim2.new(1, -68, 0.5, -14)
-    settingsBtn.BackgroundColor3 = Color3.fromRGB(245, 195, 45)
+    settingsBtn.Size = UDim2.fromOffset(30, 30)
+    settingsBtn.Position = UDim2.new(1, -72, 0.5, -15)
+    settingsBtn.BackgroundColor3 = Color3.fromRGB(255, 195, 45)
     settingsBtn.Text = ""
     settingsBtn.BorderSizePixel = 0
     settingsBtn.ZIndex = 5
     settingsBtn.Parent = titlePlate
-    Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 10)
     local sbStroke = Instance.new("UIStroke", settingsBtn)
-    sbStroke.Thickness = 1.5
-    sbStroke.Color = Color3.fromRGB(42, 12, 70)
+    sbStroke.Thickness = 2.5
+    sbStroke.Color = Color3.fromRGB(55, 35, 10)
     Library.AttachInteractiveEffects(settingsBtn)
 
     -- ========================================================
-    -- หน้าต่างตั้งค่าภาพ (POPUP SETTINGS MODAL)
+    -- หน้าต่างตั้งค่าภาพ (POPUP SETTINGS)
     -- ========================================================
     local settingsModal = Instance.new("Frame")
     settingsModal.Name = "SettingsModal"
-    settingsModal.Size = UDim2.fromOffset(260, 240)
-    settingsModal.Position = UDim2.new(0.5, -130, 0.5, -120)
-    settingsModal.BackgroundColor3 = Color3.fromRGB(50, 18, 80)
+    settingsModal.Size = UDim2.fromOffset(265, 240)
+    settingsModal.Position = UDim2.new(0.5, -132, 0.5, -120)
+    settingsModal.BackgroundColor3 = Color3.fromRGB(52, 20, 84)
     settingsModal.BorderSizePixel = 0
     settingsModal.ZIndex = 60
     settingsModal.Visible = false
     settingsModal.Parent = card
-    Instance.new("UICorner", settingsModal).CornerRadius = UDim.new(0, 16)
+    Instance.new("UICorner", settingsModal).CornerRadius = UDim.new(0, 18)
     local smStroke = Instance.new("UIStroke", settingsModal)
-    smStroke.Thickness = 3
-    smStroke.Color = Color3.fromRGB(160, 75, 235)
+    smStroke.Thickness = 3.5
+    smStroke.Color = Color3.fromRGB(35, 12, 58)
 
     local smTitle = Instance.new("TextLabel")
-    smTitle.Size = UDim2.new(1, -20, 0, 32)
+    smTitle.Size = UDim2.new(1, -20, 0, 34)
     smTitle.Position = UDim2.fromOffset(10, 8)
     smTitle.BackgroundTransparency = 1
     smTitle.Text = "VISUAL SETTINGS"
-    smTitle.TextColor3 = Color3.fromRGB(255, 235, 120)
-    smTitle.TextSize = 14
+    smTitle.TextColor3 = Color3.fromRGB(255, 225, 90)
+    smTitle.TextSize = 15
     smTitle.Font = Enum.Font.FredokaOne
     smTitle.ZIndex = 61
     smTitle.Parent = settingsModal
@@ -303,11 +365,11 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         local row = Instance.new("Frame")
         row.Size = UDim2.new(1, -24, 0, 34)
         row.Position = UDim2.fromOffset(12, yPos)
-        row.BackgroundColor3 = Color3.fromRGB(35, 12, 55)
+        row.BackgroundColor3 = Color3.fromRGB(38, 14, 62)
         row.BorderSizePixel = 0
         row.ZIndex = 61
         row.Parent = settingsModal
-        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 9)
 
         local lbl = Instance.new("TextLabel")
         lbl.Size = UDim2.new(1, -60, 1, 0)
@@ -321,18 +383,16 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         lbl.ZIndex = 62
         lbl.Parent = row
 
-        -- Switch Track
         local switchTrack = Instance.new("TextButton")
         switchTrack.Size = UDim2.fromOffset(42, 22)
         switchTrack.Position = UDim2.new(1, -48, 0.5, -11)
-        switchTrack.BackgroundColor3 = Library.Settings[settingKey] and Color3.fromRGB(90, 205, 75) or Color3.fromRGB(95, 95, 105)
+        switchTrack.BackgroundColor3 = Library.Settings[settingKey] and Color3.fromRGB(115, 225, 85) or Color3.fromRGB(90, 85, 105)
         switchTrack.Text = ""
         switchTrack.BorderSizePixel = 0
         switchTrack.ZIndex = 62
         switchTrack.Parent = row
         Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
 
-        -- Smooth Switch Thumb
         local thumb = Instance.new("Frame")
         thumb.Size = UDim2.fromOffset(18, 18)
         thumb.Position = Library.Settings[settingKey] and UDim2.fromOffset(22, 2) or UDim2.fromOffset(2, 2)
@@ -344,10 +404,11 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
 
         switchTrack.Activated:Connect(function()
             Library.Settings[settingKey] = not Library.Settings[settingKey]
-            local active = Library.Settings[settingKey]
+            saveCurrentSettings()
 
+            local active = Library.Settings[settingKey]
             TweenService:Create(switchTrack, toggleSlide, {
-                BackgroundColor3 = active and Color3.fromRGB(90, 205, 75) or Color3.fromRGB(95, 95, 105)
+                BackgroundColor3 = active and Color3.fromRGB(115, 225, 85) or Color3.fromRGB(90, 85, 105)
             }):Play()
             TweenService:Create(thumb, toggleSlide, {
                 Position = active and UDim2.fromOffset(22, 2) or UDim2.fromOffset(2, 2)
@@ -357,19 +418,14 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end)
     end
 
-    createSettingRow("Moving Aurora", 45, "MovingAurora", function(val)
-        bgGradient.Enabled = val
+    createSettingRow("Moving Texture", 46, "MovingAurora", function(val)
+        if val then dotTween:Play() else dotTween:Pause() end
     end)
-    createSettingRow("Breathing Border", 85, "BreathingBorder", function(val)
-        if not val then
-            borderTween:Pause()
-            cardStroke.Color = Color3.fromRGB(50, 15, 80)
-        else
-            borderTween:Play()
-        end
+    createSettingRow("Breathing Border", 88, "BreathingBorder", function(val)
+        if val then borderTween:Play() else borderTween:Pause() cardStroke.Color = Color3.fromRGB(40, 16, 68) end
     end)
-    createSettingRow("Click Ripple", 125, "ClickRipple")
-    createSettingRow("Anime Glint", 165, "AnimeGlint")
+    createSettingRow("Click Ripple", 130, "ClickRipple")
+    createSettingRow("Anime Glint", 172, "AnimeGlint")
 
     settingsBtn.Activated:Connect(function()
         settingsModal.Visible = not settingsModal.Visible
@@ -382,29 +438,43 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
+    -- พาเนลคอนเทนต์พื้นหลังม่วงเข้มทึบ (Inner Recessed Board ตามรูป)
+    local board = Instance.new("Frame")
+    board.Name = "RecessedBoard"
+    board.Size = UDim2.new(1, -28, 1, -72)
+    board.Position = UDim2.fromOffset(14, 64)
+    board.BackgroundColor3 = Color3.fromRGB(52, 20, 84) -- สีพื้นหลังช่องเมนูแบบในรูป
+    board.BorderSizePixel = 0
+    board.ZIndex = 3
+    board.Parent = card
+    Instance.new("UICorner", board).CornerRadius = UDim.new(0, 18)
+    local boardStroke = Instance.new("UIStroke", board)
+    boardStroke.Thickness = 3
+    boardStroke.Color = Color3.fromRGB(35, 12, 58)
+
     if config.SingleColumn then
         local col = Instance.new("Frame")
-        col.Size = UDim2.new(1, -28, 1, -66)
-        col.Position = UDim2.fromOffset(14, 62)
+        col.Size = UDim2.new(1, -16, 1, -16)
+        col.Position = UDim2.fromOffset(8, 8)
         col.BackgroundTransparency = 1
-        col.ZIndex = 3
-        col.Parent = card
+        col.ZIndex = 4
+        col.Parent = board
         self.CenterColumn = col
     else
         local left = Instance.new("Frame")
-        left.Size = UDim2.new(0.5, -20, 1, -72)
-        left.Position = UDim2.fromOffset(14, 66)
+        left.Size = UDim2.new(0.5, -12, 1, -16)
+        left.Position = UDim2.fromOffset(8, 8)
         left.BackgroundTransparency = 1
-        left.ZIndex = 3
-        left.Parent = card
+        left.ZIndex = 4
+        left.Parent = board
         self.LeftColumn = left
 
         local right = Instance.new("Frame")
-        right.Size = UDim2.new(0.5, -20, 1, -72)
-        right.Position = UDim2.new(0.5, 6, 0, 66)
+        right.Size = UDim2.new(0.5, -12, 1, -16)
+        right.Position = UDim2.new(0.5, 4, 0, 8)
         right.BackgroundTransparency = 1
-        right.ZIndex = 3
-        right.Parent = card
+        right.ZIndex = 4
+        right.Parent = board
         self.RightColumn = right
     end
 
@@ -418,90 +488,78 @@ function Library:GetColumn(side: string): Frame
 end
 
 -- ========================================================
--- SMOOTH TOGGLE SWITCH (สวิตช์ลูกกลมเลื่อน เปิด-ปิด)
+-- CARTOON CANDY TOGGLE (แถบม่วงสดใส + สวิตช์เขียวมิ้นท์สไตล์ EQUIP)
 -- ========================================================
 function Library:CreateToggle(side: string, text: string, yPos: number, colors: {On: Color3, Off: Color3}, default: boolean, callback: (boolean) -> ())
     local parent = self:GetColumn(side)
     local state = default or false
 
+    -- การ์ดแถบยาว (Bar Card ตามรูป)
     local base = Instance.new("Frame")
-    base.Size = UDim2.new(1, 0, 0, 38)
+    base.Size = UDim2.new(1, 0, 0, 42)
     base.Position = UDim2.fromOffset(0, yPos)
-    base.BackgroundColor3 = Color3.fromRGB(35, 10, 55)
+    base.BackgroundColor3 = Color3.fromRGB(168, 112, 230) -- ม่วงสว่างสดใส
     base.BorderSizePixel = 0
-    base.ZIndex = 4
+    base.ZIndex = 5
     base.Parent = parent
-    Instance.new("UICorner", base).CornerRadius = UDim.new(1, 0)
+    Instance.new("UICorner", base).CornerRadius = UDim.new(0, 14)
     local bs = Instance.new("UIStroke", base)
     bs.Thickness = 2.5
-    bs.Color = Color3.fromRGB(35, 10, 55)
+    bs.Color = Color3.fromRGB(42, 14, 70)
 
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -2, 1, -4)
-    btn.Position = UDim2.fromOffset(1, 1)
-    btn.BackgroundColor3 = state and colors.On or colors.Off
-    btn.BorderSizePixel = 0
-    btn.AutoButtonColor = false
+    btn.Size = UDim2.fromScale(1, 1)
+    btn.BackgroundTransparency = 1
     btn.Text = ""
-    btn.ClipsDescendants = true
-    btn.ZIndex = 5
+    btn.ZIndex = 6
     btn.Parent = base
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
-
-    local gloss = Instance.new("Frame")
-    gloss.Size = UDim2.new(1, -14, 0.45, 0)
-    gloss.Position = UDim2.fromOffset(7, 1)
-    gloss.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    gloss.BackgroundTransparency = 0.72
-    gloss.BorderSizePixel = 0
-    gloss.ZIndex = 6
-    gloss.Parent = btn
-    Instance.new("UICorner", gloss).CornerRadius = UDim.new(1, 0)
 
     local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, -66, 1, 0)
-    label.Position = UDim2.fromOffset(16, 0)
+    label.Size = UDim2.new(1, -74, 1, 0)
+    label.Position = UDim2.fromOffset(14, 0)
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.TextSize = 13.5
+    label.TextSize = 14
     label.Font = Enum.Font.FredokaOne
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.ZIndex = 7
     label.Text = text
     label.Parent = btn
     local ts = Instance.new("UIStroke", label)
-    ts.Thickness = 2.5
-    ts.Color = Color3.fromRGB(40, 10, 60)
+    ts.Thickness = 3
+    ts.Color = Color3.fromRGB(38, 10, 60)
 
-    -- Switch Pill Track
+    -- สวิตช์เขียวมิ้นท์สไตล์ปุ่ม EQUIP
     local switchTrack = Instance.new("Frame")
-    switchTrack.Size = UDim2.fromOffset(40, 22)
-    switchTrack.Position = UDim2.new(1, -48, 0.5, -11)
-    switchTrack.BackgroundColor3 = Color3.fromRGB(25, 8, 40)
+    switchTrack.Size = UDim2.fromOffset(48, 26)
+    switchTrack.Position = UDim2.new(1, -56, 0.5, -13)
+    switchTrack.BackgroundColor3 = state and Color3.fromRGB(135, 245, 105) or Color3.fromRGB(85, 45, 120)
     switchTrack.BorderSizePixel = 0
     switchTrack.ZIndex = 7
     switchTrack.Parent = btn
     Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
+    local stStroke = Instance.new("UIStroke", switchTrack)
+    stStroke.Thickness = 2
+    stStroke.Color = Color3.fromRGB(38, 14, 62)
 
-    -- Smooth Slider Thumb
     local thumb = Instance.new("Frame")
-    thumb.Size = UDim2.fromOffset(18, 18)
-    thumb.Position = state and UDim2.fromOffset(20, 2) or UDim2.fromOffset(2, 2)
+    thumb.Size = UDim2.fromOffset(22, 22)
+    thumb.Position = state and UDim2.fromOffset(24, 2) or UDim2.fromOffset(2, 2)
     thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     thumb.BorderSizePixel = 0
     thumb.ZIndex = 8
     thumb.Parent = switchTrack
     Instance.new("UICorner", thumb).CornerRadius = UDim.new(1, 0)
 
-    Library.AttachInteractiveEffects(btn, UDim2.fromOffset(1, 1))
+    Library.AttachInteractiveEffects(btn, UDim2.fromOffset(0, yPos))
 
     local function setVisual(val: boolean)
         state = val
-        TweenService:Create(btn, toggleSlide, {
-            BackgroundColor3 = state and colors.On or colors.Off
+        TweenService:Create(switchTrack, toggleSlide, {
+            BackgroundColor3 = state and Color3.fromRGB(135, 245, 105) or Color3.fromRGB(85, 45, 120)
         }):Play()
         TweenService:Create(thumb, toggleSlide, {
-            Position = state and UDim2.fromOffset(20, 2) or UDim2.fromOffset(2, 2)
+            Position = state and UDim2.fromOffset(24, 2) or UDim2.fromOffset(2, 2)
         }):Play()
     end
 
@@ -514,22 +572,25 @@ function Library:CreateToggle(side: string, text: string, yPos: number, colors: 
     return setVisual
 end
 
+-- ========================================================
+-- CARTOON DROPDOWN (กล่องดรอปดาวน์มนกลมสไตล์ลูกกวาด)
+-- ========================================================
 function Library:CreateDropdown(side: string, title: string, yPos: number, options: {any}, default: any, zIndexOffset: number, callback: (any) -> ())
     local parent = self:GetColumn(side)
     local selected = default
     local zBase = 10 + (zIndexOffset or 0)
 
     local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 38)
+    card.Size = UDim2.new(1, 0, 0, 42)
     card.Position = UDim2.fromOffset(0, yPos)
-    card.BackgroundColor3 = Color3.fromRGB(60, 20, 85)
+    card.BackgroundColor3 = Color3.fromRGB(115, 65, 175)
     card.BorderSizePixel = 0
     card.ZIndex = zBase
     card.Parent = parent
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 14)
     local cs = Instance.new("UIStroke", card)
-    cs.Thickness = 2
-    cs.Color = Color3.fromRGB(160, 75, 235)
+    cs.Thickness = 2.5
+    cs.Color = Color3.fromRGB(42, 14, 70)
 
     local selectBtn = Instance.new("TextButton")
     selectBtn.Size = UDim2.fromScale(1, 1)
@@ -541,25 +602,28 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
     selectBtn.TextXAlignment = Enum.TextXAlignment.Left
     selectBtn.ZIndex = zBase + 1
     selectBtn.Parent = card
+    local sbtnStroke = Instance.new("UIStroke", selectBtn)
+    sbtnStroke.Thickness = 2.5
+    sbtnStroke.Color = Color3.fromRGB(38, 10, 60)
 
     Library.AttachInteractiveEffects(selectBtn)
 
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, 0, 0, 78)
-    scroll.Position = UDim2.fromOffset(0, 42)
-    scroll.BackgroundColor3 = Color3.fromRGB(35, 12, 55)
+    scroll.Size = UDim2.new(1, 0, 0, 84)
+    scroll.Position = UDim2.fromOffset(0, 46)
+    scroll.BackgroundColor3 = Color3.fromRGB(42, 16, 68)
     scroll.BorderSizePixel = 0
     scroll.ScrollBarThickness = 4
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     scroll.Visible = false
     scroll.ZIndex = zBase + 20
     scroll.Parent = card
-    Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 12)
     local ss = Instance.new("UIStroke", scroll)
-    ss.Thickness = 1.5
-    ss.Color = Color3.fromRGB(160, 75, 235)
+    ss.Thickness = 2
+    ss.Color = Color3.fromRGB(146, 92, 214)
     local list = Instance.new("UIListLayout", scroll)
-    list.Padding = UDim.new(0, 3)
+    list.Padding = UDim.new(0, 4)
 
     local function populate()
         for _, ch in ipairs(scroll:GetChildren()) do
@@ -567,9 +631,9 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
         end
         for _, opt in ipairs(options) do
             local optBtn = Instance.new("TextButton")
-            optBtn.Size = UDim2.new(1, -6, 0, 26)
-            optBtn.Position = UDim2.fromOffset(3, 0)
-            optBtn.BackgroundColor3 = (selected == opt) and Color3.fromRGB(160, 75, 235) or Color3.fromRGB(65, 25, 95)
+            optBtn.Size = UDim2.new(1, -8, 0, 28)
+            optBtn.Position = UDim2.fromOffset(4, 0)
+            optBtn.BackgroundColor3 = (selected == opt) and Color3.fromRGB(168, 112, 230) or Color3.fromRGB(68, 28, 105)
             optBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
             optBtn.TextSize = 12
             optBtn.Font = Enum.Font.FredokaOne
@@ -578,7 +642,7 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
             optBtn.BorderSizePixel = 0
             optBtn.ZIndex = zBase + 21
             optBtn.Parent = scroll
-            Instance.new("UICorner", optBtn).CornerRadius = UDim.new(0, 6)
+            Instance.new("UICorner", optBtn).CornerRadius = UDim.new(0, 8)
             Library.AttachInteractiveEffects(optBtn)
 
             optBtn.Activated:Connect(function()
@@ -596,25 +660,31 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
     end)
 end
 
+-- ========================================================
+-- CARTOON 3D RENDER TOGGLE (ปุ่มมุมขวาล่างสไตล์ลูกกวาด)
+-- ========================================================
 function Library:Create3DRenderToggle(side: string)
     local parent = self:GetColumn(side or "Right")
     local enabled = true
 
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 115, 0, 32)
-    btn.Position = UDim2.new(1, -115, 1, -34)
-    btn.BackgroundColor3 = Color3.fromRGB(55, 140, 65)
+    btn.Size = UDim2.new(0, 120, 0, 34)
+    btn.Position = UDim2.new(1, -120, 1, -36)
+    btn.BackgroundColor3 = Color3.fromRGB(115, 225, 85)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 12
+    btn.TextSize = 13
     btn.Font = Enum.Font.FredokaOne
     btn.Text = "[ 3D: ON ]"
     btn.BorderSizePixel = 0
     btn.ZIndex = 15
     btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
     local bs = Instance.new("UIStroke", btn)
-    bs.Thickness = 2
-    bs.Color = Color3.fromRGB(35, 10, 55)
+    bs.Thickness = 2.5
+    bs.Color = Color3.fromRGB(42, 14, 70)
+    local ts = Instance.new("UIStroke", btn)
+    ts.Thickness = 2
+    ts.Color = Color3.fromRGB(38, 10, 60)
 
     Library.AttachInteractiveEffects(btn)
 
@@ -634,7 +704,7 @@ function Library:Create3DRenderToggle(side: string)
                 end
             end)
             self.BlackoutFrame.Visible = true
-            btn.BackgroundColor3 = Color3.fromRGB(190, 50, 50)
+            btn.BackgroundColor3 = Color3.fromRGB(245, 95, 105)
             btn.Text = "[ 3D: OFF ]"
         else
             pcall(function()
@@ -644,7 +714,7 @@ function Library:Create3DRenderToggle(side: string)
                 end
             end)
             self.BlackoutFrame.Visible = false
-            btn.BackgroundColor3 = Color3.fromRGB(55, 140, 65)
+            btn.BackgroundColor3 = Color3.fromRGB(115, 225, 85)
             btn.Text = "[ 3D: ON ]"
         end
     end)
