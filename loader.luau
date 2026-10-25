@@ -22,7 +22,7 @@ local function runRemoteScript(url: string)
 end
 
 -- ตรวจสอบ PlaceId เพื่อเลือกรัน (เปลี่ยน PlaceId ของ Lobby ให้ตรงกับเกมของคุณ)
-if placeId == 1234567890 then
+if placeId == 111053011787075 then
     runRemoteScript("https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/lobby.luau")
 else
     runRemoteScript("https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/in-match.luau")
