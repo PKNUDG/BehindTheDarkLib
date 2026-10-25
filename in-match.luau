@@ -4,21 +4,6 @@
 repeat task.wait() until game:IsLoaded()
 
 local env = (type(getgenv) == "function" and getgenv()) or _G
-local queueOnTeleport = (env and env.queue_on_teleport) 
-    or (rawget(env, "syn") and env.syn.queue_on_teleport)
-    or (rawget(env, "fluxus") and env.fluxus.queue_on_teleport)
-
-if queueOnTeleport then
-    pcall(function()
-        queueOnTeleport([[
-            repeat task.wait() until game:IsLoaded()
-            if not _G.CandyTD_InMatchInstance then
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/in-match.luau?v=" .. os.time()))()
-            end
-        ]])
-    end)
-end
-
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -347,6 +332,8 @@ btnMinus.BorderSizePixel = 0
 btnMinus.ZIndex = 5
 btnMinus.Parent = configBox
 Instance.new("UICorner", btnMinus).CornerRadius = UDim.new(0, 6)
+Library.AttachInteractiveEffects(btnMinus)
+
 btnMinus.Activated:Connect(function()
     if states.TargetRounds > 1 then
         states.TargetRounds = states.TargetRounds - 1
@@ -367,6 +354,8 @@ btnPlus.BorderSizePixel = 0
 btnPlus.ZIndex = 5
 btnPlus.Parent = configBox
 Instance.new("UICorner", btnPlus).CornerRadius = UDim.new(0, 6)
+Library.AttachInteractiveEffects(btnPlus)
+
 btnPlus.Activated:Connect(function()
     states.TargetRounds = states.TargetRounds + 1
     roundCountLabel.Text = tostring(states.TargetRounds)
