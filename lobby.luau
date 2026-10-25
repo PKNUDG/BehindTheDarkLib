@@ -72,9 +72,7 @@ local states = {
         Rare = false,
         Epic = false,
         Legendary = false
-    },
-    AutoBuyCrystal = false,
-    BuyCrystalAmount = 10
+    }
 }
 
 -- Remote Action Helpers
@@ -84,6 +82,16 @@ local function setServerAutoDelete(rarity: string, enable: boolean)
     if setRemote and setRemote:IsA("RemoteFunction") then
         pcall(function()
             setRemote:InvokeServer({ [rarity] = enable })
+        end)
+    end
+end
+
+local function buyItemFromTeller(itemId: string, amount: number)
+    local tellerRemotes = ReplicatedStorage:FindFirstChild("TellerRemotes")
+    local buyRemote = tellerRemotes and tellerRemotes:FindFirstChild("Buy")
+    if buyRemote and buyRemote:IsA("RemoteFunction") then
+        pcall(function()
+            buyRemote:InvokeServer(itemId, amount)
         end)
     end
 end
@@ -137,68 +145,75 @@ Window:CreateToggle("Left", "Delete Legendary", 236, { On = Color3.fromRGB(245, 
 end)
 
 -- ========================================================
--- ฝั่งขวา: CANDY SHOP (TRAIT CRYSTAL) & ACTIONS
+-- ฝั่งขวา: CANDY SHOP INSTANT BUY BUTTONS
 -- ========================================================
-Window:CreateToggle("Right", "Auto Buy Crystal", 0, { On = Color3.fromRGB(60, 210, 140), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
-    states.AutoBuyCrystal = v
-end)
-
-Window:CreateDropdown("Right", "Crystal Amount", 46, { 10, 1 }, states.BuyCrystalAmount, 20, function(selected)
-    states.BuyCrystalAmount = tonumber(selected) or 10
-end)
-
--- ปุ่มคลิกซื้อทันที (Manual Buy Button)
 local rightCol = Window:GetColumn("Right")
-local buyOnceBase = Instance.new("Frame")
-buyOnceBase.Size = UDim2.new(1, 0, 0, 38)
-buyOnceBase.Position = UDim2.fromOffset(0, 96)
-buyOnceBase.BackgroundColor3 = Color3.fromRGB(35, 10, 55)
-buyOnceBase.BorderSizePixel = 0
-buyOnceBase.ZIndex = 4
-buyOnceBase.Parent = rightCol
-Instance.new("UICorner", buyOnceBase).CornerRadius = UDim.new(1, 0)
 
-local buyOnceBtn = Instance.new("TextButton")
-buyOnceBtn.Size = UDim2.new(1, -2, 1, -4)
-buyOnceBtn.Position = UDim2.fromOffset(1, 1)
-buyOnceBtn.BackgroundColor3 = Color3.fromRGB(160, 75, 235)
-buyOnceBtn.BorderSizePixel = 0
-buyOnceBtn.AutoButtonColor = false
-buyOnceBtn.Text = ""
-buyOnceBtn.ClipsDescendants = true
-buyOnceBtn.ZIndex = 5
-buyOnceBtn.Parent = buyOnceBase
-Instance.new("UICorner", buyOnceBtn).CornerRadius = UDim.new(1, 0)
+local function createInstantBuyButton(text: string, yPos: number, btnColor: Color3, callback: () -> ())
+    local base = Instance.new("Frame")
+    base.Size = UDim2.new(1, 0, 0, 38)
+    base.Position = UDim2.fromOffset(0, yPos)
+    base.BackgroundColor3 = Color3.fromRGB(35, 10, 55)
+    base.BorderSizePixel = 0
+    base.ZIndex = 4
+    base.Parent = rightCol
+    Instance.new("UICorner", base).CornerRadius = UDim.new(1, 0)
+    local bs = Instance.new("UIStroke", base)
+    bs.Thickness = 2.5
+    bs.Color = Color3.fromRGB(35, 10, 55)
 
-local buyOnceLabel = Instance.new("TextLabel")
-buyOnceLabel.Size = UDim2.fromScale(1, 1)
-buyOnceLabel.BackgroundTransparency = 1
-buyOnceLabel.Text = "Buy Trait Crystal (Once)"
-buyOnceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-buyOnceLabel.TextSize = 14
-buyOnceLabel.Font = Enum.Font.FredokaOne
-buyOnceLabel.ZIndex = 6
-buyOnceLabel.Parent = buyOnceBtn
-local bols = Instance.new("UIStroke", buyOnceLabel)
-bols.Thickness = 2.5
-bols.Color = Color3.fromRGB(40, 10, 60)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -2, 1, -4)
+    btn.Position = UDim2.fromOffset(1, 1)
+    btn.BackgroundColor3 = btnColor
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
+    btn.Text = ""
+    btn.ClipsDescendants = true
+    btn.ZIndex = 5
+    btn.Parent = base
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
 
-Library.AttachInteractiveEffects(buyOnceBtn, UDim2.fromOffset(1, 1))
+    local gloss = Instance.new("Frame")
+    gloss.Size = UDim2.new(1, -14, 0.45, 0)
+    gloss.Position = UDim2.fromOffset(7, 1)
+    gloss.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    gloss.BackgroundTransparency = 0.72
+    gloss.BorderSizePixel = 0
+    gloss.ZIndex = 6
+    gloss.Parent = btn
+    Instance.new("UICorner", gloss).CornerRadius = UDim.new(1, 0)
 
-buyOnceBtn.Activated:Connect(function()
-    local tellerRemotes = ReplicatedStorage:FindFirstChild("TellerRemotes")
-    local buyRemote = tellerRemotes and tellerRemotes:FindFirstChild("Buy")
-    if buyRemote and buyRemote:IsA("RemoteFunction") then
-        pcall(function()
-            buyRemote:InvokeServer("crystal", states.BuyCrystalAmount)
-        end)
-    end
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.TextSize = 14
+    label.Font = Enum.Font.FredokaOne
+    label.ZIndex = 7
+    label.Parent = btn
+    local ts = Instance.new("UIStroke", label)
+    ts.Thickness = 2.5
+    ts.Color = Color3.fromRGB(40, 10, 60)
+
+    Library.AttachInteractiveEffects(btn, UDim2.fromOffset(1, 1))
+    btn.Activated:Connect(callback)
+end
+
+-- 1. ปุ่มซื้อ Trait Crystal 10 ชิ้น
+createInstantBuyButton("Buy Trait Crystal x10", 0, Color3.fromRGB(60, 210, 140), function()
+    buyItemFromTeller("crystal", 10)
+end)
+
+-- 2. ปุ่มซื้อ Unit of Juice 10 ชิ้น
+createInstantBuyButton("Buy Unit of Juice x10", 46, Color3.fromRGB(255, 140, 40), function()
+    buyItemFromTeller("statroll", 10)
 end)
 
 -- ========================================================
--- BACKGROUND EXECUTION LOOPS
+-- AUTO SUMMON LOOP
 -- ========================================================
--- Auto Summon Loop
 task.spawn(function()
     while Controller.Running do
         task.wait(0.5)
@@ -211,23 +226,6 @@ task.spawn(function()
                     pcall(function() summonRemote:InvokeServer(states.RollAmount) end)
                     task.wait(0.8)
                 end
-            end
-        end
-    end
-end)
-
--- Auto Buy Crystal Loop
-task.spawn(function()
-    while Controller.Running do
-        task.wait(1)
-        if states.AutoBuyCrystal then
-            local tellerRemotes = ReplicatedStorage:FindFirstChild("TellerRemotes")
-            local buyRemote = tellerRemotes and tellerRemotes:FindFirstChild("Buy")
-            if buyRemote and buyRemote:IsA("RemoteFunction") then
-                pcall(function()
-                    buyRemote:InvokeServer("crystal", states.BuyCrystalAmount)
-                end)
-                task.wait(1.5)
             end
         end
     end
