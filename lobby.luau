@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : LOBBY HUB (CLEAN AUTO SUMMON CONTROLLER)
+-- CANDY TD : LOBBY HUB (POWERED BY BEHINDTHEDARKLIB)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -11,16 +11,13 @@ local queueOnTeleport = (env and env.queue_on_teleport)
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 local GuiService = game:GetService("GuiService")
 local TeleportService = game:GetService("TeleportService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- ลบ Instance เก่า
 if _G.CandyTD_LobbyInstance then
     pcall(function()
         _G.CandyTD_LobbyInstance.Running = false
@@ -69,377 +66,58 @@ player.Idled:Connect(function()
 end)
 
 -- ========================================================
--- UI CREATION (COMPACT LAYOUT 340 x 230)
--- ========================================================
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CandyTD_BehindTheDarkLobby"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.DisplayOrder = 999
-Controller.Gui = screenGui
-
-local successParent = pcall(function() screenGui.Parent = CoreGui end)
-if not successParent then screenGui.Parent = playerGui end
-
-local mainCard = Instance.new("Frame")
-mainCard.Name = "MainCard"
-mainCard.Size = UDim2.fromOffset(340, 230)
-mainCard.Position = UDim2.new(0.5, -170, 0.5, -115)
-mainCard.BackgroundColor3 = Color3.fromRGB(152, 114, 203)
-mainCard.BorderSizePixel = 0
-mainCard.Active = true
-mainCard.Parent = screenGui
-Instance.new("UICorner", mainCard).CornerRadius = UDim.new(0, 20)
-local mainStroke = Instance.new("UIStroke", mainCard)
-mainStroke.Thickness = 5
-mainStroke.Color = Color3.fromRGB(42, 12, 70)
-
--- Dragging
-local dragging, dragStart, startPos = false, nil, nil
-mainCard.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainCard.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
-    end
-end)
-mainCard.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if dragging then
-            local delta = input.Position - dragStart
-            mainCard.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end
-end)
-
--- Title Bar
-local titlePlate = Instance.new("Frame")
-titlePlate.Size = UDim2.new(1, -28, 0, 40)
-titlePlate.Position = UDim2.fromOffset(14, 14)
-titlePlate.BackgroundColor3 = Color3.fromRGB(75, 30, 115)
-titlePlate.BorderSizePixel = 0
-titlePlate.ZIndex = 2
-titlePlate.Parent = mainCard
-Instance.new("UICorner", titlePlate).CornerRadius = UDim.new(0, 12)
-local tpStroke = Instance.new("UIStroke", titlePlate)
-tpStroke.Thickness = 2.5
-tpStroke.Color = Color3.fromRGB(42, 12, 70)
-
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.fromScale(1, 1)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "BEHIND THE DARK - LOBBY"
-titleLabel.TextColor3 = Color3.fromRGB(255, 235, 120)
-titleLabel.TextSize = 15
-titleLabel.Font = Enum.Font.FredokaOne
-titleLabel.ZIndex = 3
-titleLabel.Parent = titlePlate
-local titleStroke = Instance.new("UIStroke", titleLabel)
-titleStroke.Thickness = 3
-titleStroke.Color = Color3.fromRGB(35, 10, 55)
-
--- Hotkey Hide/Show (RightShift)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.UserInputType == Enum.UserInputType.Keyboard then
-        if input.KeyCode == Enum.KeyCode.RightShift then
-            mainCard.Visible = not mainCard.Visible
-        end
-    end
-end)
-
--- Main Container
-local contentContainer = Instance.new("Frame")
-contentContainer.Size = UDim2.new(1, -28, 1, -66)
-contentContainer.Position = UDim2.fromOffset(14, 62)
-contentContainer.BackgroundTransparency = 1
-contentContainer.Parent = mainCard
-
--- ========================================================
--- INTERACTIVE BUTTON ENGINE
--- ========================================================
-local tweenInfoFast = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local function attachInteractiveEffects(btn: GuiButton, _: any, originalPos: UDim2?)
-    local originalSize = btn.Size
-    local origPos = originalPos or btn.Position
-    local isHovered = false
-
-    btn.MouseEnter:Connect(function()
-        isHovered = true
-        TweenService:Create(btn, tweenInfoFast, {
-            Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 1.025, originalSize.Y.Scale, originalSize.Y.Offset * 1.025),
-            Position = UDim2.new(origPos.X.Scale, origPos.X.Offset, origPos.Y.Scale, origPos.Y.Offset - 1)
-        }):Play()
-    end)
-
-    btn.MouseLeave:Connect(function()
-        isHovered = false
-        TweenService:Create(btn, tweenInfoFast, { Size = originalSize, Position = origPos }):Play()
-    end)
-
-    btn.MouseButton1Down:Connect(function()
-        TweenService:Create(btn, tweenInfoFast, {
-            Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 0.96, originalSize.Y.Scale, originalSize.Y.Offset * 0.96),
-            Position = UDim2.new(origPos.X.Scale, origPos.X.Offset, origPos.Y.Scale, origPos.Y.Offset + 1.5)
-        }):Play()
-    end)
-
-    btn.MouseButton1Up:Connect(function()
-        local targetSize = isHovered and UDim2.new(originalSize.X.Scale, originalSize.X.Offset * 1.025, originalSize.Y.Scale, originalSize.Y.Offset * 1.025) or originalSize
-        local targetPos = isHovered and UDim2.new(origPos.X.Scale, origPos.X.Offset, origPos.Y.Scale, origPos.Y.Offset - 1) or origPos
-        TweenService:Create(btn, tweenInfoFast, { Size = targetSize, Position = targetPos }):Play()
-    end)
-end
-
-local function createSolidCandyButton(parentObj: Frame, text: string, yPos: number, colorPreset: {On: Color3, Off: Color3}, callback: () -> ())
-    local btnBase = Instance.new("Frame")
-    btnBase.Size = UDim2.new(1, 0, 0, 38)
-    btnBase.Position = UDim2.fromOffset(0, yPos)
-    btnBase.BackgroundColor3 = Color3.fromRGB(35, 10, 55)
-    btnBase.BorderSizePixel = 0
-    btnBase.ZIndex = 2
-    btnBase.Parent = parentObj
-    Instance.new("UICorner", btnBase).CornerRadius = UDim.new(1, 0)
-    local bs = Instance.new("UIStroke", btnBase)
-    bs.Thickness = 2.5
-    bs.Color = Color3.fromRGB(35, 10, 55)
-
-    local btnTop = Instance.new("TextButton")
-    btnTop.Size = UDim2.new(1, -2, 1, -4)
-    btnTop.Position = UDim2.fromOffset(1, 1)
-    btnTop.BackgroundColor3 = colorPreset.Off
-    btnTop.BorderSizePixel = 0
-    btnTop.AutoButtonColor = false
-    btnTop.Text = ""
-    btnTop.ClipsDescendants = true
-    btnTop.ZIndex = 3
-    btnTop.Parent = btnBase
-    Instance.new("UICorner", btnTop).CornerRadius = UDim.new(1, 0)
-
-    local gloss = Instance.new("Frame")
-    gloss.Size = UDim2.new(1, -14, 0.45, 0)
-    gloss.Position = UDim2.fromOffset(7, 1)
-    gloss.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    gloss.BackgroundTransparency = 0.72
-    gloss.BorderSizePixel = 0
-    gloss.ZIndex = 4
-    gloss.Parent = btnTop
-    Instance.new("UICorner", gloss).CornerRadius = UDim.new(1, 0)
-
-    local btnText = Instance.new("TextLabel")
-    btnText.Size = UDim2.new(1, -24, 1, 0)
-    btnText.Position = UDim2.fromOffset(16, 0)
-    btnText.BackgroundTransparency = 1
-    btnText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btnText.TextSize = 14
-    btnText.Font = Enum.Font.FredokaOne
-    btnText.TextXAlignment = Enum.TextXAlignment.Left
-    btnText.ZIndex = 5
-    btnText.Text = text .. " : OFF"
-    btnText.Parent = btnTop
-    local ts = Instance.new("UIStroke", btnText)
-    ts.Thickness = 2.5
-    ts.Color = Color3.fromRGB(40, 10, 60)
-
-    attachInteractiveEffects(btnTop, btnTop.BackgroundColor3, UDim2.fromOffset(1, 1))
-
-    local function setVisual(active: boolean)
-        if active then
-            btnTop.BackgroundColor3 = colorPreset.On
-            btnText.Text = text .. " : ON"
-        else
-            btnTop.BackgroundColor3 = colorPreset.Off
-            btnText.Text = text .. " : OFF"
-        end
-    end
-
-    btnTop.Activated:Connect(callback)
-    return setVisual
-end
-
--- ========================================================
--- STATES & SUMMON CONFIG
+-- STATES
 -- ========================================================
 local states = {
     AutoSummon = false,
-    BannerType = "Standard", -- "Standard" หรือ "Event"
-    RollAmount = 10         -- 1 หรือ 10
+    BannerType = "Standard",
+    RollAmount = 10
 }
 
 -- ========================================================
--- CONTROLS: BANNER CONTROLLER & DROPDOWNS
+-- โหลดและใช้งาน BEHINDTHEDARKLIB (COMPACT SINGLE COLUMN)
 -- ========================================================
--- 1. ปุ่มเปิด/ปิด Auto Summon
-local autoSummonUpdater = nil
-autoSummonUpdater = createSolidCandyButton(contentContainer, "Auto Summon", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, function()
-    states.AutoSummon = not states.AutoSummon
-    if autoSummonUpdater then autoSummonUpdater(states.AutoSummon) end
-end)
-autoSummonUpdater(states.AutoSummon)
-
--- 2. Dropdown เลือกตู้ (Banner Type)
-local bannerCard = Instance.new("Frame")
-bannerCard.Size = UDim2.new(1, 0, 0, 38)
-bannerCard.Position = UDim2.fromOffset(0, 48)
-bannerCard.BackgroundColor3 = Color3.fromRGB(60, 20, 85)
-bannerCard.BorderSizePixel = 0
-bannerCard.ZIndex = 20
-bannerCard.Parent = contentContainer
-Instance.new("UICorner", bannerCard).CornerRadius = UDim.new(0, 10)
-local bcs = Instance.new("UIStroke", bannerCard)
-bcs.Thickness = 2
-bcs.Color = Color3.fromRGB(160, 75, 235)
-
-local bannerSelectBtn = Instance.new("TextButton")
-bannerSelectBtn.Size = UDim2.fromScale(1, 1)
-bannerSelectBtn.BackgroundTransparency = 1
-bannerSelectBtn.Text = "  Banner: " .. states.BannerType .. " ▾"
-bannerSelectBtn.TextColor3 = Color3.fromRGB(255, 235, 120)
-bannerSelectBtn.TextSize = 13
-bannerSelectBtn.Font = Enum.Font.FredokaOne
-bannerSelectBtn.TextXAlignment = Enum.TextXAlignment.Left
-bannerSelectBtn.ZIndex = 21
-bannerSelectBtn.Parent = bannerCard
-
-local bannerDropdownScroll = Instance.new("Frame")
-bannerDropdownScroll.Size = UDim2.new(1, 0, 0, 68)
-bannerDropdownScroll.Position = UDim2.fromOffset(0, 42)
-bannerDropdownScroll.BackgroundColor3 = Color3.fromRGB(35, 12, 55)
-bannerDropdownScroll.BorderSizePixel = 0
-bannerDropdownScroll.Visible = false
-bannerDropdownScroll.ZIndex = 50
-bannerDropdownScroll.Parent = bannerCard
-Instance.new("UICorner", bannerDropdownScroll).CornerRadius = UDim.new(0, 8)
-local bdsStroke = Instance.new("UIStroke", bannerDropdownScroll)
-bdsStroke.Thickness = 1.5
-bdsStroke.Color = Color3.fromRGB(160, 75, 235)
-local bdsList = Instance.new("UIListLayout", bannerDropdownScroll)
-bdsList.Padding = UDim.new(0, 4)
-
-local function populateBannerOptions()
-    for _, ch in ipairs(bannerDropdownScroll:GetChildren()) do
-        if ch:IsA("TextButton") then ch:Destroy() end
-    end
-    for _, bType in ipairs({ "Standard", "Event" }) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -8, 0, 28)
-        btn.Position = UDim2.fromOffset(4, 0)
-        btn.BackgroundColor3 = (states.BannerType == bType) and Color3.fromRGB(160, 75, 235) or Color3.fromRGB(65, 25, 95)
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.TextSize = 12
-        btn.Font = Enum.Font.FredokaOne
-        btn.Text = "  " .. bType .. " Banner"
-        btn.TextXAlignment = Enum.TextXAlignment.Left
-        btn.BorderSizePixel = 0
-        btn.ZIndex = 51
-        btn.Parent = bannerDropdownScroll
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-
-        btn.Activated:Connect(function()
-            states.BannerType = bType
-            bannerSelectBtn.Text = "  Banner: " .. states.BannerType .. " ▾"
-            bannerDropdownScroll.Visible = false
-        end)
-    end
+local libUrl = "https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/BehindTheDarkLib.luau?v=" .. os.time()
+local libRaw = game:HttpGet(libUrl)
+local libChunk, libErr = loadstring(libRaw)
+if not libChunk then
+    error("[BehindTheDark] โหลด Library ไม่สำเร็จ: " .. tostring(libErr))
 end
+local Library = libChunk()
 
-bannerSelectBtn.Activated:Connect(function()
-    bannerDropdownScroll.Visible = not bannerDropdownScroll.Visible
-    if bannerDropdownScroll.Visible then populateBannerOptions() end
+local Window = Library:CreateWindow({
+    Title = "BEHIND THE DARK - LOBBY",
+    Name = "CandyTD_BehindTheDarkLobby",
+    SingleColumn = true,
+    Size = UDim2.fromOffset(340, 230)
+})
+Controller.Gui = Window.Gui
+
+Window:CreateToggle("Center", "Auto Summon", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
+    states.AutoSummon = v
 end)
 
--- 3. Dropdown เลือกจำนวนครั้ง (Roll Amount)
-local rollCard = Instance.new("Frame")
-rollCard.Size = UDim2.new(1, 0, 0, 38)
-rollCard.Position = UDim2.fromOffset(0, 96)
-rollCard.BackgroundColor3 = Color3.fromRGB(60, 20, 85)
-rollCard.BorderSizePixel = 0
-rollCard.ZIndex = 15
-rollCard.Parent = contentContainer
-Instance.new("UICorner", rollCard).CornerRadius = UDim.new(0, 10)
-local rcs = Instance.new("UIStroke", rollCard)
-rcs.Thickness = 2
-rcs.Color = Color3.fromRGB(160, 75, 235)
+Window:CreateDropdown("Center", "Banner", 48, { "Standard", "Event" }, states.BannerType, 20, function(selected)
+    states.BannerType = selected
+end)
 
-local rollSelectBtn = Instance.new("TextButton")
-rollSelectBtn.Size = UDim2.fromScale(1, 1)
-rollSelectBtn.BackgroundTransparency = 1
-rollSelectBtn.Text = "  Amount: " .. states.RollAmount .. " Rolls ▾"
-rollSelectBtn.TextColor3 = Color3.fromRGB(255, 235, 120)
-rollSelectBtn.TextSize = 13
-rollSelectBtn.Font = Enum.Font.FredokaOne
-rollSelectBtn.TextXAlignment = Enum.TextXAlignment.Left
-rollSelectBtn.ZIndex = 16
-rollSelectBtn.Parent = rollCard
-
-local rollDropdownScroll = Instance.new("Frame")
-rollDropdownScroll.Size = UDim2.new(1, 0, 0, 68)
-rollDropdownScroll.Position = UDim2.fromOffset(0, 42)
-rollDropdownScroll.BackgroundColor3 = Color3.fromRGB(35, 12, 55)
-rollDropdownScroll.BorderSizePixel = 0
-rollDropdownScroll.Visible = false
-rollDropdownScroll.ZIndex = 50
-rollDropdownScroll.Parent = rollCard
-Instance.new("UICorner", rollDropdownScroll).CornerRadius = UDim.new(0, 8)
-local rdsStroke = Instance.new("UIStroke", rollDropdownScroll)
-rdsStroke.Thickness = 1.5
-rdsStroke.Color = Color3.fromRGB(160, 75, 235)
-local rdsList = Instance.new("UIListLayout", rollDropdownScroll)
-rdsList.Padding = UDim.new(0, 4)
-
-local function populateRollOptions()
-    for _, ch in ipairs(rollDropdownScroll:GetChildren()) do
-        if ch:IsA("TextButton") then ch:Destroy() end
-    end
-    for _, amt in ipairs({ 10, 1 }) do
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(1, -8, 0, 28)
-        btn.Position = UDim2.fromOffset(4, 0)
-        btn.BackgroundColor3 = (states.RollAmount == amt) and Color3.fromRGB(160, 75, 235) or Color3.fromRGB(65, 25, 95)
-        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btn.TextSize = 12
-        btn.Font = Enum.Font.FredokaOne
-        btn.Text = "  " .. amt .. " Rolls"
-        btn.TextXAlignment = Enum.TextXAlignment.Left
-        btn.BorderSizePixel = 0
-        btn.ZIndex = 51
-        btn.Parent = rollDropdownScroll
-        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-
-        btn.Activated:Connect(function()
-            states.RollAmount = amt
-            rollSelectBtn.Text = "  Amount: " .. states.RollAmount .. " Rolls ▾"
-            rollDropdownScroll.Visible = false
-        end)
-    end
-end
-
-rollSelectBtn.Activated:Connect(function()
-    rollDropdownScroll.Visible = not rollDropdownScroll.Visible
-    if rollDropdownScroll.Visible then populateRollOptions() end
+Window:CreateDropdown("Center", "Amount", 96, { 10, 1 }, states.RollAmount, 10, function(selected)
+    states.RollAmount = tonumber(selected) or 10
 end)
 
 -- ========================================================
--- AUTO SUMMON EXECUTION LOOP
+-- AUTO SUMMON LOOP
 -- ========================================================
 task.spawn(function()
     while Controller.Running do
         task.wait(0.5)
-
         if states.AutoSummon then
             local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
             if hubRemotes then
                 local remoteName = (states.BannerType == "Event") and "SummonEvent" or "Summon"
                 local summonRemote = hubRemotes:FindFirstChild(remoteName)
-
                 if summonRemote and summonRemote:IsA("RemoteFunction") then
-                    pcall(function()
-                        summonRemote:InvokeServer(states.RollAmount)
-                    end)
-
-                    -- หน่วงเวลา 0.8 วินาที เพื่อไม่ให้เซิร์ฟเวอร์ติด Rate Limit
+                    pcall(function() summonRemote:InvokeServer(states.RollAmount) end)
                     task.wait(0.8)
                 end
             end
