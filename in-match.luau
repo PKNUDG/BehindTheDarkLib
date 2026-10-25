@@ -346,10 +346,42 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CandyTD_BehindTheDarkHub"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
+-- ตั้งค่า DisplayOrder ให้สูงกว่า UI ของเกม (เพื่อให้ม่านดำบัง UI เกมได้)
+screenGui.DisplayOrder = 999 
 Controller.Gui = screenGui
 
 local successParent = pcall(function() screenGui.Parent = CoreGui end)
 if not successParent then screenGui.Parent = playerGui end
+
+-- ========================================================
+-- BLACKOUT CURTAIN (มืดสนิท บัง UI เกมให้เห็นจางๆ สคริปต์เราชัดเจน)
+-- ========================================================
+local blackoutFrame = Instance.new("Frame")
+blackoutFrame.Name = "BlackoutFrame"
+blackoutFrame.Size = UDim2.fromScale(1, 1)
+blackoutFrame.Position = UDim2.fromScale(0, 0)
+blackoutFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+-- ปรับเป็น 0.07 เพื่อให้ฉากมืดสนิท แต่แสงจาก UI เกมยังพอมองเห็นลางๆ
+blackoutFrame.BackgroundTransparency = 0.07 
+blackoutFrame.BorderSizePixel = 0
+blackoutFrame.ZIndex = 1 -- อยู่บน UI เกม แต่อยู่ใต้ mainCard
+blackoutFrame.Visible = false
+blackoutFrame.Active = false
+blackoutFrame.Parent = screenGui
+
+local mainCard = Instance.new("Frame")
+mainCard.Name = "MainCard"
+mainCard.Size = UDim2.fromOffset(660, 440)
+mainCard.Position = UDim2.new(0.5, -330, 0.5, -220)
+mainCard.BackgroundColor3 = Color3.fromRGB(152, 114, 203)
+mainCard.BorderSizePixel = 0
+mainCard.Active = true
+mainCard.ZIndex = 2 -- อยู่เหนือกราฟิกม่านดำ แสดงผลชัดเจน 100%
+mainCard.Parent = screenGui
+Instance.new("UICorner", mainCard).CornerRadius = UDim.new(0, 22)
+local mainStroke = Instance.new("UIStroke", mainCard)
+mainStroke.Thickness = 5
+mainStroke.Color = Color3.fromRGB(42, 12, 70)
 
 -- Blackout Frame
 local blackoutFrame = Instance.new("Frame")
