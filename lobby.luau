@@ -77,19 +77,21 @@ local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CandyTD_BehindTheDarkLobby"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 999 -- ดันเลเยอร์ขึ้นเหนือ UI ตัวเกม
 Controller.Gui = screenGui
 
 local successParent = pcall(function() screenGui.Parent = CoreGui end)
 if not successParent then screenGui.Parent = playerGui end
 
--- Blackout Frame
+-- Blackout Frame (มืดสนิท บัง UI เกมให้เห็นจางๆ)
 local blackoutFrame = Instance.new("Frame")
 blackoutFrame.Name = "BlackoutFrame"
 blackoutFrame.Size = UDim2.fromScale(1, 1)
 blackoutFrame.Position = UDim2.fromScale(0, 0)
 blackoutFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+blackoutFrame.BackgroundTransparency = 0.07 -- เห็น UI เกมจางๆ
 blackoutFrame.BorderSizePixel = 0
-blackoutFrame.ZIndex = 0
+blackoutFrame.ZIndex = 1 -- อยู่เหนือ UI เกม แต่อยู่ใต้หน้าต่างสคริปต์
 blackoutFrame.Visible = false
 blackoutFrame.Active = false
 blackoutFrame.Parent = screenGui
@@ -101,11 +103,8 @@ mainCard.Position = UDim2.new(0.5, -330, 0.5, -220)
 mainCard.BackgroundColor3 = Color3.fromRGB(152, 114, 203)
 mainCard.BorderSizePixel = 0
 mainCard.Active = true
+mainCard.ZIndex = 2 -- ให้หน้าต่างหลักอยู่เหนือม่านดำ
 mainCard.Parent = screenGui
-Instance.new("UICorner", mainCard).CornerRadius = UDim.new(0, 22)
-local mainStroke = Instance.new("UIStroke", mainCard)
-mainStroke.Thickness = 5
-mainStroke.Color = Color3.fromRGB(42, 12, 70)
 
 -- Dragging
 local dragging, dragStart, startPos = false, nil, nil
