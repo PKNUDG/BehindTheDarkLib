@@ -16,8 +16,6 @@ local GuiService = game:GetService("GuiService")
 local TeleportService = game:GetService("TeleportService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local Lighting = game:GetService("Lighting")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -71,41 +69,27 @@ player.Idled:Connect(function()
 end)
 
 -- ========================================================
--- UI CREATION (WIDE LAYOUT 660 x 440)
+-- UI CREATION (COMPACT LAYOUT 340 x 230)
 -- ========================================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CandyTD_BehindTheDarkLobby"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
-screenGui.DisplayOrder = 999 -- ยกเลเยอร์ให้ครอบคลุมเหนือ UI เกม
+screenGui.DisplayOrder = 999
 Controller.Gui = screenGui
 
 local successParent = pcall(function() screenGui.Parent = CoreGui end)
 if not successParent then screenGui.Parent = playerGui end
 
--- Blackout Frame (มืดสนิท บัง UI เกมให้เห็นจางๆ)
-local blackoutFrame = Instance.new("Frame")
-blackoutFrame.Name = "BlackoutFrame"
-blackoutFrame.Size = UDim2.fromScale(1, 1)
-blackoutFrame.Position = UDim2.fromScale(0, 0)
-blackoutFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-blackoutFrame.BackgroundTransparency = 0.07 -- เห็น UI เกมจางๆ
-blackoutFrame.BorderSizePixel = 0
-blackoutFrame.ZIndex = 1 -- อยู่เหนือ UI เกม แต่อยู่ใต้ mainCard
-blackoutFrame.Visible = false
-blackoutFrame.Active = false
-blackoutFrame.Parent = screenGui
-
 local mainCard = Instance.new("Frame")
 mainCard.Name = "MainCard"
-mainCard.Size = UDim2.fromOffset(660, 440)
-mainCard.Position = UDim2.new(0.5, -330, 0.5, -220)
+mainCard.Size = UDim2.fromOffset(340, 230)
+mainCard.Position = UDim2.new(0.5, -170, 0.5, -115)
 mainCard.BackgroundColor3 = Color3.fromRGB(152, 114, 203)
 mainCard.BorderSizePixel = 0
 mainCard.Active = true
-mainCard.ZIndex = 2 -- อยู่เหนือกราฟิกม่านดำ
 mainCard.Parent = screenGui
-Instance.new("UICorner", mainCard).CornerRadius = UDim.new(0, 22)
+Instance.new("UICorner", mainCard).CornerRadius = UDim.new(0, 20)
 local mainStroke = Instance.new("UIStroke", mainCard)
 mainStroke.Thickness = 5
 mainStroke.Color = Color3.fromRGB(42, 12, 70)
@@ -133,7 +117,7 @@ end)
 
 -- Title Bar
 local titlePlate = Instance.new("Frame")
-titlePlate.Size = UDim2.new(1, -28, 0, 42)
+titlePlate.Size = UDim2.new(1, -28, 0, 40)
 titlePlate.Position = UDim2.fromOffset(14, 14)
 titlePlate.BackgroundColor3 = Color3.fromRGB(75, 30, 115)
 titlePlate.BorderSizePixel = 0
@@ -147,9 +131,9 @@ tpStroke.Color = Color3.fromRGB(42, 12, 70)
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.fromScale(1, 1)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "BEHIND THE DARK"
+titleLabel.Text = "BEHIND THE DARK - LOBBY"
 titleLabel.TextColor3 = Color3.fromRGB(255, 235, 120)
-titleLabel.TextSize = 17
+titleLabel.TextSize = 15
 titleLabel.Font = Enum.Font.FredokaOne
 titleLabel.ZIndex = 3
 titleLabel.Parent = titlePlate
@@ -166,18 +150,12 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- 2 คอลัมน์
-local leftColumn = Instance.new("Frame")
-leftColumn.Size = UDim2.new(0.5, -20, 1, -72)
-leftColumn.Position = UDim2.fromOffset(14, 66)
-leftColumn.BackgroundTransparency = 1
-leftColumn.Parent = mainCard
-
-local rightColumn = Instance.new("Frame")
-rightColumn.Size = UDim2.new(0.5, -20, 1, -72)
-rightColumn.Position = UDim2.new(0.5, 6, 0, 66)
-rightColumn.BackgroundTransparency = 1
-rightColumn.Parent = mainCard
+-- Main Container
+local contentContainer = Instance.new("Frame")
+contentContainer.Size = UDim2.new(1, -28, 1, -66)
+contentContainer.Position = UDim2.fromOffset(14, 62)
+contentContainer.BackgroundTransparency = 1
+contentContainer.Parent = mainCard
 
 -- ========================================================
 -- INTERACTIVE BUTTON ENGINE
@@ -287,17 +265,15 @@ end
 local states = {
     AutoSummon = false,
     BannerType = "Standard", -- "Standard" หรือ "Event"
-    RollAmount = 10,        -- 1 หรือ 10
-    Render3DEnabled = true,
-    TotalSummons = 0
+    RollAmount = 10         -- 1 หรือ 10
 }
 
 -- ========================================================
--- LEFT COLUMN: BANNER CONTROLLER & DROPDOWNS
+-- CONTROLS: BANNER CONTROLLER & DROPDOWNS
 -- ========================================================
 -- 1. ปุ่มเปิด/ปิด Auto Summon
 local autoSummonUpdater = nil
-autoSummonUpdater = createSolidCandyButton(leftColumn, "Auto Summon", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, function()
+autoSummonUpdater = createSolidCandyButton(contentContainer, "Auto Summon", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, function()
     states.AutoSummon = not states.AutoSummon
     if autoSummonUpdater then autoSummonUpdater(states.AutoSummon) end
 end)
@@ -306,11 +282,11 @@ autoSummonUpdater(states.AutoSummon)
 -- 2. Dropdown เลือกตู้ (Banner Type)
 local bannerCard = Instance.new("Frame")
 bannerCard.Size = UDim2.new(1, 0, 0, 38)
-bannerCard.Position = UDim2.fromOffset(0, 46)
+bannerCard.Position = UDim2.fromOffset(0, 48)
 bannerCard.BackgroundColor3 = Color3.fromRGB(60, 20, 85)
 bannerCard.BorderSizePixel = 0
 bannerCard.ZIndex = 20
-bannerCard.Parent = leftColumn
+bannerCard.Parent = contentContainer
 Instance.new("UICorner", bannerCard).CornerRadius = UDim.new(0, 10)
 local bcs = Instance.new("UIStroke", bannerCard)
 bcs.Thickness = 2
@@ -377,11 +353,11 @@ end)
 -- 3. Dropdown เลือกจำนวนครั้ง (Roll Amount)
 local rollCard = Instance.new("Frame")
 rollCard.Size = UDim2.new(1, 0, 0, 38)
-rollCard.Position = UDim2.fromOffset(0, 92)
+rollCard.Position = UDim2.fromOffset(0, 96)
 rollCard.BackgroundColor3 = Color3.fromRGB(60, 20, 85)
 rollCard.BorderSizePixel = 0
 rollCard.ZIndex = 15
-rollCard.Parent = leftColumn
+rollCard.Parent = contentContainer
 Instance.new("UICorner", rollCard).CornerRadius = UDim.new(0, 10)
 local rcs = Instance.new("UIStroke", rollCard)
 rcs.Thickness = 2
@@ -445,118 +421,6 @@ rollSelectBtn.Activated:Connect(function()
     if rollDropdownScroll.Visible then populateRollOptions() end
 end)
 
--- 4. Stat Counter Display
-local counterBox = Instance.new("Frame")
-counterBox.Size = UDim2.new(1, 0, 0, 52)
-counterBox.Position = UDim2.fromOffset(0, 144)
-counterBox.BackgroundColor3 = Color3.fromRGB(45, 18, 72)
-counterBox.BorderSizePixel = 0
-counterBox.Parent = leftColumn
-Instance.new("UICorner", counterBox).CornerRadius = UDim.new(0, 12)
-local cbs = Instance.new("UIStroke", counterBox)
-cbs.Thickness = 2.5
-cbs.Color = Color3.fromRGB(75, 30, 115)
-
-local counterLabel = Instance.new("TextLabel")
-counterLabel.Size = UDim2.fromScale(1, 1)
-counterLabel.BackgroundTransparency = 1
-counterLabel.Text = "Total Summoned: 0"
-counterLabel.TextColor3 = Color3.fromRGB(255, 225, 80)
-counterLabel.TextSize = 16
-counterLabel.Font = Enum.Font.FredokaOne
-counterLabel.Parent = counterBox
-
--- ========================================================
--- RIGHT COLUMN: STATUS & 3D RENDERING
--- ========================================================
-local statusBox = Instance.new("Frame")
-statusBox.Size = UDim2.new(1, 0, 0, 136)
-statusBox.Position = UDim2.fromOffset(0, 0)
-statusBox.BackgroundColor3 = Color3.fromRGB(45, 18, 72)
-statusBox.BorderSizePixel = 0
-statusBox.Parent = rightColumn
-Instance.new("UICorner", statusBox).CornerRadius = UDim.new(0, 12)
-local sbs = Instance.new("UIStroke", statusBox)
-sbs.Thickness = 2.5
-sbs.Color = Color3.fromRGB(75, 30, 115)
-
-local statusTitle = Instance.new("TextLabel")
-statusTitle.Size = UDim2.new(1, -20, 0, 30)
-statusTitle.Position = UDim2.fromOffset(10, 8)
-statusTitle.BackgroundTransparency = 1
-statusTitle.Text = "LOBBY STATUS"
-statusTitle.TextColor3 = Color3.fromRGB(255, 235, 120)
-statusTitle.TextSize = 14
-statusTitle.Font = Enum.Font.FredokaOne
-statusTitle.TextXAlignment = Enum.TextXAlignment.Left
-statusTitle.Parent = statusBox
-
-local statusLog = Instance.new("TextLabel")
-statusLog.Size = UDim2.new(1, -20, 0, 85)
-statusLog.Position = UDim2.fromOffset(10, 40)
-statusLog.BackgroundTransparency = 1
-statusLog.Text = "System Ready\nWaiting for Auto Summon..."
-statusLog.TextColor3 = Color3.fromRGB(215, 215, 225)
-statusLog.TextSize = 13
-statusLog.Font = Enum.Font.FredokaOne
-statusLog.TextXAlignment = Enum.TextXAlignment.Left
-statusLog.TextYAlignment = Enum.TextYAlignment.Top
-statusLog.TextWrapped = true
-statusLog.Parent = statusBox
-
--- 3D Rendering Toggle Button (มุมขวาล่าง)
-local render3dBtn = Instance.new("TextButton")
-render3dBtn.Size = UDim2.new(0, 115, 0, 32)
-render3dBtn.Position = UDim2.new(1, -115, 1, -34)
-render3dBtn.BackgroundColor3 = states.Render3DEnabled and Color3.fromRGB(55, 140, 65) or Color3.fromRGB(190, 50, 50)
-render3dBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-render3dBtn.TextSize = 12
-render3dBtn.Font = Enum.Font.FredokaOne
-render3dBtn.Text = states.Render3DEnabled and "[ 3D: ON ]" or "[ 3D: OFF ]"
-render3dBtn.BorderSizePixel = 0
-render3dBtn.ZIndex = 15
-render3dBtn.Parent = rightColumn
-Instance.new("UICorner", render3dBtn).CornerRadius = UDim.new(0, 8)
-local r3dStroke = Instance.new("UIStroke", render3dBtn)
-r3dStroke.Thickness = 2
-r3dStroke.Color = Color3.fromRGB(35, 10, 55)
-
-attachInteractiveEffects(render3dBtn, render3dBtn.BackgroundColor3)
-
-local originalCameraType = Enum.CameraType.Custom
-local originalCameraCFrame = nil
-
-render3dBtn.Activated:Connect(function()
-    states.Render3DEnabled = not states.Render3DEnabled
-    local cam = workspace.CurrentCamera
-
-    if not states.Render3DEnabled then
-        pcall(function()
-            if cam then
-                originalCameraType = cam.CameraType
-                originalCameraCFrame = cam.CFrame
-                cam.CameraType = Enum.CameraType.Scriptable
-                cam.CFrame = CFrame.new(0, 50000, 0)
-            end
-        end)
-        blackoutFrame.Visible = true
-        render3dBtn.BackgroundColor3 = Color3.fromRGB(190, 50, 50)
-        render3dBtn.Text = "[ 3D: OFF ]"
-    else
-        pcall(function()
-            if cam then
-                cam.CameraType = originalCameraType or Enum.CameraType.Custom
-                if originalCameraCFrame then
-                    cam.CFrame = originalCameraCFrame
-                end
-            end
-        end)
-        blackoutFrame.Visible = false
-        render3dBtn.BackgroundColor3 = Color3.fromRGB(55, 140, 65)
-        render3dBtn.Text = "[ 3D: ON ]"
-    end
-end)
-
 -- ========================================================
 -- AUTO SUMMON EXECUTION LOOP
 -- ========================================================
@@ -571,24 +435,12 @@ task.spawn(function()
                 local summonRemote = hubRemotes:FindFirstChild(remoteName)
 
                 if summonRemote and summonRemote:IsA("RemoteFunction") then
-                    statusLog.Text = string.format("Summoning [%s Banner] x%d...", states.BannerType, states.RollAmount)
-                    
-                    local success, result = pcall(function()
-                        return summonRemote:InvokeServer(states.RollAmount)
+                    pcall(function()
+                        summonRemote:InvokeServer(states.RollAmount)
                     end)
-
-                    if success then
-                        states.TotalSummons = states.TotalSummons + states.RollAmount
-                        counterLabel.Text = "Total Summoned: " .. states.TotalSummons
-                        statusLog.Text = string.format("Success: Rolled x%d!\nWaiting for next summon...", states.RollAmount)
-                    else
-                        statusLog.Text = "Summon Failed: " .. tostring(result)
-                    end
 
                     -- หน่วงเวลา 0.8 วินาที เพื่อไม่ให้เซิร์ฟเวอร์ติด Rate Limit
                     task.wait(0.8)
-                else
-                    statusLog.Text = "Remote not found: " .. remoteName
                 end
             end
         end
