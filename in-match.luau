@@ -446,20 +446,12 @@ local function runEndMatchSequence(choice: string)
     task.spawn(function()
         local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
         if not matchRemotes then return end
+
         local actRemote = matchRemotes:FindFirstChild("Act")
         local replayRemote = matchRemotes:FindFirstChild("Replay")
 
-        if choice == "NEXT" then
-            if actRemote and actRemote:IsA("RemoteFunction") then pcall(function() actRemote:InvokeServer("next") end) end
-        elseif choice == "AGAIN" then
-            if actRemote and actRemote:IsA("RemoteFunction") then pcall(function() actRemote:InvokeServer("again") end) end
-            if replayRemote and replayRemote:IsA("RemoteFunction") then
-                pcall(function() replayRemote:InvokeServer("info") end)
-                task.wait(0.25)
-                pcall(function() replayRemote:InvokeServer("pay") end)
-            end
-        end
-        task.wait(0.3)
+        -- 1. ตรวจสอบปุ่ม Next สำหรับ Raid Halloween (ชั้น 1 และ 2)
+        local hasNextButton = false
         pcall(function()
             for _, desc in ipairs(candyTD:GetDescendants()) do
                 if desc:IsA("GuiButton") and desc.Visible then
@@ -467,7 +459,48 @@ local function runEndMatchSequence(choice: string)
                     for _, l in ipairs(desc:GetDescendants()) do
                         if l:IsA("TextLabel") and l.Visible then t = t .. " " .. l.Text:upper() end
                     end
-                    if t:find("YES") or t:find("POUR") or desc.Name:upper():find("YES") then triggerInternalButton(desc) end
+                    if t:find("NEXT") or desc.Name:upper():find("NEXT") then
+                        hasNextButton = true
+                        triggerInternalButton(desc)
+                    end
+                end
+            end
+        end)
+
+        -- หากเป็นชั้น 1 หรือ 2 ใน Raid ให้ส่งคำสั่ง Next ขึ้นชั้นถัดไปก่อน
+        if hasNextButton or choice == "NEXT" then
+            if actRemote and actRemote:IsA("RemoteFunction") then
+                pcall(function() actRemote:InvokeServer("next") end)
+            end
+        end
+
+        -- 2. กรณีเลือกเล่นซ้ำ (AGAIN) หรือจ่ายเงินเล่นต่อใน Raid (ชั้น 3 / Game Over)
+        if choice == "AGAIN" and not hasNextButton then
+            -- สั่งขอข้อมูลค่าใช้จ่ายและรอเซิร์ฟเวอร์สร้าง Session
+            if replayRemote and replayRemote:IsA("RemoteFunction") then
+                pcall(function() replayRemote:InvokeServer("info") end)
+                task.wait(0.4) -- เพิ่มช่วงหน่วงเวลาเพื่อรอเซิร์ฟเวอร์ตอบรับ
+                pcall(function() replayRemote:InvokeServer("pay") end)
+            end
+
+            -- สั่งเล่นซ้ำในโหมดปกติ
+            if actRemote and actRemote:IsA("RemoteFunction") then
+                pcall(function() actRemote:InvokeServer("again") end)
+            end
+        end
+
+        -- 3. ตรวจสอบกดยืนยันปุ่ม Popup เช่น YES / OK / REPLAY บนหน้าจอ
+        task.wait(0.35)
+        pcall(function()
+            for _, desc in ipairs(candyTD:GetDescendants()) do
+                if desc:IsA("GuiButton") and desc.Visible then
+                    local t = (desc:IsA("TextButton") and desc.Text:upper()) or ""
+                    for _, l in ipairs(desc:GetDescendants()) do
+                        if l:IsA("TextLabel") and l.Visible then t = t .. " " .. l.Text:upper() end
+                    end
+                    if t:find("YES") or t:find("POUR") or t:find("REPLAY") or desc.Name:upper():find("YES") then
+                        triggerInternalButton(desc)
+                    end
                 end
             end
         end)
