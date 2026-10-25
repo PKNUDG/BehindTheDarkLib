@@ -13,7 +13,7 @@ if queueOnTeleport then
         queueOnTeleport([[
             repeat task.wait() until game:IsLoaded()
             if not _G.CandyTD_InMatchInstance then
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/in-match.luau"))()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/in-match.luau?v=" .. os.time()))()
             end
         ]])
     end)
@@ -345,22 +345,21 @@ end
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CandyTD_BehindTheDarkHub"
 screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true -- ดัน UI ให้คลุมเต็มจอทะลุขอบ Topbar ด้านบน
+screenGui.IgnoreGuiInset = true
 Controller.Gui = screenGui
 
 local successParent = pcall(function() screenGui.Parent = CoreGui end)
 if not successParent then screenGui.Parent = playerGui end
 
--- ========================================================
--- BLACKOUT CURTAIN (ม่านจอดำเวลาปิด 3D)
--- ========================================================
+-- Blackout Frame
 local blackoutFrame = Instance.new("Frame")
 blackoutFrame.Name = "BlackoutFrame"
 blackoutFrame.Size = UDim2.fromScale(1, 1)
 blackoutFrame.Position = UDim2.fromScale(0, 0)
 blackoutFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+blackoutFrame.BackgroundTransparency = 0.15
 blackoutFrame.BorderSizePixel = 0
-blackoutFrame.ZIndex = 0 -- อยู่หลังสุด ไม่บัง UI หลัก
+blackoutFrame.ZIndex = 0
 blackoutFrame.Visible = false
 blackoutFrame.Active = false
 blackoutFrame.Parent = screenGui
@@ -458,7 +457,7 @@ local StagePresets = {
         { unit = "Lemongrab3", x = -15.872089385986328, z = -24.980955123901367 },
         { unit = "CandyElemental", x = -12.905556678771973, z = -26.32013702392578 },
         { unit = "CandyElemental", x = -10.390554428100586, z = -28.499164581298828 },
-        { unit = "HunsonDemon", x = -10.000167846679688, z = -30.825727462768555, useAbility = true }
+        { unit = "HunsonDemon", x = -10.000167846679688, z = -30.825727462768555 }
     },
     ["Inf Bug Milk"] = {
         { unit = "AlienJake", x = -12.826902389526367, z = -31.56324577331543 },
@@ -481,7 +480,7 @@ local states = {
     AutoSkipWave = true,
     BoostFPS = false,
     AutoPlace = false,
-    Render3DEnabled = true, -- ตัวแปรสถานะเปิด/ปิดการ Render 3D
+    Render3DEnabled = true,
     CurrentStage = "Inf Bug Milk",
     TargetRounds = 10,
     CurrentRounds = 0
@@ -577,7 +576,6 @@ visualUpdaters["NEXT"] = createSolidCandyButton(leftColumn, "Auto Next", 0, { On
 visualUpdaters["AGAIN"] = createSolidCandyButton(leftColumn, "Auto Again", 46, { On = Color3.fromRGB(240, 150, 40), Off = Color3.fromRGB(120, 120, 130) }, function() setEndChoice("AGAIN") end)
 visualUpdaters["HOME"] = createSolidCandyButton(leftColumn, "Auto Home", 92, { On = Color3.fromRGB(60, 180, 245), Off = Color3.fromRGB(120, 120, 130) }, function() setEndChoice("HOME") end)
 
--- สั่งอัปเดตสีตาม states.EndChoice ทันที
 updateEndChoiceVisuals()
 
 local againHomeToggleUpdater = nil
@@ -677,7 +675,6 @@ btnPlus.Activated:Connect(function()
     roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
 end)
 
--- ตรวจสอบบรรทัดนี้: เรียก updateEndChoiceVisuals() เท่านั้น ห้ามเรียก setEndChoice(states.EndChoice)
 updateEndChoiceVisuals()
 
 -- ========================================================
@@ -705,7 +702,6 @@ boostFpsVisualUpdater = createSolidCandyButton(rightColumn, "Boost FPS", 92, { O
 end)
 boostFpsVisualUpdater(states.BoostFPS)
 
--- สวิตช์เปิด/ปิด Auto Place
 local autoPlaceVisualUpdater = nil
 autoPlaceVisualUpdater = createSolidCandyButton(rightColumn, "Auto Place", 144, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, function()
     states.AutoPlace = not states.AutoPlace
@@ -713,7 +709,6 @@ autoPlaceVisualUpdater = createSolidCandyButton(rightColumn, "Auto Place", 144, 
 end)
 autoPlaceVisualUpdater(states.AutoPlace)
 
--- Dropdown เลือกด่านสำหรับ Auto Place
 local dropdownCard = Instance.new("Frame")
 dropdownCard.Size = UDim2.new(1, 0, 0, 38)
 dropdownCard.Position = UDim2.fromOffset(0, 190)
@@ -783,12 +778,10 @@ stageSelectBtn.Activated:Connect(function()
     end
 end)
 
--- ========================================================
--- [NEW] ปุ่มเล็กเปิด/ปิด 3D RENDERING (มุมขวาล่างสุด)
--- ========================================================
+-- 3D Rendering Toggle Button (มุมขวาล่างสุด)
 local render3dBtn = Instance.new("TextButton")
 render3dBtn.Size = UDim2.new(0, 115, 0, 32)
-render3dBtn.Position = UDim2.new(1, -115, 1, -34) -- ล็อคตำแหน่งมุมขวาล่างสุด
+render3dBtn.Position = UDim2.new(1, -115, 1, -34)
 render3dBtn.BackgroundColor3 = states.Render3DEnabled and Color3.fromRGB(55, 140, 65) or Color3.fromRGB(190, 50, 50)
 render3dBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 render3dBtn.TextSize = 12
@@ -804,17 +797,40 @@ r3dStroke.Color = Color3.fromRGB(35, 10, 55)
 
 attachInteractiveEffects(render3dBtn, render3dBtn.BackgroundColor3)
 
+local originalCameraType = Enum.CameraType.Custom
+local originalCameraCFrame = nil
+
 render3dBtn.Activated:Connect(function()
     states.Render3DEnabled = not states.Render3DEnabled
-    pcall(function()
-        RunService:Set3dRenderingEnabled(states.Render3DEnabled)
-    end)
-    
-    -- ควบคุมม่านจอดำ
-    blackoutFrame.Visible = not states.Render3DEnabled
-    
-    render3dBtn.BackgroundColor3 = states.Render3DEnabled and Color3.fromRGB(55, 140, 65) or Color3.fromRGB(190, 50, 50)
-    render3dBtn.Text = states.Render3DEnabled and "[ 3D: ON ]" or "[ 3D: OFF ]"
+    local cam = workspace.CurrentCamera
+
+    if not states.Render3DEnabled then
+        -- สลับมุมกล้องหนีฉาก 3D ไปส่องที่ว่างเปล่า (ลดการประมวลผล GPU โดยไม่ทำให้ GUI พัง)
+        pcall(function()
+            if cam then
+                originalCameraType = cam.CameraType
+                originalCameraCFrame = cam.CFrame
+                cam.CameraType = Enum.CameraType.Scriptable
+                cam.CFrame = CFrame.new(0, 50000, 0)
+            end
+        end)
+        blackoutFrame.Visible = true
+        render3dBtn.BackgroundColor3 = Color3.fromRGB(190, 50, 50)
+        render3dBtn.Text = "[ 3D: OFF ]"
+    else
+        -- คืนค่ากล้องกลับมามองแมพตามปกติ
+        pcall(function()
+            if cam then
+                cam.CameraType = originalCameraType or Enum.CameraType.Custom
+                if originalCameraCFrame then
+                    cam.CFrame = originalCameraCFrame
+                end
+            end
+        end)
+        blackoutFrame.Visible = false
+        render3dBtn.BackgroundColor3 = Color3.fromRGB(55, 140, 65)
+        render3dBtn.Text = "[ 3D: ON ]"
+    end
 end)
 
 -- ========================================================
@@ -830,7 +846,7 @@ local function runAutoPlaceSequence()
     local currentQueue = StagePresets[states.CurrentStage]
     if not currentQueue or #currentQueue == 0 then return end
 
-    print("[AutoPlace] เริ่มกระบวนการวางตัวในด่าน: " .. states.CurrentStage)
+    print("[AutoPlace] เริ่มวางยูนิตในด่าน: " .. states.CurrentStage)
 
     for _, item in ipairs(currentQueue) do
         local ok, result = pcall(function()
@@ -846,17 +862,9 @@ local function runAutoPlaceSequence()
             end
         end
 
-        -- ตรวจสอบการใช้สกิล Ability
-        if ok and item.useAbility and targetId then
-            task.wait(0.3)
-            pcall(function()
-                actRemote:InvokeServer("ability", targetId)
-            end)
-        end
-
-        -- ตรวจสอบการปรับเป้าหมาย Targeting (เช่น strongest)
+        -- ปรับเป้าหมายการโจมตี (Targeting)
         if ok and item.setTarget and targetId then
-            task.wait(0.3)
+            task.wait(0.25)
             pcall(function()
                 actRemote:InvokeServer("target", targetId, item.setTarget)
             end)
@@ -866,7 +874,7 @@ local function runAutoPlaceSequence()
     end
 
     task.wait(0.5)
-    print("[AutoPlace] วางครบเรียบร้อย! สั่งเริ่มเกม (Start)...")
+    print("[AutoPlace] วางยูนิตตามพิกัดครบแล้ว สั่งเริ่มแมตช์...")
     pcall(function()
         actRemote:InvokeServer("start")
     end)
@@ -900,42 +908,32 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- MATCH END CONTROLLER (REPLAY & BUG MILK SEQUENCE)
+-- MATCH END CONTROLLER (REMOTE-BASED FOR 3D OFF AFK)
 -- ========================================================
 local function runEndMatchSequence(choice: string)
     task.spawn(function()
         local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
-        local overlay = candyTD:FindFirstChild("Overlay")
+        if not matchRemotes then return end
 
-        local function findClickableBtn(parentObj: Instance?): GuiButton?
-            if not parentObj then return nil end
-            if parentObj:IsA("GuiButton") then return parentObj end
-            return parentObj:FindFirstChildWhichIsA("GuiButton", true)
-        end
-
-        local nextBtn = overlay and findClickableBtn(overlay:FindFirstChild("Next", true))
-        local againBtn = overlay and findClickableBtn(overlay:FindFirstChild("PlayAgain", true))
+        local actRemote = matchRemotes:FindFirstChild("Act")
+        local replayRemote = matchRemotes:FindFirstChild("Replay")
 
         if choice == "NEXT" then
-            if nextBtn and nextBtn.Visible then triggerInternalButton(nextBtn) end
-            requestMatchAction("next")
+            if actRemote and actRemote:IsA("RemoteFunction") then
+                pcall(function() actRemote:InvokeServer("next") end)
+            end
         elseif choice == "AGAIN" then
-            if againBtn and againBtn.Visible then triggerInternalButton(againBtn) end
-            requestMatchAction("again")
-        end
-
-        task.wait(0.4)
-
-        if matchRemotes then
-            local replayRemote = matchRemotes:FindFirstChild("Replay")
+            if actRemote and actRemote:IsA("RemoteFunction") then
+                pcall(function() actRemote:InvokeServer("again") end)
+            end
             if replayRemote and replayRemote:IsA("RemoteFunction") then
                 pcall(function() replayRemote:InvokeServer("info") end)
-                task.wait(0.3)
+                task.wait(0.25)
                 pcall(function() replayRemote:InvokeServer("pay") end)
             end
         end
 
-        task.wait(0.2)
+        task.wait(0.3)
         pcall(function()
             for _, desc in ipairs(candyTD:GetDescendants()) do
                 if desc:IsA("GuiButton") and desc.Visible then
@@ -966,14 +964,6 @@ task.spawn(function()
                 matchHandled = true
                 task.wait(0.6)
 
-                local function findClickableBtn(parentObj: Instance?): GuiButton?
-                    if not parentObj then return nil end
-                    if parentObj:IsA("GuiButton") then return parentObj end
-                    return parentObj:FindFirstChildWhichIsA("GuiButton", true)
-                end
-
-                local homeBtn = findClickableBtn(overlay:FindFirstChild("ReturnToHub", true))
-
                 if states.EndChoice == "NEXT" or states.EndChoice == "AGAIN" then
                     if states.AgainBeforeHomeActive then
                         states.CurrentRounds = states.CurrentRounds + 1
@@ -986,7 +976,6 @@ task.spawn(function()
                             roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
                             setEndChoice("HOME")
                             
-                            if homeBtn then triggerInternalButton(homeBtn) end
                             pcall(function()
                                 local mRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
                                 local retRemote = mRemotes and mRemotes:FindFirstChild("ReturnToHub")
@@ -1000,7 +989,6 @@ task.spawn(function()
                     end
 
                 elseif states.EndChoice == "HOME" then
-                    if homeBtn then triggerInternalButton(homeBtn) end
                     pcall(function()
                         local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
                         local retRemote = matchRemotes and matchRemotes:FindFirstChild("ReturnToHub")
@@ -1013,44 +1001,34 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- AUTO UPGRADE & AUTO SKIP WAVE LOOPS
+-- AUTO UPGRADE & AUTO SKIP WAVE LOOPS (PURE REMOTES)
 -- ========================================================
 task.spawn(function()
     while Controller.Running do
-        task.wait(0.2)
+        task.wait(0.8)
         if states.AutoUpgrade then
             local overlay = candyTD:FindFirstChild("Overlay")
             local isOverlayOpen = overlay and overlay.Visible
 
+            -- ตรวจสอบว่าอยู่ในช่วงรอกดเริ่ม Wave 1 หรือไม่
             local isPreMatch = false
             local startWaveBtn = candyTD:FindFirstChild("StartWave")
             if startWaveBtn and startWaveBtn.Visible then
                 local txtLabel = startWaveBtn:FindFirstChildWhichIsA("TextLabel", true)
-                if txtLabel and txtLabel.Text:find("START WAVE 1") then isPreMatch = true end
+                local txt = (txtLabel and txtLabel.Text:upper()) or (startWaveBtn:IsA("TextButton") and startWaveBtn.Text:upper()) or ""
+                if txt:find("START WAVE 1") or (txt:find("WAVE 1") and not txt:find("WAVE 10") and not txt:find("WAVE 11") and not txt:find("WAVE 12")) then
+                    isPreMatch = true
+                end
             end
 
+            -- ทำงานเฉพาะตอนที่เกมเริ่มเวฟไปแล้ว (ไม่ใช่ PreMatch) และหน้าต่างจบเกมไม่ได้เปิดอยู่
             if not isPreMatch and not isOverlayOpen then
-                local upgradeAllBtn: GuiButton? = nil
-                local isFullyMaxed = false
-
-                for _, desc in ipairs(candyTD:GetDescendants()) do
-                    if desc:IsA("GuiButton") and desc.Visible then
-                        local n = desc.Name:lower()
-                        local txt = ""
-                        for _, l in ipairs(desc:GetDescendants()) do
-                            if l:IsA("TextLabel") then txt = txt .. " " .. l.Text:lower() end
-                        end
-                        if desc:IsA("TextButton") then txt = txt .. " " .. desc.Text:lower() end
-
-                        if n:find("upgradeall") or txt:find("upgrade all") then
-                            if txt:find("max") or n:find("max") then isFullyMaxed = true else upgradeAllBtn = desc end
-                            break
-                        end
-                    end
-                end
-
-                if upgradeAllBtn and not isFullyMaxed then
-                    triggerInternalButton(upgradeAllBtn)
+                local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
+                local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
+                if actRemote and actRemote:IsA("RemoteFunction") then
+                    pcall(function()
+                        actRemote:InvokeServer("upgradeall")
+                    end)
                 end
             end
         end
@@ -1059,7 +1037,7 @@ end)
 
 task.spawn(function()
     while Controller.Running do
-        task.wait(0.15)
+        task.wait(0.3)
         if states.AutoSkipWave then
             local overlay = candyTD:FindFirstChild("Overlay")
             local isOverlayOpen = overlay and overlay.Visible
