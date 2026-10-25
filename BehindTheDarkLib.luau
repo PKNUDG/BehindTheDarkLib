@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (ANIME GLINT & BOUNCE)
+-- BEHIND THE DARK : CORE UI LIBRARY (ANIMATED & SHINY)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -12,6 +12,8 @@ Library.__index = Library
 local springBounce = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local pressSquish = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local glintTween = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local bgRotateInfo = TweenInfo.new(12, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1)
+local borderPulseInfo = TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
 
 function Library.AttachInteractiveEffects(btn: GuiButton, origPos: UDim2?)
     local originalSize = btn.Size
@@ -20,6 +22,7 @@ function Library.AttachInteractiveEffects(btn: GuiButton, origPos: UDim2?)
 
     btn.ClipsDescendants = true
 
+    -- ประกายแสงสะท้อนแว่นอนิเมะ (Anime Glasses Glint)
     local glint = Instance.new("Frame")
     glint.Name = "AnimeGlint"
     glint.Size = UDim2.new(0.28, 0, 2.6, 0)
@@ -104,21 +107,37 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     blackout.Parent = screenGui
     self.BlackoutFrame = blackout
 
+    -- การ์ดหน้าต่างหลัก
     local card = Instance.new("Frame")
     card.Name = "MainCard"
     card.Size = UDim2.fromOffset(width, height)
     card.Position = UDim2.new(0.5, -width / 2, 0.5, -height / 2)
-    card.BackgroundColor3 = Color3.fromRGB(152, 114, 203)
+    card.BackgroundColor3 = Color3.fromRGB(120, 85, 175)
     card.BorderSizePixel = 0
     card.Active = true
     card.ZIndex = 2
     card.Parent = screenGui
     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 22)
+
+    -- พื้นหลัง Dynamic Moving Aurora Gradient
+    local bgGradient = Instance.new("UIGradient")
+    bgGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(155, 105, 215)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(85, 45, 130)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(40, 15, 65))
+    })
+    bgGradient.Rotation = 45
+    bgGradient.Parent = card
+    TweenService:Create(bgGradient, bgRotateInfo, { Rotation = 405 }):Play()
+
+    -- ขอบเรืองแสงหายใจ (Breathing Stroke)
     local cardStroke = Instance.new("UIStroke", card)
-    cardStroke.Thickness = 5
-    cardStroke.Color = Color3.fromRGB(42, 12, 70)
+    cardStroke.Thickness = 4.5
+    cardStroke.Color = Color3.fromRGB(50, 15, 80)
+    TweenService:Create(cardStroke, borderPulseInfo, { Color = Color3.fromRGB(180, 85, 255) }):Play()
     self.MainCard = card
 
+    -- ระบบลากหน้าต่าง
     local dragging, dragStart, startPos = false, nil, nil
     card.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -143,14 +162,14 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     local titlePlate = Instance.new("Frame")
     titlePlate.Size = UDim2.new(1, -28, 0, 42)
     titlePlate.Position = UDim2.fromOffset(14, 14)
-    titlePlate.BackgroundColor3 = Color3.fromRGB(75, 30, 115)
+    titlePlate.BackgroundColor3 = Color3.fromRGB(65, 20, 100)
     titlePlate.BorderSizePixel = 0
     titlePlate.ZIndex = 3
     titlePlate.Parent = card
     Instance.new("UICorner", titlePlate).CornerRadius = UDim.new(0, 12)
     local tpStroke = Instance.new("UIStroke", titlePlate)
     tpStroke.Thickness = 2.5
-    tpStroke.Color = Color3.fromRGB(42, 12, 70)
+    tpStroke.Color = Color3.fromRGB(35, 10, 55)
 
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Size = UDim2.new(1, -44, 1, 0)
@@ -167,7 +186,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     titleStroke.Thickness = 3
     titleStroke.Color = Color3.fromRGB(35, 10, 55)
 
-    -- ปุ่มปิดระบบถาวร (Unload Button)
+    -- ปุ่มปิด Unload
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.fromOffset(28, 28)
     closeBtn.Position = UDim2.new(1, -34, 0.5, -14)
