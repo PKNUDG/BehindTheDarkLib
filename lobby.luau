@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : LOBBY HUB (POWERED BY BEHINDTHEDARKLIB)
+-- CANDY TD : LOBBY HUB (SEPARATED TRAYS LIKE IN-MATCH)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -139,7 +139,7 @@ local Window = Library:CreateWindow({
 })
 Controller.Gui = Window.Gui
 
--- ซ่อนกล่องพื้นหลังรวมเดิมของฝั่งขวาเพื่อไม่ให้เกิดการซ้อนทับ
+-- ซ่อนกรอบเดิมฝั่งขวาเพื่อไม่ให้มีกรอบซ้อนทับ
 if Window.RightColumn and Window.RightColumn.Parent and Window.RightColumn.Parent.Parent then
     Window.RightColumn.Parent.Parent.Visible = false
 end
@@ -184,17 +184,20 @@ Window:CreateToggle("Left", "Delete Legendary", 236, { On = Color3.fromRGB(245, 
 end)
 
 -- ========================================================
--- ฝั่งขวา: กล่องเดี่ยวแยกอิสระ (CHALLENGE & CANDY SHOP TRAY)
+-- ฝั่งขวา: แยกเป็น 2 กล่องพื้นหลังเหมือนหน้า IN-MATCH
 -- ========================================================
-local rightSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 154))
 
--- 1. ปุ่ม Auto Challenge 3D Toggle
-Window:CreateToggle(rightSubTray, "Auto Challenge", 0, { On = Color3.fromRGB(255, 90, 150), Off = Color3.fromRGB(120, 120, 130) }, states.AutoChallenge, function(v)
+-- 1. กล่องบน (Challenge Tray): สำหรับ Auto Challenge
+local challengeTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 72))
+
+Window:CreateToggle(challengeTray, "Auto Challenge", 0, { On = Color3.fromRGB(255, 90, 150), Off = Color3.fromRGB(120, 120, 130) }, states.AutoChallenge, function(v)
     states.AutoChallenge = v
     saveConfigState()
 end)
 
--- 2. ฟังก์ชันสร้างปุ่มซื้อของด่วนแบบ 3D มาตรฐาน
+-- 2. กล่องล่าง (Candy Shop Tray): สำหรับปุ่มซื้อของด่วน
+local shopTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 80), UDim2.new(0.5, -20, 1, -92))
+
 local function createShopActionButton(parentTarget: Instance, text: string, yPos: number, rimColor: Color3, btnColor: Color3, callback: () -> ())
     local shadow = Instance.new("Frame")
     shadow.Size = UDim2.new(1, 0, 0, 44)
@@ -238,11 +241,11 @@ local function createShopActionButton(parentTarget: Instance, text: string, yPos
     btn.Activated:Connect(callback)
 end
 
-createShopActionButton(rightSubTray, "Buy Trait Crystal x10", 46, Color3.fromRGB(140, 240, 180), Color3.fromRGB(60, 210, 140), function()
+createShopActionButton(shopTray, "Buy Trait Crystal x10", 0, Color3.fromRGB(140, 240, 180), Color3.fromRGB(60, 210, 140), function()
     buyItemFromTeller("crystal", 10)
 end)
 
-createShopActionButton(rightSubTray, "Buy Unit of Juice x10", 92, Color3.fromRGB(255, 185, 110), Color3.fromRGB(255, 140, 40), function()
+createShopActionButton(shopTray, "Buy Unit of Juice x10", 46, Color3.fromRGB(255, 185, 110), Color3.fromRGB(255, 140, 40), function()
     buyItemFromTeller("statroll", 10)
 end)
 
