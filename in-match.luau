@@ -121,7 +121,6 @@ pcall(function()
     end
 end)
 
--- ปิด Mute Banners
 task.spawn(function()
     local banner = candyTD:WaitForChild("Banner", 15)
     if banner then
@@ -271,7 +270,7 @@ againLimitUpdater = Window:CreateToggle("Left", "Again Count Limit", 144, { On =
 end)
 
 -- ========================================================
--- TARGET ROUNDS & 3D BUTTONS (ไม่มีตัวอักษรบนปุ่มบวกลบ)
+-- TARGET ROUNDS & 3D BUTTONS (ไร้ตัวอักษรบนปุ่มบวกลบ)
 -- ========================================================
 local leftCol = Window:GetColumn("Left")
 
@@ -367,7 +366,6 @@ local rsts = Instance.new("UIStroke", roundStatus)
 rsts.Thickness = 3
 rsts.Color = Color3.fromRGB(22, 5, 36)
 
--- ฟังก์ชันสร้างปุ่ม 3D ไร้ตัวอักษร
 local function create3DActionButton(xPos: number, rimColor: Color3, btnColor: Color3)
     local shadow = Instance.new("Frame")
     shadow.Size = UDim2.fromOffset(26, 28)
@@ -409,7 +407,6 @@ local function create3DActionButton(xPos: number, rimColor: Color3, btnColor: Co
     return btn
 end
 
--- ปุ่มลดสีแดง (ไร้ตัวอักษร - กดครั้งหนึ่งแกว่งซ้าย อีกครั้งแกว่งขวา)
 local btnMinus = create3DActionButton(-98, Color3.fromRGB(255, 140, 150), Color3.fromRGB(235, 65, 75))
 btnMinus.Activated:Connect(function()
     if states.TargetRounds > 1 then
@@ -420,7 +417,6 @@ btnMinus.Activated:Connect(function()
     end
 end)
 
--- ปุ่มบวกสีเขียว (ไร้ตัวอักษร - กดครั้งหนึ่งแกว่งซ้าย อีกครั้งแกว่งขวา)
 local btnPlus = create3DActionButton(-32, Color3.fromRGB(190, 255, 145), Color3.fromRGB(115, 225, 70))
 btnPlus.Activated:Connect(function()
     states.TargetRounds = states.TargetRounds + 1
@@ -517,7 +513,6 @@ local function runEndMatchSequence(choice: string)
         local actRemote = matchRemotes:FindFirstChild("Act")
         local replayRemote = matchRemotes:FindFirstChild("Replay")
 
-        -- 1. ตรวจสอบปุ่ม Next สำหรับ Raid Halloween (ชั้น 1 และ 2)
         local hasNextButton = false
         pcall(function()
             for _, desc in ipairs(candyTD:GetDescendants()) do
@@ -540,7 +535,6 @@ local function runEndMatchSequence(choice: string)
             end
         end
 
-        -- 2. กรณีเลือกเล่นซ้ำ (AGAIN)
         if choice == "AGAIN" and not hasNextButton then
             if replayRemote and replayRemote:IsA("RemoteFunction") then
                 pcall(function() replayRemote:InvokeServer("info") end)
@@ -553,7 +547,6 @@ local function runEndMatchSequence(choice: string)
             end
         end
 
-        -- 3. ตรวจสอบกดยืนยันปุ่ม Popup เช่น YES / OK / REPLAY บนหน้าจอ
         task.wait(0.35)
         pcall(function()
             for _, desc in ipairs(candyTD:GetDescendants()) do
