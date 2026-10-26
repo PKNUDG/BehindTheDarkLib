@@ -236,7 +236,6 @@ local Window = Library:CreateWindow({
     Name = "CandyTD_BehindTheDarkHub",
     OnUnload = function()
         Controller.Running = false
-        -- คืนค่ากล้องกรณีปิด 3D ค้างไว้
         pcall(function()
             local cam = workspace.CurrentCamera
             if cam then
@@ -313,82 +312,127 @@ local cgls = Instance.new("UIStroke", cfgLabel)
 cgls.Thickness = 2.5
 cgls.Color = Color3.fromRGB(22, 5, 36)
 
+-- กล่องแสดงตัวเลขเป้าหมาย (สไตล์การ์ตูนตามภาพ)
+local roundCountBadge = Instance.new("Frame")
+roundCountBadge.Size = UDim2.fromOffset(30, 28)
+roundCountBadge.Position = UDim2.new(1, -66, 0.5, -14)
+roundCountBadge.BackgroundColor3 = Color3.fromRGB(36, 10, 58)
+roundCountBadge.BorderSizePixel = 0
+roundCountBadge.ZIndex = 6
+roundCountBadge.Parent = configBox
+Instance.new("UICorner", roundCountBadge).CornerRadius = UDim.new(0, 8)
+local rcbs = Instance.new("UIStroke", roundCountBadge)
+rcbs.Thickness = 2
+rcbs.Color = Color3.fromRGB(22, 5, 36)
+
 local roundCountLabel = Instance.new("TextLabel")
-roundCountLabel.Size = UDim2.fromOffset(30, 26)
-roundCountLabel.Position = UDim2.new(1, -66, 0.5, -13)
-roundCountLabel.BackgroundColor3 = Color3.fromRGB(45, 15, 75)
+roundCountLabel.Size = UDim2.fromScale(1, 1)
+roundCountLabel.BackgroundTransparency = 1
 roundCountLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-roundCountLabel.TextSize = 13
+roundCountLabel.TextSize = 14
 roundCountLabel.Font = Enum.Font.FredokaOne
 roundCountLabel.Text = tostring(states.TargetRounds)
-roundCountLabel.ZIndex = 5
-roundCountLabel.Parent = configBox
-Instance.new("UICorner", roundCountLabel).CornerRadius = UDim.new(0, 6)
+roundCountLabel.ZIndex = 7
+roundCountLabel.Parent = roundCountBadge
+
+-- 2. กรอบแสดง Round 0/10 (3D)
+local roundStatusShadow = Instance.new("Frame")
+roundStatusShadow.Size = UDim2.new(1, 0, 0, 54)
+roundStatusShadow.Position = UDim2.fromOffset(0, 244)
+roundStatusShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+roundStatusShadow.BorderSizePixel = 0
+roundStatusShadow.ZIndex = 4
+roundStatusShadow.Parent = leftCol
+Instance.new("UICorner", roundStatusShadow).CornerRadius = UDim.new(0, 16)
 
 local roundStatusBox = Instance.new("Frame")
-roundStatusBox.Size = UDim2.new(1, 0, 0, 52)
-roundStatusBox.Position = UDim2.fromOffset(0, 236)
-roundStatusBox.BackgroundColor3 = Color3.fromRGB(45, 18, 72)
+roundStatusBox.Size = UDim2.new(1, 0, 0, 50)
+roundStatusBox.Position = UDim2.fromOffset(0, 0)
+roundStatusBox.BackgroundColor3 = Color3.fromRGB(42, 14, 68)
 roundStatusBox.BorderSizePixel = 0
-roundStatusBox.ZIndex = 4
-roundStatusBox.Parent = leftCol
-Instance.new("UICorner", roundStatusBox).CornerRadius = UDim.new(0, 12)
+roundStatusBox.ZIndex = 5
+roundStatusBox.Parent = roundStatusShadow
+Instance.new("UICorner", roundStatusBox).CornerRadius = UDim.new(0, 16)
 local rsbs = Instance.new("UIStroke", roundStatusBox)
-rsbs.Thickness = 2.5
-rsbs.Color = Color3.fromRGB(75, 30, 115)
+rsbs.Thickness = 3
+rsbs.Color = Color3.fromRGB(22, 5, 36)
 
 local roundStatus = Instance.new("TextLabel")
 roundStatus.Size = UDim2.fromScale(1, 1)
 roundStatus.BackgroundTransparency = 1
-roundStatus.Text = "Round " .. states.CurrentRounds .. "/" .. states.TargetRounds
-roundStatus.TextColor3 = Color3.fromRGB(255, 225, 80)
+roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
+roundStatus.TextColor3 = Color3.fromRGB(255, 235, 110)
 roundStatus.TextSize = 17
 roundStatus.Font = Enum.Font.FredokaOne
-roundStatus.ZIndex = 5
+roundStatus.ZIndex = 6
 roundStatus.Parent = roundStatusBox
+local rsts = Instance.new("UIStroke", roundStatus)
+rsts.Thickness = 3
+rsts.Color = Color3.fromRGB(22, 5, 36)
 
-local btnMinus = Instance.new("TextButton")
-btnMinus.Size = UDim2.fromOffset(24, 26)
-btnMinus.Position = UDim2.new(1, -96, 0.5, -13)
-btnMinus.BackgroundColor3 = Color3.fromRGB(240, 70, 70)
-btnMinus.Text = "-"
-btnMinus.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnMinus.TextSize = 16
-btnMinus.Font = Enum.Font.FredokaOne
-btnMinus.BorderSizePixel = 0
-btnMinus.ZIndex = 5
-btnMinus.Parent = configBox
-Instance.new("UICorner", btnMinus).CornerRadius = UDim.new(0, 6)
-Library.AttachInteractiveEffects(btnMinus)
+-- ฟังก์ชันสร้างปุ่ม 3D ขอบ 3 ชั้นสำหรับบวกลบ
+local function create3DActionButton(text: string, xPos: number, rimColor: Color3, btnColor: Color3)
+    local shadow = Instance.new("Frame")
+    shadow.Size = UDim2.fromOffset(26, 28)
+    shadow.Position = UDim2.new(1, xPos, 0.5, -14)
+    shadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+    shadow.BorderSizePixel = 0
+    shadow.ZIndex = 6
+    shadow.Parent = configBox
+    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 8)
 
+    local rim = Instance.new("Frame")
+    rim.Size = UDim2.new(1, 0, 0, 25)
+    rim.Position = UDim2.fromOffset(0, 0)
+    rim.BackgroundColor3 = rimColor
+    rim.BorderSizePixel = 0
+    rim.ZIndex = 7
+    rim.Parent = shadow
+    Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 8)
+    local rs = Instance.new("UIStroke", rim)
+    rs.Thickness = 2
+    rs.Color = Color3.fromRGB(22, 5, 36)
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -4, 1, -4)
+    btn.Position = UDim2.fromOffset(2, 2)
+    btn.BackgroundColor3 = btnColor
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 16
+    btn.Font = Enum.Font.FredokaOne
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
+    btn.ZIndex = 8
+    btn.Parent = rim
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    local bts = Instance.new("UIStroke", btn)
+    bts.Thickness = 2
+    bts.Color = Color3.fromRGB(22, 5, 36)
+
+    Library.AttachInteractiveEffects(btn, shadow)
+    return btn
+end
+
+-- ปุ่มลบ (-) สีแดง 3D
+local btnMinus = create3DActionButton("-", -98, Color3.fromRGB(255, 140, 150), Color3.fromRGB(235, 65, 75))
 btnMinus.Activated:Connect(function()
     if states.TargetRounds > 1 then
         states.TargetRounds = states.TargetRounds - 1
         roundCountLabel.Text = tostring(states.TargetRounds)
         roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
-        Library.BounceWiggleText(roundCountLabel)
+        Library.StartIntenseWiggle(roundStatus)
     end
 end)
 
-local btnPlus = Instance.new("TextButton")
-btnPlus.Size = UDim2.fromOffset(24, 26)
-btnPlus.Position = UDim2.new(1, -30, 0.5, -13)
-btnPlus.BackgroundColor3 = Color3.fromRGB(115, 220, 75)
-btnPlus.Text = "+"
-btnPlus.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnPlus.TextSize = 16
-btnPlus.Font = Enum.Font.FredokaOne
-btnPlus.BorderSizePixel = 0
-btnPlus.ZIndex = 5
-btnPlus.Parent = configBox
-Instance.new("UICorner", btnPlus).CornerRadius = UDim.new(0, 6)
-Library.AttachInteractiveEffects(btnPlus)
-
+-- ปุ่มบวก (+) สีเขียว 3D
+local btnPlus = create3DActionButton("+", -32, Color3.fromRGB(190, 255, 145), Color3.fromRGB(115, 225, 70))
 btnPlus.Activated:Connect(function()
     states.TargetRounds = states.TargetRounds + 1
     roundCountLabel.Text = tostring(states.TargetRounds)
     roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
-    Library.BounceWiggleText(roundCountLabel)
+    Library.StartIntenseWiggle(roundStatus)
 end)
 
 -- ควบคุมฝั่งขวา
@@ -496,14 +540,13 @@ local function runEndMatchSequence(choice: string)
             end
         end)
 
-        -- หากเป็นชั้น 1 หรือ 2 ใน Raid ให้ส่งคำสั่ง Next ขึ้นชั้นถัดไปก่อน
         if hasNextButton or choice == "NEXT" then
             if actRemote and actRemote:IsA("RemoteFunction") then
                 pcall(function() actRemote:InvokeServer("next") end)
             end
         end
 
-        -- 2. กรณีเลือกเล่นซ้ำ (AGAIN) หรือจ่ายเงินเล่นต่อใน Raid (ชั้น 3 / Game Over)
+        -- 2. กรณีเลือกเล่นซ้ำ (AGAIN)
         if choice == "AGAIN" and not hasNextButton then
             if replayRemote and replayRemote:IsA("RemoteFunction") then
                 pcall(function() replayRemote:InvokeServer("info") end)
