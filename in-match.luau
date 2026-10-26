@@ -350,6 +350,7 @@ btnMinus.Activated:Connect(function()
         states.TargetRounds = states.TargetRounds - 1
         roundCountLabel.Text = tostring(states.TargetRounds)
         roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
+        Library.BounceWiggleText(roundCountLabel)
     end
 end)
 
@@ -371,6 +372,7 @@ btnPlus.Activated:Connect(function()
     states.TargetRounds = states.TargetRounds + 1
     roundCountLabel.Text = tostring(states.TargetRounds)
     roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
+    Library.BounceWiggleText(roundCountLabel)
 end)
 
 -- ควบคุมฝั่งขวา
