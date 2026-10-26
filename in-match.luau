@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : IN-MATCH CONTROLLER (PURE REMOTE AUTO AGAIN)
+-- CANDY TD : IN-MATCH CONTROLLER (FULL AUTO NEXT, HOME & PRESET)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -432,8 +432,16 @@ if not libChunk then
 end
 local Library = libChunk()
 
--- โหลดด่านที่เคยเลือกล่าสุดจาก Settings
-if Library.Settings.SelectedStage and StagePresets[Library.Settings.SelectedStage] then
+-- ระบบจับคู่ PlaceId กับด่านที่บันทึกไว้ใน Record (อัตโนมัติ)
+local currentPlaceId = tostring(game.PlaceId)
+if Library.Settings.PlaceIdStageMap and Library.Settings.PlaceIdStageMap[currentPlaceId] then
+    local mappedStage = Library.Settings.PlaceIdStageMap[currentPlaceId]
+    if StagePresets[mappedStage] then
+        states.CurrentStage = mappedStage
+        states.RecordStageName = mappedStage
+        print(string.format("[AutoStage] ตรวจพบ PlaceId '%s' ตรงกับด่าน '%s' อัตโนมัติ", currentPlaceId, mappedStage))
+    end
+elseif Library.Settings.SelectedStage and StagePresets[Library.Settings.SelectedStage] then
     states.CurrentStage = Library.Settings.SelectedStage
     states.RecordStageName = Library.Settings.SelectedStage
 end
@@ -465,11 +473,23 @@ end
 local function setEndChoice(choice: string)
     states.EndChoice = (states.EndChoice == choice) and "NONE" or choice
     updateEndChoiceVisuals()
+    -- บันทึกค่า Config ล่าสุด (จำค่าปุ่ม EndChoice)
+    Library.Settings.LastEndChoice = states.EndChoice
+    Library.SaveSettings()
 end
 
-visualUpdaters["NEXT"] = Window:CreateToggle("Left", "Auto Next", 0, { On = Color3.fromRGB(235, 65, 135), Off = Color3.fromRGB(120, 120, 130) }, false, function() setEndChoice("NEXT") end)
-visualUpdaters["AGAIN"] = Window:CreateToggle("Left", "Auto Again", 46, { On = Color3.fromRGB(240, 150, 40), Off = Color3.fromRGB(120, 120, 130) }, true, function() setEndChoice("AGAIN") end)
-visualUpdaters["HOME"] = Window:CreateToggle("Left", "Auto Home", 92, { On = Color3.fromRGB(60, 180, 245), Off = Color3.fromRGB(120, 120, 130) }, false, function() setEndChoice("HOME") end)
+-- โหลดค่า Config ล่าสุดที่เคยเปิดไว้
+if Library.Settings.LastEndChoice then
+    states.EndChoice = Library.Settings.LastEndChoice
+end
+if Library.Settings.AutoUpgradeSetting ~= nil then states.AutoUpgrade = Library.Settings.AutoUpgradeSetting end
+if Library.Settings.AutoSkipWaveSetting ~= nil then states.AutoSkipWave = Library.Settings.AutoSkipWaveSetting end
+if Library.Settings.BoostFPSSetting ~= nil then states.BoostFPS = Library.Settings.BoostFPSSetting end
+if Library.Settings.AutoPlaceSetting ~= nil then states.AutoPlace = Library.Settings.AutoPlaceSetting end
+
+visualUpdaters["NEXT"] = Window:CreateToggle("Left", "Auto Next", 0, { On = Color3.fromRGB(235, 65, 135), Off = Color3.fromRGB(120, 120, 130) }, states.EndChoice == "NEXT", function() setEndChoice("NEXT") end)
+visualUpdaters["AGAIN"] = Window:CreateToggle("Left", "Auto Again", 46, { On = Color3.fromRGB(240, 150, 40), Off = Color3.fromRGB(120, 120, 130) }, states.EndChoice == "AGAIN", function() setEndChoice("AGAIN") end)
+visualUpdaters["HOME"] = Window:CreateToggle("Left", "Auto Home", 92, { On = Color3.fromRGB(60, 180, 245), Off = Color3.fromRGB(120, 120, 130) }, states.EndChoice == "HOME", function() setEndChoice("HOME") end)
 updateEndChoiceVisuals()
 
 local againLimitUpdater = nil
@@ -634,28 +654,39 @@ end)
 -- ควบคุมฝั่งขวา (Controls)
 local rightCol = Window:GetColumn("Right")
 
-Window:CreateToggle("Right", "Auto Upgrade All", 0, { On = Color3.fromRGB(90, 195, 60), Off = Color3.fromRGB(120, 120, 130) }, true, function(v)
+Window:CreateToggle("Right", "Auto Upgrade All", 0, { On = Color3.fromRGB(90, 195, 60), Off = Color3.fromRGB(120, 120, 130) }, states.AutoUpgrade, function(v)
     states.AutoUpgrade = v
+    Library.Settings.AutoUpgradeSetting = v
+    Library.SaveSettings()
 end)
 
-Window:CreateToggle("Right", "Auto Skip Wave", 46, { On = Color3.fromRGB(160, 75, 235), Off = Color3.fromRGB(120, 120, 130) }, true, function(v)
+Window:CreateToggle("Right", "Auto Skip Wave", 46, { On = Color3.fromRGB(160, 75, 235), Off = Color3.fromRGB(120, 120, 130) }, states.AutoSkipWave, function(v)
     states.AutoSkipWave = v
+    Library.Settings.AutoSkipWaveSetting = v
+    Library.SaveSettings()
 end)
 
-Window:CreateToggle("Right", "Boost FPS", 92, { On = Color3.fromRGB(50, 205, 150), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
+Window:CreateToggle("Right", "Boost FPS", 92, { On = Color3.fromRGB(50, 205, 150), Off = Color3.fromRGB(120, 120, 130) }, states.BoostFPS, function(v)
     states.BoostFPS = v
+    Library.Settings.BoostFPSSetting = v
+    Library.SaveSettings()
     applyUltraBoostFPS(v)
 end)
 
 local autoPlaceToggle = nil
-autoPlaceToggle = Window:CreateToggle("Right", "Auto Place", 144, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
+autoPlaceToggle = Window:CreateToggle("Right", "Auto Place", 144, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
     states.AutoPlace = v
+    Library.Settings.AutoPlaceSetting = v
+    Library.SaveSettings()
 end)
 
 local stageDropdown = Window:CreateDropdown("Right", "Stage", 190, getStageNames(), states.CurrentStage, 10, function(selected)
     states.CurrentStage = selected
     states.RecordStageName = selected
     Library.Settings.SelectedStage = selected
+    -- บันทึกการจับคู่ PlaceId กับ Stage ปัจจุบัน
+    Library.Settings.PlaceIdStageMap = Library.Settings.PlaceIdStageMap or {}
+    Library.Settings.PlaceIdStageMap[currentPlaceId] = selected
     Library.SaveSettings()
 end)
 
@@ -938,6 +969,8 @@ recToggleBtn.Activated:Connect(function()
         savePresetsToFile()
         states.CurrentStage = clean
         Library.Settings.SelectedStage = clean
+        Library.Settings.PlaceIdStageMap = Library.Settings.PlaceIdStageMap or {}
+        Library.Settings.PlaceIdStageMap[currentPlaceId] = clean
         Library.SaveSettings()
         stageDropdown.SetOptions(getStageNames())
     end
@@ -1089,7 +1122,7 @@ createNavButton("Reload Presets ↺", 282, Color3.fromRGB(255, 220, 110), Color3
 end)
 
 -- ========================================================
--- GAMEPLAY LOGIC LOOPS (AUTO AGAIN & AUTO ACTIONS)
+-- GAMEPLAY LOGIC LOOPS (AUTO PLACE & UPGRADE & SKIP)
 -- ========================================================
 local hasPlacedThisMatch = false
 local function runAutoPlaceSequence()
@@ -1148,7 +1181,7 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- PURE REMOTE AUTO AGAIN LOGIC (ไม่มีการจับหน้าต่างเกม)
+-- PURE REMOTE AUTO END-MATCH LOGIC (NEXT, AGAIN, HOME)
 -- ========================================================
 local matchHandled = false
 task.spawn(function()
@@ -1156,21 +1189,39 @@ task.spawn(function()
         task.wait(0.5)
         pcall(function()
             local overlay = candyTD:FindFirstChild("Overlay")
+            -- ตรวจสอบให้แน่ใจว่าอยู่ในหน้าต่างสรุปผลเกมจบแล้วจริง ๆ (Overlay แสดงผล)
             local isGameOver = overlay and overlay.Visible
 
             if not isGameOver then
                 matchHandled = false
             else
-                if not matchHandled and states.EndChoice == "AGAIN" then
+                if not matchHandled and states.EndChoice ~= "NONE" then
                     matchHandled = true
-                    task.wait(1)
+                    task.wait(1.0) -- หน่วงเวลา 1 วินาทีให้หน้าต่างสรุปผลโหลดเสร็จสมบูรณ์
                     
                     local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
                     local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
                     
-                    if actRemote and actRemote:IsA("RemoteFunction") then
-                        print("[AutoAgain] เกมจบแล้ว ส่งคำสั่ง Again ผ่าน Remote...")
-                        actRemote:InvokeServer("again")
+                    if states.EndChoice == "NEXT" then
+                        if actRemote and actRemote:IsA("RemoteFunction") then
+                            print("[AutoNext] เกมจบแล้ว ส่งคำสั่ง NEXT ผ่าน Remote...")
+                            actRemote:InvokeServer("next")
+                        end
+                    elseif states.EndChoice == "AGAIN" then
+                        if actRemote and actRemote:IsA("RemoteFunction") then
+                            print("[AutoAgain] เกมจบแล้ว ส่งคำสั่ง AGAIN ผ่าน Remote...")
+                            actRemote:InvokeServer("again")
+                        end
+                    elseif states.EndChoice == "HOME" then
+                        print("[AutoHome] เกมจบแล้ว ส่งคำสั่งกลับ HOME/ReturnToHub...")
+                        local retRemote = matchRemotes and matchRemotes:FindFirstChild("ReturnToHub")
+                        if retRemote then
+                            if retRemote:IsA("RemoteEvent") then
+                                retRemote:FireServer()
+                            elseif retRemote:IsA("RemoteFunction") then
+                                retRemote:InvokeServer()
+                            end
+                        end
                     end
                 end
             end
