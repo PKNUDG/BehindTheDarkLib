@@ -613,8 +613,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
 
     -- 3. ปุ่ม 3D Toggle (ย้ายมาไว้ข้างซ้ายของปุ่มตั้งค่าสีเหลือง)
     local btn3DRim = Instance.new("Frame")
-    btn3DRim.Size = UDim2.fromOffset(72, 30)
-    btn3DRim.Position = UDim2.new(1, -150, 0.5, -15)
+    btn3DRim.Size = UDim2.fromOffset(74, 30)
+    btn3DRim.Position = UDim2.new(1, -152, 0.5, -15)
     btn3DRim.BackgroundColor3 = Color3.fromRGB(190, 255, 145)
     btn3DRim.BorderSizePixel = 0
     btn3DRim.ZIndex = 6
@@ -696,7 +696,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    -- หน้าหลัก (Main View Container)
+    -- หน้าหลัก (Main View)
     local mainView = Instance.new("Frame")
     mainView.Name = "MainView"
     mainView.Size = UDim2.new(1, 0, 1, -64)
@@ -744,7 +744,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     self.RightColumn = createColumnTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 1, -12))
     self.CenterColumn = self.LeftColumn
 
-    -- หน้าต่างตั้งค่าภาพ/เสียง (Settings Modal)
+    -- หน้าต่าง Visual & Sound Settings
     local settingsModal = Instance.new("Frame")
     settingsModal.Name = "SettingsModal"
     settingsModal.Size = UDim2.fromOffset(270, 290)
@@ -870,7 +870,7 @@ function Library:GetColumn(side: string): Frame
 end
 
 -- ========================================================
--- ระบบแยกหน้า (SEPARATE VIEW / NOT POP-UP)
+-- ระบบแยกหน้า (SEPARATE FULL VIEW)
 -- ========================================================
 function Library:CreatePage(name: string)
     local pageView = Instance.new("Frame")
