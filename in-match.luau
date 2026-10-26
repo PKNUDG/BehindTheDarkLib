@@ -267,7 +267,7 @@ local states = {
     AutoPlace = false,
     RecordMode = false,
     CurrentStage = "Inf Bug Milk",
-    RecordStageName = "My New Stage",
+    RecordStageName = "Inf Bug Milk",
     TargetRounds = 10,
     CurrentRounds = 0
 }
@@ -275,101 +275,173 @@ local states = {
 local refreshRecordUI: (() -> ())? = nil
 local lastRecordTick = 0
 
--- ฟังก์ชันประมวลผลยูนิตที่วางลงสนาม
-local function handleRecordInput(actionName, unitArg, p1, p2)
+-- ระบบดึงและประมวลผลตำแหน่งยูนิตแบบยืดหยุ่น
+local function handleRecordInput(...)
     if not states.RecordMode then return end
-    local act = tostring(actionName):lower()
-    if act ~= "place" and act ~= "target" then return end
+    local rawArgs = { ... }
+    if #rawArgs == 0 then return end
 
-    local targetStage = (states.RecordStageName and states.RecordStageName ~= "") and states.RecordStageName or states.CurrentStage
-    StagePresets[targetStage] = StagePresets[targetStage] or {}
-    local currentQueue = StagePresets[targetStage]
+    local isPlace = false
+    local isTarget = false
+    local unitName = nil
+    local posX, posZ = nil, nil
+    local targetMode = nil
 
-    if act == "place" then
-        local uName = "UnknownUnit"
-        local posX, posZ = 0, 0
+    for _, arg in ipairs(rawArgs) do
+        local str = tostring(arg):lower()
+        if str == "place" then
+            isPlace = true
+        elseif str == "target" then
+            isTarget = true
+        elseif typeof(arg) == "Vector3" then
+            posX, posZ = arg.X, arg.Z
+        elseif typeof(arg) == "CFrame" then
+            posX, posZ = arg.Position.X, arg.Position.Z
+        elseif type(arg) == "table" then
+            if arg.unit or arg.name or arg.Name or arg.Unit then
+                unitName = tostring(arg.unit or arg.name or arg.Name or arg.Unit)
+            end
+            if arg.x or arg.X then posX = tonumber(arg.x or arg.X) end
+            if arg.z or arg.Z then posZ = tonumber(arg.z or arg.Z) end
+            if tostring(arg.action or arg.Action):lower() == "place" then isPlace = true end
+            if tostring(arg.action or arg.Action):lower() == "target" then isTarget = true end
+        end
+    end
 
-        if type(unitArg) == "table" then
-            uName = tostring(unitArg.unit or unitArg.name or unitArg.Name or "UnknownUnit")
-            posX = tonumber(unitArg.x or unitArg.X) or 0
-            posZ = tonumber(unitArg.z or unitArg.Z) or 0
-        else
-            uName = tostring(unitArg or "UnknownUnit")
-            if typeof(p1) == "Vector3" then
-                posX, posZ = p1.X, p1.Z
-            elseif typeof(p1) == "CFrame" then
-                posX, posZ = p1.Position.X, p1.Position.Z
-            elseif type(p1) == "table" then
-                posX = tonumber(p1.x or p1.X) or 0
-                posZ = tonumber(p1.z or p1.Z) or 0
-            elseif type(p1) == "number" and type(p2) == "number" then
-                posX, posZ = p1, p2
+    if isPlace then
+        if not unitName then
+            for _, arg in ipairs(rawArgs) do
+                if type(arg) == "string" and arg:lower() ~= "place" and not tonumber(arg) then
+                    unitName = arg
+                    break
+                end
             end
         end
 
-        if tick() - lastRecordTick < 0.15 then
-            local last = currentQueue[#currentQueue]
-            if last and last.unit == uName and math.abs((last.x or 0) - posX) < 0.05 and math.abs((last.z or 0) - posZ) < 0.05 then
-                return
+        if not posX or not posZ then
+            local nums = {}
+            for _, arg in ipairs(rawArgs) do
+                if type(arg) == "number" then
+                    table.insert(nums, arg)
+                end
+            end
+            if #nums >= 2 then
+                posX, posZ = nums[1], nums[2]
             end
         end
-        lastRecordTick = tick()
 
-        table.insert(currentQueue, {
-            unit = uName,
-            x = posX,
-            z = posZ
-        })
+        if unitName and posX and posZ then
+            local targetStage = (states.RecordStageName and states.RecordStageName ~= "") and states.RecordStageName or states.CurrentStage
+            StagePresets[targetStage] = StagePresets[targetStage] or {}
+            local currentQueue = StagePresets[targetStage]
 
-        task.spawn(function()
-            savePresetsToFile()
-            if refreshRecordUI then refreshRecordUI() end
-        end)
-        print(string.format("[Recorder] บันทึกสำเร็จ: #%d %s (X: %.1f, Z: %.1f) ในด่าน '%s'", #currentQueue, uName, posX, posZ, targetStage))
+            if tick() - lastRecordTick < 0.15 then
+                local last = currentQueue[#currentQueue]
+                if last and last.unit == unitName and math.abs((last.x or 0) - posX) < 0.05 and math.abs((last.z or 0) - posZ) < 0.05 then
+                    return
+                end
+            end
+            lastRecordTick = tick()
 
-    elseif act == "target" then
-        local targetMode = tostring(p1 or p2 or "strongest")
-        if #currentQueue > 0 then
-            currentQueue[#currentQueue].setTarget = targetMode
+            table.insert(currentQueue, {
+                unit = unitName,
+                x = posX,
+                z = posZ
+            })
+
             task.spawn(function()
                 savePresetsToFile()
                 if refreshRecordUI then refreshRecordUI() end
             end)
-            print(string.format("[Recorder] บันทึก Target สำเร็จ: #%d %s -> %s", #currentQueue, currentQueue[#currentQueue].unit, targetMode))
+            print(string.format("[Recorder] บันทึกสำเร็จ: #%d %s (X: %.1f, Z: %.1f) ในด่าน '%s'", #currentQueue, unitName, posX, posZ, targetStage))
+        end
+
+    elseif isTarget then
+        for _, arg in ipairs(rawArgs) do
+            if type(arg) == "string" and arg:lower() ~= "target" then
+                targetMode = arg
+            end
+        end
+        if targetMode then
+            local targetStage = (states.RecordStageName and states.RecordStageName ~= "") and states.RecordStageName or states.CurrentStage
+            local currentQueue = StagePresets[targetStage]
+            if currentQueue and #currentQueue > 0 then
+                currentQueue[#currentQueue].setTarget = targetMode
+                task.spawn(function()
+                    savePresetsToFile()
+                    if refreshRecordUI then refreshRecordUI() end
+                end)
+                print(string.format("[Recorder] บันทึก Target สำเร็จ: #%d %s -> %s", #currentQueue, currentQueue[#currentQueue].unit, targetMode))
+            end
         end
     end
 end
 
--- อัปเดต Handler ให้ _G เพื่อไม่ให้หลุดแม้ Re-execute
-_G.CandyTD_ActiveRecordHandler = function(action, ...)
-    handleRecordInput(action, ...)
+-- ซิงก์ Handler เข้าตัวแปร Global เสมอ
+_G.CandyTD_ActiveRecordHandler = function(...)
+    handleRecordInput(...)
 end
 
--- Hook Remote แบบไม่ Yield เพื่อความเสถียร 100%
+-- ติดตั้งตัวดักฟังคำสั่ง Remote ทุกช่องทาง
 local function installPlacementHook()
-    if _G.CandyTD_PlacementHookInstalled then return end
-    _G.CandyTD_PlacementHookInstalled = true
-
-    local hookMeta = (type(hookmetamethod) == "function" and hookmetamethod) or nil
-    local newCClosure = (type(newcclosure) == "function" and newcclosure) or function(f) return f end
-
-    if hookMeta then
-        local oldNamecall
-        oldNamecall = hookMeta(game, "__namecall", newCClosure(function(self, ...)
-            local method = getnamecallmethod()
-            if (method == "InvokeServer" or method == "FireServer") then
-                local remoteName = tostring(self.Name)
-                if remoteName == "Act" or remoteName == "Request" then
-                    local args = { ... }
-                    task.spawn(function()
-                        if _G.CandyTD_ActiveRecordHandler then
-                            _G.CandyTD_ActiveRecordHandler(args[1], args[2], args[3], args[4])
-                        end
-                    end)
+    -- 1. Hook MatchNet.request
+    if matchNet and type(matchNet.request) == "function" and not _G.CandyTD_MatchNetHooked then
+        _G.CandyTD_MatchNetHooked = true
+        local oldReq = matchNet.request
+        matchNet.request = function(...)
+            local args = { ... }
+            task.spawn(function()
+                if _G.CandyTD_ActiveRecordHandler then
+                    _G.CandyTD_ActiveRecordHandler(unpack(args))
                 end
-            end
-            return oldNamecall(self, ...)
-        end))
+            end)
+            return oldReq(...)
+        end
+    end
+
+    -- 2. Hook __namecall (แบบไม่สนตัวพิมพ์เล็ก-ใหญ่)
+    if not _G.CandyTD_PlacementHookInstalled then
+        _G.CandyTD_PlacementHookInstalled = true
+        local hookMeta = (type(hookmetamethod) == "function" and hookmetamethod) or nil
+        local newCClosure = (type(newcclosure) == "function" and newcclosure) or function(f) return f end
+
+        if hookMeta then
+            local oldNamecall
+            oldNamecall = hookMeta(game, "__namecall", newCClosure(function(self, ...)
+                local method = getnamecallmethod()
+                local m = tostring(method):lower()
+                if (m == "invokeserver" or m == "fireserver") then
+                    local rName = tostring(self.Name):lower()
+                    local isMatchRemote = (rName == "act" or rName == "request" or (self.Parent and tostring(self.Parent.Name):lower() == "matchremotes"))
+                    if isMatchRemote then
+                        local args = { ... }
+                        task.spawn(function()
+                            if _G.CandyTD_ActiveRecordHandler then
+                                _G.CandyTD_ActiveRecordHandler(unpack(args))
+                            end
+                        end)
+                    end
+                end
+                return oldNamecall(self, ...)
+            end))
+        end
+    end
+
+    -- 3. Hook RemoteFunction.InvokeServer ตรงๆ
+    local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
+    local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
+    if actRemote and typeof(hookfunction) == "function" and not _G.CandyTD_ActInvokeHooked then
+        _G.CandyTD_ActInvokeHooked = true
+        local oldInvoke
+        oldInvoke = hookfunction(actRemote.InvokeServer, function(self, ...)
+            local args = { ... }
+            task.spawn(function()
+                if _G.CandyTD_ActiveRecordHandler then
+                    _G.CandyTD_ActiveRecordHandler(unpack(args))
+                end
+            end)
+            return oldInvoke(self, ...)
+        end)
     end
 end
 pcall(installPlacementHook)
@@ -752,7 +824,6 @@ uListPad.PaddingLeft = UDim.new(0, 6)
 uListPad.PaddingRight = UDim.new(0, 6)
 uListPad.PaddingBottom = UDim.new(0, 6)
 
--- ฟังก์ชันรีเฟรชรายการที่วางลงจอ
 refreshRecordUI = function()
     local cName = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
     if cName == "" then cName = states.CurrentStage end
@@ -808,7 +879,7 @@ end)
 recToggleBtn.Activated:Connect(function()
     states.RecordMode = not states.RecordMode
     local clean = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
-    if clean == "" then clean = "My New Stage" end
+    if clean == "" then clean = states.CurrentStage end
     states.RecordStageName = clean
     stageInput.Text = clean
 
