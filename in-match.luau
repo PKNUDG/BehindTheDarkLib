@@ -1103,7 +1103,7 @@ clearBtn.Activated:Connect(function()
     end
 end)
 
-createBottomActionButton("Setup Record & Presets ⚙", 92, Color3.fromRGB(255, 145, 160), Color3.fromRGB(235, 65, 85), function()
+createBottomActionButton("Setup Record & Presets", 92, Color3.fromRGB(255, 145, 160), Color3.fromRGB(235, 65, 85), function()
     stageInput.Text = states.CurrentStage
     states.RecordStageName = states.CurrentStage
     refreshRecordUI()
