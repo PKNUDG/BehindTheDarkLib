@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (SUB-PAGE & MODAL POPUP)
+-- BEHIND THE DARK : CORE UI LIBRARY (PAGE SYSTEM & TOP 3D)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -483,6 +483,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
+    -- Title Bar
     local titleRim = Instance.new("Frame")
     titleRim.Size = UDim2.new(1, -28, 0, 44)
     titleRim.Position = UDim2.fromOffset(14, 12)
@@ -505,12 +506,12 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", titlePlate).CornerRadius = UDim.new(0, 13)
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -86, 1, 0)
+    titleLabel.Size = UDim2.new(1, -190, 1, 0)
     titleLabel.Position = UDim2.fromOffset(14, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = config.Title or "BEHIND THE DARK"
     titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextSize = 17
+    titleLabel.TextSize = 16
     titleLabel.Font = Enum.Font.FredokaOne
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.ZIndex = 6
@@ -546,6 +547,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
+    -- 1. ปุ่มปิดสีแดง (Close)
     local closeBtnRim = Instance.new("Frame")
     closeBtnRim.Size = UDim2.fromOffset(30, 30)
     closeBtnRim.Position = UDim2.new(1, -36, 0.5, -15)
@@ -584,6 +586,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         screenGui:Destroy()
     end)
 
+    -- 2. ปุ่ม Settings สีเหลือง
     local setBtnRim = Instance.new("Frame")
     setBtnRim.Size = UDim2.fromOffset(30, 30)
     setBtnRim.Position = UDim2.new(1, -72, 0.5, -15)
@@ -608,6 +611,101 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 8)
     Library.AttachInteractiveEffects(settingsBtn, setBtnRim)
 
+    -- 3. ปุ่ม 3D Toggle (ย้ายมาไว้ข้างซ้ายของปุ่มตั้งค่าสีเหลือง)
+    local btn3DRim = Instance.new("Frame")
+    btn3DRim.Size = UDim2.fromOffset(72, 30)
+    btn3DRim.Position = UDim2.new(1, -150, 0.5, -15)
+    btn3DRim.BackgroundColor3 = Color3.fromRGB(190, 255, 145)
+    btn3DRim.BorderSizePixel = 0
+    btn3DRim.ZIndex = 6
+    btn3DRim.Parent = titlePlate
+    Instance.new("UICorner", btn3DRim).CornerRadius = UDim.new(0, 10)
+    local b3ds = Instance.new("UIStroke", btn3DRim)
+    b3ds.Thickness = 2.5
+    b3ds.Color = Color3.fromRGB(22, 5, 36)
+
+    local btn3D = Instance.new("TextButton")
+    btn3D.Size = UDim2.new(1, -4, 1, -4)
+    btn3D.Position = UDim2.fromOffset(2, 2)
+    btn3D.BackgroundColor3 = Color3.fromRGB(115, 225, 70)
+    btn3D.Text = "3D: ON"
+    btn3D.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn3D.TextSize = 12
+    btn3D.Font = Enum.Font.FredokaOne
+    btn3D.BorderSizePixel = 0
+    btn3D.AutoButtonColor = false
+    btn3D.ZIndex = 7
+    btn3D.Parent = btn3DRim
+    Instance.new("UICorner", btn3D).CornerRadius = UDim.new(0, 8)
+    local b3dts = Instance.new("UIStroke", btn3D)
+    b3dts.Thickness = 2.5
+    b3dts.Color = Color3.fromRGB(22, 5, 36)
+    Library.AttachInteractiveEffects(btn3D, btn3DRim)
+
+    local is3DActive = true
+    local originalCamType = Enum.CameraType.Custom
+    local originalCamCFrame = nil
+
+    btn3D.Activated:Connect(function()
+        is3DActive = not is3DActive
+        Library.PlaySound(SOUND_TOGGLE)
+        local cam = workspace.CurrentCamera
+
+        if not is3DActive then
+            pcall(function()
+                if cam then
+                    originalCamType = cam.CameraType
+                    originalCamCFrame = cam.CFrame
+                    cam.CameraType = Enum.CameraType.Scriptable
+                end
+            end)
+            self.BlackoutFrame.Visible = true
+
+            if self.LockConnection then self.LockConnection:Disconnect() end
+            self.LockConnection = RunService.RenderStepped:Connect(function()
+                if not is3DActive then
+                    local c = workspace.CurrentCamera
+                    if c then
+                        c.CameraType = Enum.CameraType.Scriptable
+                        c.CFrame = CFrame.new(0, 50000, 0)
+                    end
+                    if self.BlackoutFrame and not self.BlackoutFrame.Visible then
+                        self.BlackoutFrame.Visible = true
+                    end
+                end
+            end)
+
+            btn3DRim.BackgroundColor3 = Color3.fromRGB(255, 140, 150)
+            btn3D.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
+            btn3D.Text = "3D: OFF"
+        else
+            if self.LockConnection then
+                self.LockConnection:Disconnect()
+                self.LockConnection = nil
+            end
+            pcall(function()
+                if cam then
+                    cam.CameraType = originalCamType or Enum.CameraType.Custom
+                    if originalCamCFrame then cam.CFrame = originalCamCFrame end
+                end
+            end)
+            self.BlackoutFrame.Visible = false
+            btn3DRim.BackgroundColor3 = Color3.fromRGB(190, 255, 145)
+            btn3D.BackgroundColor3 = Color3.fromRGB(115, 225, 70)
+            btn3D.Text = "3D: ON"
+        end
+    end)
+
+    -- หน้าหลัก (Main View Container)
+    local mainView = Instance.new("Frame")
+    mainView.Name = "MainView"
+    mainView.Size = UDim2.new(1, 0, 1, -64)
+    mainView.Position = UDim2.fromOffset(0, 64)
+    mainView.BackgroundTransparency = 1
+    mainView.ZIndex = 3
+    mainView.Parent = card
+    self.MainView = mainView
+
     local function createColumnTray(pos: UDim2, size: UDim2)
         local trayRim = Instance.new("Frame")
         trayRim.Size = size
@@ -615,7 +713,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         trayRim.BackgroundColor3 = Color3.fromRGB(98, 52, 148)
         trayRim.BorderSizePixel = 0
         trayRim.ZIndex = 3
-        trayRim.Parent = card
+        trayRim.Parent = mainView
         Instance.new("UICorner", trayRim).CornerRadius = UDim.new(0, 20)
         
         local trayOuterBlack = Instance.new("UIStroke", trayRim)
@@ -642,10 +740,11 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         return container
     end
 
-    self.LeftColumn = createColumnTray(UDim2.fromOffset(14, 64), UDim2.new(0.5, -20, 1, -76))
-    self.RightColumn = createColumnTray(UDim2.new(0.5, 6, 0, 64), UDim2.new(0.5, -20, 1, -76))
+    self.LeftColumn = createColumnTray(UDim2.fromOffset(14, 0), UDim2.new(0.5, -20, 1, -12))
+    self.RightColumn = createColumnTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 1, -12))
     self.CenterColumn = self.LeftColumn
 
+    -- หน้าต่างตั้งค่าภาพ/เสียง (Settings Modal)
     local settingsModal = Instance.new("Frame")
     settingsModal.Name = "SettingsModal"
     settingsModal.Size = UDim2.fromOffset(270, 290)
@@ -771,123 +870,49 @@ function Library:GetColumn(side: string): Frame
 end
 
 -- ========================================================
--- ฟังก์ชันสร้างหน้าต่างใหม่ (SUB-PAGE MODAL + BACKDROP)
+-- ระบบแยกหน้า (SEPARATE VIEW / NOT POP-UP)
 -- ========================================================
-function Library:CreateSubPage(config: {Title: string, Size: UDim2?})
-    local width = config.Size and config.Size.X.Offset or 520
-    local height = config.Size and config.Size.Y.Offset or 360
+function Library:CreatePage(name: string)
+    local pageView = Instance.new("Frame")
+    pageView.Name = "PageView_" .. name
+    pageView.Size = UDim2.new(1, -28, 1, -76)
+    pageView.Position = UDim2.fromOffset(14, 64)
+    pageView.BackgroundColor3 = Color3.fromRGB(38, 12, 62)
+    pageView.BorderSizePixel = 0
+    pageView.ZIndex = 5
+    pageView.Visible = false
+    pageView.Parent = self.CardInner
+    Instance.new("UICorner", pageView).CornerRadius = UDim.new(0, 18)
 
-    -- แผ่นม่านโปร่งแสงบังด้านหลัง (Backdrop)
-    local backdrop = Instance.new("TextButton")
-    backdrop.Name = "SubPageBackdrop_" .. config.Title
-    backdrop.Size = UDim2.fromScale(1, 1)
-    backdrop.BackgroundColor3 = Color3.fromRGB(15, 5, 25)
-    backdrop.BackgroundTransparency = 0.45
-    backdrop.Text = ""
-    backdrop.AutoButtonColor = false
-    backdrop.BorderSizePixel = 0
-    backdrop.ZIndex = 80
-    backdrop.Visible = false
-    backdrop.Parent = self.CardInner
-
-    local pageFrame = Instance.new("Frame")
-    pageFrame.Name = "SubPageFrame"
-    pageFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    pageFrame.Size = UDim2.fromOffset(width, height)
-    pageFrame.Position = UDim2.fromScale(0.5, 0.5)
-    pageFrame.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
-    pageFrame.BorderSizePixel = 0
-    pageFrame.ZIndex = 82
-    pageFrame.Active = true
-    pageFrame.Parent = backdrop
-    Instance.new("UICorner", pageFrame).CornerRadius = UDim.new(0, 20)
-
-    local stroke = Instance.new("UIStroke", pageFrame)
-    stroke.Thickness = 4
+    local stroke = Instance.new("UIStroke", pageView)
+    stroke.Thickness = 3.5
     stroke.Color = Color3.fromRGB(22, 5, 36)
 
-    local subScale = Instance.new("UIScale")
-    subScale.Scale = 1
-    subScale.Parent = pageFrame
+    applyCartoonSurface(pageView, 5, 18, false)
 
-    -- Header Title Bar
-    local header = Instance.new("Frame")
-    header.Size = UDim2.new(1, -20, 0, 42)
-    header.Position = UDim2.fromOffset(10, 10)
-    header.BackgroundColor3 = Color3.fromRGB(75, 28, 115)
-    header.BorderSizePixel = 0
-    header.ZIndex = 83
-    header.Parent = pageFrame
-    Instance.new("UICorner", header).CornerRadius = UDim.new(0, 12)
-    local hs = Instance.new("UIStroke", header)
-    hs.Thickness = 2.5
-    hs.Color = Color3.fromRGB(22, 5, 36)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1, -20, 1, -20)
+    container.Position = UDim2.fromOffset(10, 10)
+    container.BackgroundTransparency = 1
+    container.ZIndex = 6
+    container.Parent = pageView
 
-    local titleLbl = Instance.new("TextLabel")
-    titleLbl.Size = UDim2.new(1, -44, 1, 0)
-    titleLbl.Position = UDim2.fromOffset(12, 0)
-    titleLbl.BackgroundTransparency = 1
-    titleLbl.Text = config.Title
-    titleLbl.TextColor3 = Color3.fromRGB(255, 225, 95)
-    titleLbl.TextSize = 15
-    titleLbl.Font = Enum.Font.FredokaOne
-    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-    titleLbl.ZIndex = 84
-    titleLbl.Parent = header
-    local ts = Instance.new("UIStroke", titleLbl)
-    ts.Thickness = 2.5
-    ts.Color = Color3.fromRGB(22, 5, 36)
-
-    local closeBtn = Instance.new("TextButton")
-    closeBtn.Size = UDim2.fromOffset(28, 28)
-    closeBtn.Position = UDim2.new(1, -34, 0.5, -14)
-    closeBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
-    closeBtn.Text = "✕"
-    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeBtn.TextSize = 14
-    closeBtn.Font = Enum.Font.FredokaOne
-    closeBtn.BorderSizePixel = 0
-    closeBtn.ZIndex = 84
-    closeBtn.Parent = header
-    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
-    Library.AttachInteractiveEffects(closeBtn)
-
-    local function closePage()
-        if Library.Settings.Animations then
-            local tw = TweenService:Create(subScale, windowSquishClose, { Scale = 0.05 })
-            tw:Play()
-            tw.Completed:Wait()
-        end
-        backdrop.Visible = false
-        subScale.Scale = 1
+    local function showPage()
+        self.MainView.Visible = false
+        pageView.Visible = true
         Library.PlaySound(SOUND_TOGGLE)
     end
 
-    local function openPage()
-        backdrop.Visible = true
+    local function showMain()
+        pageView.Visible = false
+        self.MainView.Visible = true
         Library.PlaySound(SOUND_TOGGLE)
-        if Library.Settings.Animations then
-            subScale.Scale = 0.05
-            TweenService:Create(subScale, windowPopOpen, { Scale = 1 }):Play()
-        else
-            subScale.Scale = 1
-        end
     end
-
-    closeBtn.Activated:Connect(closePage)
-
-    local content = Instance.new("Frame")
-    content.Size = UDim2.new(1, -20, 1, -66)
-    content.Position = UDim2.fromOffset(10, 58)
-    content.BackgroundTransparency = 1
-    content.ZIndex = 83
-    content.Parent = pageFrame
 
     return {
-        Frame = pageFrame,
-        Content = content,
-        Open = openPage,
-        Close = closePage
+        Container = container,
+        Show = showPage,
+        Hide = showMain
     }
 end
 
@@ -1212,113 +1237,6 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
             if scroll.Visible then populate() end
         end
     }
-end
-
-function Library:Create3DRenderToggle(side: string)
-    local parent = self:GetColumn(side or "Right")
-    local enabled = true
-
-    local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(0, 118, 0, 39)
-    shadow.Position = UDim2.new(1, -118, 1, -41)
-    shadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
-    shadow.BorderSizePixel = 0
-    shadow.ZIndex = 15
-    shadow.Parent = parent
-    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 12)
-
-    local btnRim = Instance.new("Frame")
-    btnRim.Size = UDim2.new(1, 0, 0, 36)
-    btnRim.Position = UDim2.fromOffset(0, 0)
-    btnRim.BackgroundColor3 = Color3.fromRGB(190, 255, 145)
-    btnRim.BorderSizePixel = 0
-    btnRim.ZIndex = 16
-    btnRim.Parent = shadow
-    Instance.new("UICorner", btnRim).CornerRadius = UDim.new(0, 12)
-    local bs = Instance.new("UIStroke", btnRim)
-    bs.Thickness = 3
-    bs.Color = Color3.fromRGB(22, 5, 36)
-
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -6, 1, -5)
-    btn.Position = UDim2.fromOffset(3, 2)
-    btn.BackgroundColor3 = Color3.fromRGB(115, 225, 70)
-    btn.Text = ""
-    btn.BorderSizePixel = 0
-    btn.AutoButtonColor = false
-    btn.ZIndex = 17
-    btn.Parent = btnRim
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 9)
-
-    applyCartoonSurface(btn, 17, 9, false)
-
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.fromScale(1, 1)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = "[ 3D: ON ]"
-    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
-    lbl.TextSize = 12.5
-    lbl.Font = Enum.Font.FredokaOne
-    lbl.ZIndex = 19
-    lbl.Parent = btn
-    local ts = Instance.new("UIStroke", lbl)
-    ts.Thickness = 2.8
-    ts.Color = Color3.fromRGB(22, 5, 36)
-
-    Library.AttachInteractiveEffects(btn, shadow)
-
-    local originalCamType = Enum.CameraType.Custom
-    local originalCamCFrame = nil
-
-    btn.Activated:Connect(function()
-        enabled = not enabled
-        Library.PlaySound(SOUND_TOGGLE)
-        local cam = workspace.CurrentCamera
-
-        if not enabled then
-            pcall(function()
-                if cam then
-                    originalCamType = cam.CameraType
-                    originalCamCFrame = cam.CFrame
-                    cam.CameraType = Enum.CameraType.Scriptable
-                end
-            end)
-            self.BlackoutFrame.Visible = true
-
-            if self.LockConnection then self.LockConnection:Disconnect() end
-            self.LockConnection = RunService.RenderStepped:Connect(function()
-                if not enabled then
-                    local c = workspace.CurrentCamera
-                    if c then
-                        c.CameraType = Enum.CameraType.Scriptable
-                        c.CFrame = CFrame.new(0, 50000, 0)
-                    end
-                    if self.BlackoutFrame and not self.BlackoutFrame.Visible then
-                        self.BlackoutFrame.Visible = true
-                    end
-                end
-            end)
-
-            btnRim.BackgroundColor3 = Color3.fromRGB(255, 150, 160)
-            btn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
-            lbl.Text = "[ 3D: OFF ]"
-        else
-            if self.LockConnection then
-                self.LockConnection:Disconnect()
-                self.LockConnection = nil
-            end
-            pcall(function()
-                if cam then
-                    cam.CameraType = originalCamType or Enum.CameraType.Custom
-                    if originalCamCFrame then cam.CFrame = originalCamCFrame end
-                end
-            end)
-            self.BlackoutFrame.Visible = false
-            btnRim.BackgroundColor3 = Color3.fromRGB(190, 255, 145)
-            btn.BackgroundColor3 = Color3.fromRGB(115, 225, 70)
-            lbl.Text = "[ 3D: ON ]"
-        end
-    end)
 end
 
 return Library
