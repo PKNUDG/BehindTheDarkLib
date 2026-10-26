@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (CLEAN TEXT & RESTORED UI)
+-- BEHIND THE DARK : CORE UI LIBRARY (FULL EFFECTS & RESTORED 3D)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -73,6 +73,8 @@ loadSavedSettings()
 
 local springBounce = TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local pressSquish = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local glintTween = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local rippleTween = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local toggleSlide = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local windowPopOpen = TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local windowSquishClose = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
@@ -157,7 +159,7 @@ local function spawnClickRipple(btn: GuiButton, inputPos: Vector3)
     Instance.new("UICorner", ripple).CornerRadius = UDim.new(1, 0)
 
     local targetSize = math.max(btn.AbsoluteSize.X, btn.AbsoluteSize.Y) * 2.1
-    local tw = TweenService:Create(ripple, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+    local tw = TweenService:Create(ripple, rippleTween, {
         Size = UDim2.fromOffset(targetSize, targetSize),
         BackgroundTransparency = 1
     })
@@ -179,18 +181,49 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
         uiScale.Parent = targetObj
     end
 
+    local glint = Instance.new("Frame")
+    glint.Name = "AnimeGlint"
+    glint.Size = UDim2.new(0.26, 0, 2.6, 0)
+    glint.Position = UDim2.new(-0.7, 0, -0.8, 0)
+    glint.Rotation = 22
+    glint.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    glint.BackgroundTransparency = 0.52
+    glint.BorderSizePixel = 0
+    glint.ZIndex = btn.ZIndex + 3
+    glint.Parent = btn
+    Instance.new("UICorner", glint).CornerRadius = UDim.new(1, 0)
+
+    local sharpLine = Instance.new("Frame")
+    sharpLine.Size = UDim2.new(0.2, 0, 1, 0)
+    sharpLine.Position = UDim2.new(1.15, 0, 0, 0)
+    sharpLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    sharpLine.BackgroundTransparency = 0.35
+    sharpLine.BorderSizePixel = 0
+    sharpLine.ZIndex = btn.ZIndex + 3
+    sharpLine.Parent = glint
+
     btn.MouseEnter:Connect(function()
         isHovered = true
         if Library.Settings.Animations then
             TweenService:Create(uiScale, springBounce, { Scale = 1.025 }):Play()
+            if Library.Settings.AnimeGlint then
+                glint.Position = UDim2.new(-0.7, 0, -0.8, 0)
+                glint.BackgroundTransparency = 0.50
+                TweenService:Create(glint, glintTween, {
+                    Position = UDim2.new(1.5, 0, -0.8, 0),
+                    BackgroundTransparency = 0.85
+                }):Play()
+            end
         end
     end)
+
     btn.MouseLeave:Connect(function()
         isHovered = false
         if Library.Settings.Animations then
             TweenService:Create(uiScale, springBounce, { Scale = 1 }):Play()
         end
     end)
+
     btn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             Library.PlaySound(SOUND_CLICK)
@@ -200,6 +233,7 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
             end
         end
     end)
+
     btn.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             if Library.Settings.Animations then
@@ -483,7 +517,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     -- Widget แสดง CPU | GPU | Ping
     local perfBadge = Instance.new("Frame")
     perfBadge.Size = UDim2.new(0, 195, 0, 28)
-    perfBadge.Position = UDim2.new(1, -332, 0.5, -14)
+    perfBadge.Position = UDim2.new(1, -356, 0.5, -14)
     perfBadge.BackgroundColor3 = Color3.fromRGB(28, 8, 48)
     perfBadge.BorderSizePixel = 0
     perfBadge.ZIndex = 6
@@ -588,11 +622,11 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 8)
     Library.AttachInteractiveEffects(settingsBtn, setBtnRim)
 
-    -- ปุ่ม 3D (คงโครงสร้างเดิม, ข้อความ "3D", ON=เขียว, OFF=แดง)
+    -- ปุ่ม 3D (โครงสร้างเดิม: ON สีเขียว อักษรดำ / OFF สีเทา อักษรขาว)
     local btn3DRim = Instance.new("Frame")
-    btn3DRim.Size = UDim2.fromOffset(48, 30)
-    btn3DRim.Position = UDim2.new(1, -126, 0.5, -15)
-    btn3DRim.BackgroundColor3 = Color3.fromRGB(115, 95, 175)
+    btn3DRim.Size = UDim2.fromOffset(74, 30)
+    btn3DRim.Position = UDim2.new(1, -152, 0.5, -15)
+    btn3DRim.BackgroundColor3 = Color3.fromRGB(190, 255, 145)
     btn3DRim.BorderSizePixel = 0
     btn3DRim.ZIndex = 6
     btn3DRim.Parent = titlePlate
@@ -604,10 +638,10 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     local btn3D = Instance.new("TextButton")
     btn3D.Size = UDim2.new(1, -4, 1, -4)
     btn3D.Position = UDim2.fromOffset(2, 2)
-    btn3D.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
+    btn3D.BackgroundColor3 = Color3.fromRGB(115, 225, 70)
     btn3D.Text = "3D"
-    btn3D.TextColor3 = Color3.fromRGB(130, 255, 85)
-    btn3D.TextSize = 13
+    btn3D.TextColor3 = Color3.fromRGB(24, 6, 38)
+    btn3D.TextSize = 12.5
     btn3D.Font = Enum.Font.FredokaOne
     btn3D.BorderSizePixel = 0
     btn3D.AutoButtonColor = false
@@ -615,7 +649,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     btn3D.Parent = btn3DRim
     Instance.new("UICorner", btn3D).CornerRadius = UDim.new(0, 8)
     local b3dts = Instance.new("UIStroke", btn3D)
-    b3dts.Thickness = 2.2
+    b3dts.Thickness = 2
     b3dts.Color = Color3.fromRGB(22, 5, 36)
     Library.AttachInteractiveEffects(btn3D, btn3DRim)
 
@@ -652,7 +686,9 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
                 end
             end)
 
-            btn3D.TextColor3 = Color3.fromRGB(255, 75, 75)
+            btn3DRim.BackgroundColor3 = Color3.fromRGB(160, 160, 170)
+            btn3D.BackgroundColor3 = Color3.fromRGB(120, 120, 130)
+            btn3D.TextColor3 = Color3.fromRGB(255, 255, 255)
         else
             if self.LockConnection then
                 self.LockConnection:Disconnect()
@@ -665,7 +701,9 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
                 end
             end)
             self.BlackoutFrame.Visible = false
-            btn3D.TextColor3 = Color3.fromRGB(130, 255, 85)
+            btn3DRim.BackgroundColor3 = Color3.fromRGB(190, 255, 145)
+            btn3D.BackgroundColor3 = Color3.fromRGB(115, 225, 70)
+            btn3D.TextColor3 = Color3.fromRGB(24, 6, 38)
         end
     end)
 
@@ -720,7 +758,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     end
 
     -- ========================================================
-    -- SETTINGS MODAL
+    -- SETTINGS MODAL (3D TRAY THEME)
     -- ========================================================
     local settingDim = Instance.new("TextButton")
     settingDim.Name = "SettingDimBackdrop"
@@ -873,7 +911,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         local switchTrack = Instance.new("TextButton")
         switchTrack.Size = UDim2.fromOffset(44, 22)
         switchTrack.Position = UDim2.new(1, -50, 0.5, -11)
-        switchTrack.BackgroundColor3 = Library.Settings[settingKey] and Color3.fromRGB(110, 215, 65) or Color3.fromRGB(75, 65, 95)
+        switchTrack.BackgroundColor3 = Color3.fromRGB(36, 12, 58)
         switchTrack.Text = ""
         switchTrack.BorderSizePixel = 0
         switchTrack.AutoButtonColor = false
@@ -887,7 +925,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         local thumb = Instance.new("Frame")
         thumb.Size = UDim2.fromOffset(18, 18)
         thumb.Position = Library.Settings[settingKey] and UDim2.fromOffset(23, 2) or UDim2.fromOffset(2, 2)
-        thumb.BackgroundColor3 = Library.Settings[settingKey] and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(215, 215, 225)
+        thumb.BackgroundColor3 = Library.Settings[settingKey] and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(175, 175, 185)
         thumb.BorderSizePixel = 0
         thumb.ZIndex = 77
         thumb.Parent = switchTrack
@@ -899,12 +937,9 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
             Library.PlaySound(SOUND_TOGGLE)
             Library.SaveSettings()
 
-            TweenService:Create(switchTrack, toggleSlide, {
-                BackgroundColor3 = active and Color3.fromRGB(110, 215, 65) or Color3.fromRGB(75, 65, 95)
-            }):Play()
             TweenService:Create(thumb, toggleSlide, {
                 Position = active and UDim2.fromOffset(23, 2) or UDim2.fromOffset(2, 2),
-                BackgroundColor3 = active and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(215, 215, 225)
+                BackgroundColor3 = active and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(175, 175, 185)
             }):Play()
 
             if onToggle then onToggle(active) end
@@ -983,7 +1018,7 @@ function Library:CreatePage(name: string)
 end
 
 -- ========================================================
--- 3D LAYERED TOGGLE
+-- 3D LAYERED TOGGLE (พร้อมแสงวาบ ANIME GLINT)
 -- ========================================================
 function Library:CreateToggle(target: any, text: string, yPos: number, _: {On: Color3, Off: Color3}, default: boolean, callback: (boolean) -> ())
     local parent: Frame = (typeof(target) == "Instance") and target or self:GetColumn(target)
