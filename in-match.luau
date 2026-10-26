@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : IN-MATCH CONTROLLER (STABLE MULTI-TRAY & AUTO REMOTE)
+-- CANDY TD : IN-MATCH CONTROLLER (CLEAN SEPARATED TRAYS)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -275,7 +275,6 @@ local states = {
 local refreshRecordUI: (() -> ())? = nil
 local lastRecordTick = 0
 
--- ระบบดึงและประมวลผลตำแหน่งยูนิต
 local function handleRecordInput(...)
     if not states.RecordMode then return end
     local rawArgs = { ... }
@@ -452,7 +451,6 @@ if not libChunk then
 end
 local Library = libChunk()
 
--- ระบบผูกจำค่า PlaceId อัตโนมัติ
 local currentPlaceId = tostring(game.PlaceId)
 if Library.Settings.PlaceIdStageMap and Library.Settings.PlaceIdStageMap[currentPlaceId] then
     local mapped = Library.Settings.PlaceIdStageMap[currentPlaceId]
@@ -482,7 +480,6 @@ local Window = Library:CreateWindow({
 })
 Controller.Gui = Window.Gui
 
--- โหลดค่าปุ่มสถานะเดิม
 if Library.Settings.LastEndChoice then states.EndChoice = Library.Settings.LastEndChoice end
 if Library.Settings.AutoUpgradeSetting ~= nil then states.AutoUpgrade = Library.Settings.AutoUpgradeSetting end
 if Library.Settings.AutoSkipWaveSetting ~= nil then states.AutoSkipWave = Library.Settings.AutoSkipWaveSetting end
@@ -514,7 +511,6 @@ againLimitUpdater = Window:CreateToggle("Left", "Again Count Limit", 144, { On =
     states.AgainBeforeHomeActive = v
 end)
 
--- Target Rounds 3D
 local leftCol = Window:GetColumn("Left")
 
 local configBoxShadow = Instance.new("Frame")
@@ -669,271 +665,91 @@ btnPlus.Activated:Connect(function()
 end)
 
 -- ========================================================
--- ควบคุมฝั่งขวา: แยกเป็น 2 กล่องพื้นหลัง (TRAY) ชัดเจน
+-- ควบคุมฝั่งขวา: แยกเป็น 2 กรอบพื้นหลังอิสระ ไม่ซ้อนกัน
 -- ========================================================
-local rightCol = Window:GetColumn("Right")
+-- ซ่อน Tray รวมเดิมของฝั่งขวา
+local origRightTray = Window.RightColumn.Parent.Parent
+origRightTray.Visible = false
 
--- 1. กล่องพื้นหลังส่วนบน: สำหรับปุ่มทั่วไป (Auto Upgrade, Auto Skip, Boost FPS)
-local topTrayRim = Instance.new("Frame")
-topTrayRim.Size = UDim2.new(1, 0, 0, 140)
-topTrayRim.Position = UDim2.fromOffset(0, 0)
-topTrayRim.BackgroundColor3 = Color3.fromRGB(85, 42, 135)
-topTrayRim.BorderSizePixel = 0
-topTrayRim.ZIndex = 4
-topTrayRim.Parent = rightCol
-Instance.new("UICorner", topTrayRim).CornerRadius = UDim.new(0, 16)
-local ttrStroke = Instance.new("UIStroke", topTrayRim)
-ttrStroke.Thickness = 2.5
-ttrStroke.Color = Color3.fromRGB(22, 5, 36)
+-- 1. กล่องบน: สำหรับ Auto Upgrade, Auto Skip, Boost FPS
+local topTray = Window:CreateSubColumn(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 152))
 
-local topTrayInner = Instance.new("Frame")
-topTrayInner.Size = UDim2.new(1, -6, 1, -6)
-topTrayInner.Position = UDim2.fromOffset(3, 3)
-topTrayInner.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
-topTrayInner.BorderSizePixel = 0
-topTrayInner.ZIndex = 4
-topTrayInner.Parent = topTrayRim
-Instance.new("UICorner", topTrayInner).CornerRadius = UDim.new(0, 14)
-
-local function createSubToggle(parentTray: Instance, text: string, yPos: number, defaultState: boolean, callback: (boolean) -> ())
-    local state = defaultState or false
-    local btnShadow = Instance.new("Frame")
-    btnShadow.Size = UDim2.new(1, -16, 0, 38)
-    btnShadow.Position = UDim2.fromOffset(8, yPos)
-    btnShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
-    btnShadow.BorderSizePixel = 0
-    btnShadow.ZIndex = 5
-    btnShadow.Parent = parentTray
-    Instance.new("UICorner", btnShadow).CornerRadius = UDim.new(0, 10)
-
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 1, -3)
-    btn.Position = UDim2.fromOffset(0, 0)
-    btn.BackgroundColor3 = state and Color3.fromRGB(110, 215, 65) or Color3.fromRGB(154, 102, 224)
-    btn.Text = ""
-    btn.BorderSizePixel = 0
-    btn.AutoButtonColor = false
-    btn.ZIndex = 6
-    btn.Parent = btnShadow
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 9)
-    local bs = Instance.new("UIStroke", btn)
-    bs.Thickness = 2
-    bs.Color = Color3.fromRGB(22, 5, 36)
-
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -50, 1, 0)
-    lbl.Position = UDim2.fromOffset(10, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text
-    lbl.TextColor3 = state and Color3.fromRGB(180, 255, 75) or Color3.fromRGB(240, 230, 255)
-    lbl.TextSize = 13
-    lbl.Font = Enum.Font.FredokaOne
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.ZIndex = 7
-    lbl.Parent = btn
-
-    local switchTrack = Instance.new("Frame")
-    switchTrack.Size = UDim2.fromOffset(36, 18)
-    switchTrack.Position = UDim2.new(1, -44, 0.5, -9)
-    switchTrack.BackgroundColor3 = Color3.fromRGB(34, 10, 56)
-    switchTrack.BorderSizePixel = 0
-    switchTrack.ZIndex = 7
-    switchTrack.Parent = btn
-    Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
-
-    local thumb = Instance.new("Frame")
-    thumb.Size = UDim2.fromOffset(14, 14)
-    thumb.Position = state and UDim2.fromOffset(19, 2) or UDim2.fromOffset(2, 2)
-    thumb.BackgroundColor3 = state and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(175, 175, 185)
-    thumb.BorderSizePixel = 0
-    thumb.ZIndex = 8
-    thumb.Parent = switchTrack
-    Instance.new("UICorner", thumb).CornerRadius = UDim.new(1, 0)
-
-    Library.AttachInteractiveEffects(btn, btnShadow)
-
-    local function setVis(val: boolean)
-        state = val
-        btn.BackgroundColor3 = state and Color3.fromRGB(110, 215, 65) or Color3.fromRGB(154, 102, 224)
-        lbl.TextColor3 = state and Color3.fromRGB(180, 255, 75) or Color3.fromRGB(240, 230, 255)
-        thumb.Position = state and UDim2.fromOffset(19, 2) or UDim2.fromOffset(2, 2)
-        thumb.BackgroundColor3 = state and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(175, 175, 185)
-    end
-
-    btn.Activated:Connect(function()
-        state = not state
-        Library.PlaySound("rbxassetid://9069609268")
-        setVis(state)
-        callback(state)
-    end)
-
-    return setVis
-end
-
-createSubToggle(topTrayInner, "Auto Upgrade All", 6, states.AutoUpgrade, function(v)
+Window:CreateToggle(topTray, "Auto Upgrade All", 0, { On = Color3.fromRGB(90, 195, 60), Off = Color3.fromRGB(120, 120, 130) }, states.AutoUpgrade, function(v)
     states.AutoUpgrade = v
     Library.Settings.AutoUpgradeSetting = v
     Library.SaveSettings()
 end)
 
-createSubToggle(topTrayInner, "Auto Skip Wave", 48, states.AutoSkipWave, function(v)
+Window:CreateToggle(topTray, "Auto Skip Wave", 46, { On = Color3.fromRGB(160, 75, 235), Off = Color3.fromRGB(120, 120, 130) }, states.AutoSkipWave, function(v)
     states.AutoSkipWave = v
     Library.Settings.AutoSkipWaveSetting = v
     Library.SaveSettings()
 end)
 
-createSubToggle(topTrayInner, "Boost FPS", 90, states.BoostFPS, function(v)
+Window:CreateToggle(topTray, "Boost FPS", 92, { On = Color3.fromRGB(50, 205, 150), Off = Color3.fromRGB(120, 120, 130) }, states.BoostFPS, function(v)
     states.BoostFPS = v
     Library.Settings.BoostFPSSetting = v
     Library.SaveSettings()
     applyUltraBoostFPS(v)
 end)
 
--- 2. กล่องพื้นหลังส่วนล่าง (แยกออกมาอีกกล่องแต่อยู่ที่เดิม): สำหรับปุ่มตั้งแต่ Auto Place ลงไป
-local bottomTrayRim = Instance.new("Frame")
-bottomTrayRim.Size = UDim2.new(1, 0, 0, 184)
-bottomTrayRim.Position = UDim2.fromOffset(0, 148)
-bottomTrayRim.BackgroundColor3 = Color3.fromRGB(85, 42, 135)
-bottomTrayRim.BorderSizePixel = 0
-bottomTrayRim.ZIndex = 4
-bottomTrayRim.Parent = rightCol
-Instance.new("UICorner", bottomTrayRim).CornerRadius = UDim.new(0, 16)
-local btrStroke = Instance.new("UIStroke", bottomTrayRim)
-btrStroke.Thickness = 2.5
-btrStroke.Color = Color3.fromRGB(22, 5, 36)
+-- 2. กล่องล่าง: สำหรับ Auto Place และกลุ่ม Stage Presets
+local bottomTray = Window:CreateSubColumn(UDim2.new(0.5, 6, 0, 160), UDim2.new(0.5, -20, 1, -172))
 
-local bottomTrayInner = Instance.new("Frame")
-bottomTrayInner.Size = UDim2.new(1, -6, 1, -6)
-bottomTrayInner.Position = UDim2.fromOffset(3, 3)
-bottomTrayInner.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
-bottomTrayInner.BorderSizePixel = 0
-bottomTrayInner.ZIndex = 4
-bottomTrayInner.Parent = bottomTrayRim
-Instance.new("UICorner", bottomTrayInner).CornerRadius = UDim.new(0, 14)
-
-local autoPlaceToggle = createSubToggle(bottomTrayInner, "Auto Place", 6, states.AutoPlace, function(v)
+local autoPlaceToggle = nil
+autoPlaceToggle = Window:CreateToggle(bottomTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
     states.AutoPlace = v
     Library.Settings.AutoPlaceSetting = v
     Library.SaveSettings()
 end)
 
--- Dropdown Stage ภายในกล่องล่าง
-local stageDropdownShadow = Instance.new("Frame")
-stageDropdownShadow.Size = UDim2.new(1, -16, 0, 38)
-stageDropdownShadow.Position = UDim2.fromOffset(8, 48)
-stageDropdownShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
-stageDropdownShadow.BorderSizePixel = 0
-stageDropdownShadow.ZIndex = 8
-stageDropdownShadow.Parent = bottomTrayInner
-Instance.new("UICorner", stageDropdownShadow).CornerRadius = UDim.new(0, 10)
-
-local stageDropdownBtn = Instance.new("TextButton")
-stageDropdownBtn.Size = UDim2.new(1, 0, 1, -3)
-stageDropdownBtn.Position = UDim2.fromOffset(0, 0)
-stageDropdownBtn.BackgroundColor3 = Color3.fromRGB(65, 22, 105)
-stageDropdownBtn.BorderSizePixel = 0
-stageDropdownBtn.AutoButtonColor = false
-stageDropdownBtn.Text = ""
-stageDropdownBtn.ZIndex = 9
-stageDropdownBtn.Parent = stageDropdownShadow
-Instance.new("UICorner", stageDropdownBtn).CornerRadius = UDim.new(0, 9)
-local sdbStroke = Instance.new("UIStroke", stageDropdownBtn)
-sdbStroke.Thickness = 2
-sdbStroke.Color = Color3.fromRGB(22, 5, 36)
-
-local stageSelectLbl = Instance.new("TextLabel")
-stageSelectLbl.Size = UDim2.new(1, -36, 1, 0)
-stageSelectLbl.Position = UDim2.fromOffset(10, 0)
-stageSelectLbl.BackgroundTransparency = 1
-stageSelectLbl.Text = "Stage: " .. tostring(states.CurrentStage)
-stageSelectLbl.TextColor3 = Color3.fromRGB(255, 225, 95)
-stageSelectLbl.TextSize = 13
-stageSelectLbl.Font = Enum.Font.FredokaOne
-stageSelectLbl.TextXAlignment = Enum.TextXAlignment.Left
-stageSelectLbl.ZIndex = 10
-stageSelectLbl.Parent = stageDropdownBtn
-
-local stageScroll = Instance.new("ScrollingFrame")
-stageScroll.Size = UDim2.new(1, 0, 0, 84)
-stageScroll.Position = UDim2.fromOffset(0, 42)
-stageScroll.BackgroundColor3 = Color3.fromRGB(34, 10, 58)
-stageScroll.BorderSizePixel = 0
-stageScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-stageScroll.Visible = false
-stageScroll.ZIndex = 30
-stageScroll.Parent = stageDropdownBtn
-Instance.new("UICorner", stageScroll).CornerRadius = UDim.new(0, 10)
-local ssStroke = Instance.new("UIStroke", stageScroll)
-ssStroke.Thickness = 2
-ssStroke.Color = Color3.fromRGB(22, 5, 36)
-Library.ApplyCartoonScrollbar(stageScroll)
-local sListLay = Instance.new("UIListLayout", stageScroll)
-sListLay.Padding = UDim.new(0, 3)
-
-local function populateStageOptions()
-    for _, ch in ipairs(stageScroll:GetChildren()) do
-        if ch:IsA("TextButton") then ch:Destroy() end
-    end
-    for _, name in ipairs(getStageNames()) do
-        local optBtn = Instance.new("TextButton")
-        optBtn.Size = UDim2.new(1, -6, 0, 26)
-        optBtn.BackgroundColor3 = (name == states.CurrentStage) and Color3.fromRGB(115, 70, 185) or Color3.fromRGB(52, 20, 88)
-        optBtn.Text = tostring(name)
-        optBtn.TextColor3 = (name == states.CurrentStage) and Color3.fromRGB(255, 225, 95) or Color3.fromRGB(242, 230, 255)
-        optBtn.TextSize = 12
-        optBtn.Font = Enum.Font.FredokaOne
-        optBtn.BorderSizePixel = 0
-        optBtn.ZIndex = 31
-        optBtn.Parent = stageScroll
-        Instance.new("UICorner", optBtn).CornerRadius = UDim.new(0, 6)
-
-        optBtn.Activated:Connect(function()
-            states.CurrentStage = name
-            states.RecordStageName = name
-            stageSelectLbl.Text = "Stage: " .. tostring(name)
-            stageScroll.Visible = false
-            Library.PlaySound("rbxassetid://6895079853")
-            Library.Settings.SelectedStage = name
-            Library.Settings.PlaceIdStageMap = Library.Settings.PlaceIdStageMap or {}
-            Library.Settings.PlaceIdStageMap[currentPlaceId] = name
-            Library.SaveSettings()
-        end)
-    end
-end
-
-stageDropdownBtn.Activated:Connect(function()
-    stageScroll.Visible = not stageScroll.Visible
-    Library.PlaySound("rbxassetid://6895079853")
-    if stageScroll.Visible then populateStageOptions() end
+local stageDropdown = Window:CreateDropdown(bottomTray, "Stage", 46, getStageNames(), states.CurrentStage, 10, function(selected)
+    states.CurrentStage = selected
+    states.RecordStageName = selected
+    Library.Settings.SelectedStage = selected
+    Library.Settings.PlaceIdStageMap = Library.Settings.PlaceIdStageMap or {}
+    Library.Settings.PlaceIdStageMap[currentPlaceId] = selected
+    Library.SaveSettings()
 end)
 
--- ปุ่ม Record & Presets และ Reload ภายในกล่องล่าง
-local function createTrayButton(text: string, yPos: number, btnColor: Color3, callback: () -> ())
+local function createBottomActionButton(text: string, yPos: number, rimColor: Color3, btnColor: Color3, callback: () -> ())
     local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(1, -16, 0, 38)
-    shadow.Position = UDim2.fromOffset(8, yPos)
+    shadow.Size = UDim2.new(1, 0, 0, 40)
+    shadow.Position = UDim2.fromOffset(0, yPos)
     shadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
     shadow.BorderSizePixel = 0
-    shadow.ZIndex = 6
-    shadow.Parent = bottomTrayInner
-    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 10)
+    shadow.ZIndex = 8
+    shadow.Parent = bottomTray
+    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 12)
+
+    local rim = Instance.new("Frame")
+    rim.Size = UDim2.new(1, 0, 0, 37)
+    rim.Position = UDim2.fromOffset(0, 0)
+    rim.BackgroundColor3 = rimColor
+    rim.BorderSizePixel = 0
+    rim.ZIndex = 9
+    rim.Parent = shadow
+    Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 12)
+    local rs = Instance.new("UIStroke", rim)
+    rs.Thickness = 2.5
+    rs.Color = Color3.fromRGB(22, 5, 36)
 
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 1, -3)
-    btn.Position = UDim2.fromOffset(0, 0)
+    btn.Size = UDim2.new(1, -6, 1, -5)
+    btn.Position = UDim2.fromOffset(3, 2)
     btn.BackgroundColor3 = btnColor
     btn.Text = text
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 12.5
+    btn.TextSize = 13.5
     btn.Font = Enum.Font.FredokaOne
     btn.BorderSizePixel = 0
     btn.AutoButtonColor = false
-    btn.ZIndex = 7
-    btn.Parent = shadow
+    btn.ZIndex = 10
+    btn.Parent = rim
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 9)
-    local bStroke = Instance.new("UIStroke", btn)
-    bStroke.Thickness = 2
-    bStroke.Color = Color3.fromRGB(22, 5, 36)
+    local bts = Instance.new("UIStroke", btn)
+    bts.Thickness = 2.5
+    bts.Color = Color3.fromRGB(22, 5, 36)
 
     Library.AttachInteractiveEffects(btn, shadow)
     btn.Activated:Connect(callback)
@@ -944,7 +760,6 @@ end
 -- ========================================================
 local RecordPage = Window:CreatePage("RecordView")
 
--- 1. แถบ Header
 local recHeader = Instance.new("Frame")
 recHeader.Size = UDim2.new(1, 0, 0, 36)
 recHeader.Position = UDim2.fromOffset(0, 0)
@@ -998,7 +813,6 @@ local rts = Instance.new("UIStroke", recTitle)
 rts.Thickness = 2.5
 rts.Color = Color3.fromRGB(22, 5, 36)
 
--- 2. ช่องใส่ชื่อด่านใหม่
 local inputShadow = Instance.new("Frame")
 inputShadow.Size = UDim2.new(0.58, -6, 0, 38)
 inputShadow.Position = UDim2.fromOffset(0, 44)
@@ -1027,7 +841,6 @@ local sis = Instance.new("UIStroke", stageInput)
 sis.Thickness = 2
 sis.Color = Color3.fromRGB(22, 5, 36)
 
--- 3. ปุ่มสลับ Record
 local recToggleShadow = Instance.new("Frame")
 recToggleShadow.Size = UDim2.new(0.42, 0, 0, 38)
 recToggleShadow.Position = UDim2.new(0.58, 6, 0, 44)
@@ -1055,7 +868,6 @@ rts2.Thickness = 2
 rts2.Color = Color3.fromRGB(22, 5, 36)
 Library.AttachInteractiveEffects(recToggleBtn, recToggleShadow)
 
--- 4. กรอบแสดงรายการตัวละครที่วาง
 local listShadow = Instance.new("Frame")
 listShadow.Size = UDim2.new(1, 0, 1, -132)
 listShadow.Position = UDim2.fromOffset(0, 88)
@@ -1211,12 +1023,11 @@ recToggleBtn.Activated:Connect(function()
         Library.Settings.PlaceIdStageMap = Library.Settings.PlaceIdStageMap or {}
         Library.Settings.PlaceIdStageMap[currentPlaceId] = clean
         Library.SaveSettings()
-        populateStageOptions()
+        stageDropdown.SetOptions(getStageNames())
     end
     refreshRecordUI()
 end)
 
--- 5. แถบควบคุมล่าง
 local bottomBar = Instance.new("Frame")
 bottomBar.Size = UDim2.new(1, 0, 0, 36)
 bottomBar.Position = UDim2.new(0, 0, 1, -36)
@@ -1298,18 +1109,18 @@ clearBtn.Activated:Connect(function()
     end
 end)
 
-createTrayButton("Setup Record & Presets ⚙", 92, Color3.fromRGB(235, 65, 85), function()
+createBottomActionButton("Setup Record & Presets ⚙", 96, Color3.fromRGB(255, 145, 160), Color3.fromRGB(235, 65, 85), function()
     stageInput.Text = states.CurrentStage
     states.RecordStageName = states.CurrentStage
     refreshRecordUI()
     RecordPage.Show()
 end)
 
-createTrayButton("Reload Presets ↺", 136, Color3.fromRGB(240, 160, 45), function()
+createBottomActionButton("Reload Presets ↺", 140, Color3.fromRGB(255, 220, 110), Color3.fromRGB(240, 160, 45), function()
     loadPresetsFromFile()
-    populateStageOptions()
+    stageDropdown.SetOptions(getStageNames())
     Library.PlaySound("rbxassetid://6895079853")
-    print(string.format("[PresetManager] โหลดค่าพรีเซ็ตสำเร็จ!"))
+    print("[PresetManager] โหลดค่าพรีเซ็ตสำเร็จ!")
 end)
 
 -- ========================================================
@@ -1378,7 +1189,6 @@ local function checkIsMatchEnded()
     local overlay = candyTD:FindFirstChild("Overlay")
     if overlay and overlay.Visible then return true end
 
-    -- ตรวจสอบหน้าต่างผลแพ้ชนะหรือคะแนนด้านใน GUI
     for _, desc in ipairs(candyTD:GetDescendants()) do
         if desc:IsA("GuiObject") and desc.Visible then
             local n = desc.Name:lower()
@@ -1402,7 +1212,7 @@ task.spawn(function()
             else
                 if not matchHandled and states.EndChoice ~= "NONE" then
                     matchHandled = true
-                    task.wait(1.2) -- รอหน้าต่างสรุปผลและแอนิเมชันขึ้นให้เรียบร้อย
+                    task.wait(1.2)
 
                     local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
                     local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
@@ -1412,7 +1222,6 @@ task.spawn(function()
                             print("[AutoNext] สั่ง Remote: Act -> 'next'")
                             actRemote:InvokeServer("next")
                         end
-                        -- ทริกเกอร์ปุ่ม Next บนหน้าจอเผื่อเกมต้องการยืนยันคลิก
                         for _, d in ipairs(candyTD:GetDescendants()) do
                             if d:IsA("GuiButton") and d.Visible and (d.Name:lower():find("next") or (d:IsA("TextButton") and d.Text:lower():find("next"))) then
                                 triggerInternalButton(d)
@@ -1435,7 +1244,6 @@ task.spawn(function()
                                 retRemote:InvokeServer()
                             end
                         end
-                        -- ทริกเกอร์ปุ่ม Home / Lobby บน Overlay หน้าจอโดยตรง
                         for _, d in ipairs(candyTD:GetDescendants()) do
                             if d:IsA("GuiButton") and d.Visible then
                                 local n = d.Name:lower()
