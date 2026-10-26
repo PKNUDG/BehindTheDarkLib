@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (PAGE & CARTOON SCROLLBAR)
+-- BEHIND THE DARK : CORE UI LIBRARY (ENHANCED SETTINGS & DIM)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -77,7 +77,6 @@ local toggleSlide = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirect
 local windowPopOpen = TweenInfo.new(0.38, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local windowSquishClose = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In)
 
--- ฟังก์ชันจัดรูปแบบแถบเลื่อนสไตล์การ์ตูน 3D
 function Library.ApplyCartoonScrollbar(scroll: ScrollingFrame)
     scroll.ScrollBarThickness = 6
     scroll.ScrollBarImageColor3 = Color3.fromRGB(182, 130, 248)
@@ -493,7 +492,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    -- แถบ Title Bar
+    -- Title Bar
     local titleRim = Instance.new("Frame")
     titleRim.Size = UDim2.new(1, -28, 0, 44)
     titleRim.Position = UDim2.fromOffset(14, 12)
@@ -557,7 +556,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    -- ข้อความแสดงปุ่มลัด [RightShift] จางๆ สไตล์การ์ตูน
     local shortcutHint = Instance.new("TextLabel")
     shortcutHint.Size = UDim2.fromOffset(80, 20)
     shortcutHint.Position = UDim2.new(1, -242, 0.5, -10)
@@ -570,7 +568,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     shortcutHint.ZIndex = 6
     shortcutHint.Parent = titlePlate
 
-    -- 1. ปุ่มปิดสีแดง (Close)
+    -- ปุ่มปิดสีแดง (Close)
     local closeBtnRim = Instance.new("Frame")
     closeBtnRim.Size = UDim2.fromOffset(30, 30)
     closeBtnRim.Position = UDim2.new(1, -36, 0.5, -15)
@@ -609,7 +607,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         screenGui:Destroy()
     end)
 
-    -- 2. ปุ่ม Settings สีเหลือง
+    -- ปุ่ม Settings สีเหลือง
     local setBtnRim = Instance.new("Frame")
     setBtnRim.Size = UDim2.fromOffset(30, 30)
     setBtnRim.Position = UDim2.new(1, -72, 0.5, -15)
@@ -634,7 +632,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 8)
     Library.AttachInteractiveEffects(settingsBtn, setBtnRim)
 
-    -- 3. ปุ่ม 3D Toggle ด้านซ้ายปุ่มตั้งค่าสีเหลือง
+    -- ปุ่ม 3D Toggle
     local btn3DRim = Instance.new("Frame")
     btn3DRim.Size = UDim2.fromOffset(74, 30)
     btn3DRim.Position = UDim2.new(1, -152, 0.5, -15)
@@ -767,60 +765,109 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     self.RightColumn = createColumnTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 1, -12))
     self.CenterColumn = self.LeftColumn
 
-    -- หน้าต่าง Visual & Sound Settings Modal พร้อม Scrollbar สไตล์การ์ตูน
+    -- ========================================================
+    -- ม่าน Dim (Dark Backdrop) สำหรับหน้า Setting
+    -- ========================================================
+    local settingDim = Instance.new("TextButton")
+    settingDim.Name = "SettingDimBackdrop"
+    settingDim.Size = UDim2.fromScale(1, 1)
+    settingDim.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    settingDim.BackgroundTransparency = 0.55
+    settingDim.Text = ""
+    settingDim.AutoButtonColor = false
+    settingDim.BorderSizePixel = 0
+    settingDim.ZIndex = 69
+    settingDim.Visible = false
+    settingDim.Parent = card
+
+    -- หน้าต่าง Visual & Sound Settings Modal (เพิ่มเงาปุ่ม 3 ชั้น)
     local settingsModal = Instance.new("Frame")
     settingsModal.Name = "SettingsModal"
-    settingsModal.Size = UDim2.fromOffset(280, 290)
-    settingsModal.Position = UDim2.new(0.5, -140, 0.5, -145)
-    settingsModal.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
+    settingsModal.Size = UDim2.fromOffset(290, 310)
+    settingsModal.Position = UDim2.new(0.5, -145, 0.5, -155)
+    settingsModal.BackgroundColor3 = Color3.fromRGB(65, 22, 105)
     settingsModal.BorderSizePixel = 0
     settingsModal.ZIndex = 70
     settingsModal.Active = true
     settingsModal.Visible = false
     settingsModal.Parent = card
-    Instance.new("UICorner", settingsModal).CornerRadius = UDim.new(0, 18)
+    Instance.new("UICorner", settingsModal).CornerRadius = UDim.new(0, 20)
+    
     local smStroke = Instance.new("UIStroke", settingsModal)
-    smStroke.Thickness = 4
+    smStroke.Thickness = 4.5
     smStroke.Color = Color3.fromRGB(22, 5, 36)
 
+    -- ผิวด้านใน Modal
+    local smInner = Instance.new("Frame")
+    smInner.Size = UDim2.new(1, -6, 1, -6)
+    smInner.Position = UDim2.fromOffset(3, 3)
+    smInner.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
+    smInner.BorderSizePixel = 0
+    smInner.ZIndex = 70
+    smInner.Parent = settingsModal
+    Instance.new("UICorner", smInner).CornerRadius = UDim.new(0, 17)
+    applyCartoonSurface(smInner, 70, 17, false)
+
     local smTitle = Instance.new("TextLabel")
-    smTitle.Size = UDim2.new(1, -20, 0, 32)
-    smTitle.Position = UDim2.fromOffset(10, 8)
+    smTitle.Size = UDim2.new(1, -20, 0, 35)
+    smTitle.Position = UDim2.fromOffset(12, 10)
     smTitle.BackgroundTransparency = 1
     smTitle.Text = "VISUAL & SOUND"
     smTitle.TextColor3 = Color3.fromRGB(255, 225, 95)
-    smTitle.TextSize = 15
+    smTitle.TextSize = 16
     smTitle.Font = Enum.Font.FredokaOne
-    smTitle.ZIndex = 71
-    smTitle.Parent = settingsModal
+    smTitle.ZIndex = 72
+    smTitle.Parent = smInner
     local smts = Instance.new("UIStroke", smTitle)
     smts.Thickness = 3
     smts.Color = Color3.fromRGB(22, 5, 36)
 
     local settingsScroll = Instance.new("ScrollingFrame")
-    settingsScroll.Size = UDim2.new(1, -16, 1, -48)
-    settingsScroll.Position = UDim2.fromOffset(8, 42)
+    settingsScroll.Size = UDim2.new(1, -16, 1, -55)
+    settingsScroll.Position = UDim2.fromOffset(8, 48)
     settingsScroll.BackgroundTransparency = 1
     settingsScroll.BorderSizePixel = 0
     settingsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     settingsScroll.ZIndex = 71
-    settingsScroll.Parent = settingsModal
+    settingsScroll.Parent = smInner
     Library.ApplyCartoonScrollbar(settingsScroll)
 
     local sLayout = Instance.new("UIListLayout", settingsScroll)
-    sLayout.Padding = UDim.new(0, 6)
+    sLayout.Padding = UDim.new(0, 8)
 
+    -- ฟังก์ชันสร้างแถว Setting พร้อมเงาปุ่ม 3 ชั้น (3D Layered Shadow)
     local function createSettingRow(text: string, settingKey: string, onToggle: ((boolean) -> ())?)
-        local row = Instance.new("Frame")
-        row.Size = UDim2.new(1, -10, 0, 38)
-        row.BackgroundColor3 = Color3.fromRGB(34, 10, 56)
-        row.BorderSizePixel = 0
-        row.ZIndex = 72
-        row.Parent = settingsScroll
-        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
-        local rs = Instance.new("UIStroke", row)
-        rs.Thickness = 2
+        -- ชั้นที่ 1: เงาดำเข้มด้านล่างสุด
+        local rowShadow = Instance.new("Frame")
+        rowShadow.Size = UDim2.new(1, -10, 0, 42)
+        rowShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+        rowShadow.BorderSizePixel = 0
+        rowShadow.ZIndex = 72
+        rowShadow.Parent = settingsScroll
+        Instance.new("UICorner", rowShadow).CornerRadius = UDim.new(0, 12)
+
+        -- ชั้นที่ 2: ขอบนูนกลาง
+        local rowRim = Instance.new("Frame")
+        rowRim.Size = UDim2.new(1, 0, 0, 39)
+        rowRim.Position = UDim2.fromOffset(0, 0)
+        rowRim.BackgroundColor3 = Color3.fromRGB(98, 52, 148)
+        rowRim.BorderSizePixel = 0
+        rowRim.ZIndex = 73
+        rowRim.Parent = rowShadow
+        Instance.new("UICorner", rowRim).CornerRadius = UDim.new(0, 12)
+        local rs = Instance.new("UIStroke", rowRim)
+        rs.Thickness = 2.5
         rs.Color = Color3.fromRGB(22, 5, 36)
+
+        -- ชั้นที่ 3: พื้นผิวปุ่มหลัก
+        local row = Instance.new("Frame")
+        row.Size = UDim2.new(1, -6, 1, -5)
+        row.Position = UDim2.fromOffset(3, 2)
+        row.BackgroundColor3 = Color3.fromRGB(44, 14, 70)
+        row.BorderSizePixel = 0
+        row.ZIndex = 74
+        row.Parent = rowRim
+        Instance.new("UICorner", row.Parent == rowRim and row or row).CornerRadius = UDim.new(0, 10)
 
         local lbl = Instance.new("TextLabel")
         lbl.Size = UDim2.new(1, -64, 1, 0)
@@ -828,23 +875,23 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         lbl.BackgroundTransparency = 1
         lbl.Text = text
         lbl.TextColor3 = Color3.fromRGB(255, 225, 95)
-        lbl.TextSize = 12.5
+        lbl.TextSize = 13
         lbl.Font = Enum.Font.FredokaOne
         lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.ZIndex = 73
+        lbl.ZIndex = 75
         lbl.Parent = row
         local ls = Instance.new("UIStroke", lbl)
         ls.Thickness = 2.5
         ls.Color = Color3.fromRGB(22, 5, 36)
 
         local switchTrack = Instance.new("TextButton")
-        switchTrack.Size = UDim2.fromOffset(44, 22)
-        switchTrack.Position = UDim2.new(1, -52, 0.5, -11)
+        switchTrack.Size = UDim2.fromOffset(46, 24)
+        switchTrack.Position = UDim2.new(1, -54, 0.5, -12)
         switchTrack.BackgroundColor3 = Library.Settings[settingKey] and Color3.fromRGB(110, 215, 65) or Color3.fromRGB(85, 75, 105)
         switchTrack.Text = ""
         switchTrack.BorderSizePixel = 0
         switchTrack.AutoButtonColor = false
-        switchTrack.ZIndex = 73
+        switchTrack.ZIndex = 75
         switchTrack.Parent = row
         Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
         local sts = Instance.new("UIStroke", switchTrack)
@@ -852,11 +899,11 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         sts.Color = Color3.fromRGB(22, 5, 36)
 
         local thumb = Instance.new("Frame")
-        thumb.Size = UDim2.fromOffset(18, 18)
-        thumb.Position = Library.Settings[settingKey] and UDim2.fromOffset(24, 2) or UDim2.fromOffset(2, 2)
+        thumb.Size = UDim2.fromOffset(20, 20)
+        thumb.Position = Library.Settings[settingKey] and UDim2.fromOffset(23, 2) or UDim2.fromOffset(2, 2)
         thumb.BackgroundColor3 = Library.Settings[settingKey] and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(255, 255, 255)
         thumb.BorderSizePixel = 0
-        thumb.ZIndex = 74
+        thumb.ZIndex = 76
         thumb.Parent = switchTrack
         Instance.new("UICorner", thumb).CornerRadius = UDim.new(1, 0)
 
@@ -870,7 +917,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
                 BackgroundColor3 = active and Color3.fromRGB(110, 215, 65) or Color3.fromRGB(85, 75, 105)
             }):Play()
             TweenService:Create(thumb, toggleSlide, {
-                Position = active and UDim2.fromOffset(24, 2) or UDim2.fromOffset(2, 2),
+                Position = active and UDim2.fromOffset(23, 2) or UDim2.fromOffset(2, 2),
                 BackgroundColor3 = active and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(255, 255, 255)
             }):Play()
 
@@ -884,10 +931,15 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     createSettingRow("Anime Glint", "AnimeGlint")
     createSettingRow("Sound Effects", "SoundEffects")
 
-    settingsBtn.Activated:Connect(function()
-        settingsModal.Visible = not settingsModal.Visible
+    local function toggleSettings()
+        local isOpen = not settingsModal.Visible
+        settingsModal.Visible = isOpen
+        settingDim.Visible = isOpen
         Library.PlaySound(SOUND_CLICK)
-    end)
+    end
+
+    settingsBtn.Activated:Connect(toggleSettings)
+    settingDim.Activated:Connect(toggleSettings)
 
     UserInputService.InputBegan:Connect(function(input, gpe)
         if not gpe and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.RightShift then
@@ -904,9 +956,6 @@ function Library:GetColumn(side: string): Frame
     else return self.LeftColumn end
 end
 
--- ========================================================
--- ระบบแยกหน้า (SEPARATE FULL PAGE SYSTEM)
--- ========================================================
 function Library:CreatePage(name: string)
     local pageView = Instance.new("Frame")
     pageView.Name = "PageView_" .. name
