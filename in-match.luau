@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : IN-MATCH CONTROLLER (FULL PRESET, LOG & REORDER)
+-- CANDY TD : IN-MATCH CONTROLLER (PURE REMOTE AUTO AGAIN)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -139,26 +139,6 @@ task.spawn(function()
         if textLabel then textLabel:GetPropertyChangedSignal("Text"):Connect(checkBannerText) end
     end
 end)
-
-local function triggerInternalButton(btn: Instance?)
-    if not btn then return false end
-    pcall(function()
-        local firesig = (rawget(env, "firesignal") or firesignal) :: any
-        if firesig then
-            if btn:IsA("GuiButton") then
-                firesig(btn.Activated)
-                firesig(btn.MouseButton1Click)
-            end
-            for _, ch in ipairs(btn:GetChildren()) do
-                if ch:IsA("GuiButton") then
-                    firesig(ch.Activated)
-                    firesig(ch.MouseButton1Click)
-                end
-            end
-        end
-    end)
-    return true
-end
 
 local function requestMatchAction(action: string, ...)
     local ok, res = false, nil
@@ -964,7 +944,7 @@ recToggleBtn.Activated:Connect(function()
     refreshRecordUI()
 end)
 
--- 5. แถบควบคุมด้านล่าง (ปุ่ม UNDO / ลบตัวล่าสุด และ ปุ่ม CLEAR ทั้งหมด)
+-- 5. แถบควบคุมด้านล่าง (ปุ่ม UNDO และ CLEAR)
 local bottomBar = Instance.new("Frame")
 bottomBar.Size = UDim2.new(1, 0, 0, 36)
 bottomBar.Position = UDim2.new(0, 0, 1, -36)
@@ -972,7 +952,7 @@ bottomBar.BackgroundTransparency = 1
 bottomBar.ZIndex = 6
 bottomBar.Parent = RecordPage.Container
 
--- ปุ่มลบตัวล่าสุด (UNDO / DELETE LAST)
+-- ปุ่มลบตัวล่าสุด (UNDO)
 local undoShadow = Instance.new("Frame")
 undoShadow.Size = UDim2.new(0.48, -4, 1, 0)
 undoShadow.Position = UDim2.fromOffset(0, 0)
@@ -1010,7 +990,7 @@ undoBtn.Activated:Connect(function()
     end
 end)
 
--- ปุ่มลบทั้งหมดของด่านนี้ (CLEAR ALL)
+-- ปุ่มลบทั้งหมด (CLEAR ALL)
 local clearShadow = Instance.new("Frame")
 clearShadow.Size = UDim2.new(0.52, -4, 1, 0)
 clearShadow.Position = UDim2.new(0.48, 4, 0, 0)
@@ -1094,7 +1074,6 @@ local function createNavButton(text: string, yPos: number, rimColor: Color3, btn
     btn.Activated:Connect(callback)
 end
 
--- 1. ปุ่มเปิดหน้า Record View
 createNavButton("Setup Record & Presets ⚙", 236, Color3.fromRGB(255, 145, 160), Color3.fromRGB(235, 65, 85), function()
     stageInput.Text = states.CurrentStage
     states.RecordStageName = states.CurrentStage
@@ -1102,7 +1081,6 @@ createNavButton("Setup Record & Presets ⚙", 236, Color3.fromRGB(255, 145, 160)
     RecordPage.Show()
 end)
 
--- 2. ปุ่ม Reload Presets
 createNavButton("Reload Presets ↺", 282, Color3.fromRGB(255, 220, 110), Color3.fromRGB(240, 160, 45), function()
     loadPresetsFromFile()
     stageDropdown.SetOptions(getStageNames())
@@ -1111,7 +1089,7 @@ createNavButton("Reload Presets ↺", 282, Color3.fromRGB(255, 220, 110), Color3
 end)
 
 -- ========================================================
--- GAMEPLAY LOGIC LOOPS
+-- GAMEPLAY LOGIC LOOPS (AUTO AGAIN & AUTO ACTIONS)
 -- ========================================================
 local hasPlacedThisMatch = false
 local function runAutoPlaceSequence()
@@ -1169,108 +1147,34 @@ task.spawn(function()
     end
 end)
 
-local function runEndMatchSequence(choice: string)
-    task.spawn(function()
-        local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
-        if not matchRemotes then return end
-
-        local actRemote = matchRemotes:FindFirstChild("Act")
-        local replayRemote = matchRemotes:FindFirstChild("Replay")
-
-        local hasNextButton = false
-        pcall(function()
-            for _, desc in ipairs(candyTD:GetDescendants()) do
-                if desc:IsA("GuiButton") and desc.Visible then
-                    local t = (desc:IsA("TextButton") and desc.Text:upper()) or ""
-                    for _, l in ipairs(desc:GetDescendants()) do
-                        if l:IsA("TextLabel") and l.Visible then t = t .. " " .. l.Text:upper() end
-                    end
-                    if t:find("NEXT") or desc.Name:upper():find("NEXT") then
-                        hasNextButton = true
-                        triggerInternalButton(desc)
-                    end
-                end
-            end
-        end)
-
-        if hasNextButton or choice == "NEXT" then
-            if actRemote and actRemote:IsA("RemoteFunction") then
-                pcall(function() actRemote:InvokeServer("next") end)
-            end
-        end
-
-        if choice == "AGAIN" and not hasNextButton then
-            if replayRemote and replayRemote:IsA("RemoteFunction") then
-                pcall(function() replayRemote:InvokeServer("info") end)
-                task.wait(0.4)
-                pcall(function() replayRemote:InvokeServer("pay") end)
-            end
-
-            if actRemote and actRemote:IsA("RemoteFunction") then
-                pcall(function() actRemote:InvokeServer("again") end)
-            end
-        end
-
-        task.wait(0.35)
-        pcall(function()
-            for _, desc in ipairs(candyTD:GetDescendants()) do
-                if desc:IsA("GuiButton") and desc.Visible then
-                    local t = (desc:IsA("TextButton") and desc.Text:upper()) or ""
-                    for _, l in ipairs(desc:GetDescendants()) do
-                        if l:IsA("TextLabel") and l.Visible then t = t .. " " .. l.Text:upper() end
-                    end
-                    if t:find("YES") or t:find("POUR") or t:find("REPLAY") or desc.Name:upper():find("YES") then
-                        triggerInternalButton(desc)
-                    end
-                end
-            end
-        end)
-    end)
-end
-
+-- ========================================================
+-- PURE REMOTE AUTO AGAIN LOGIC (ไม่มีการจับหน้าต่างเกม)
+-- ========================================================
 local matchHandled = false
 task.spawn(function()
     while Controller.Running do
-        task.wait(0.35)
-        local overlay = candyTD:FindFirstChild("Overlay")
-        local isGameOver = overlay and overlay.Visible
+        task.wait(0.5)
+        pcall(function()
+            local overlay = candyTD:FindFirstChild("Overlay")
+            local isGameOver = overlay and overlay.Visible
 
-        if not isGameOver then
-            matchHandled = false
-        else
-            if not matchHandled and states.EndChoice ~= "NONE" then
-                matchHandled = true
-                task.wait(0.6)
-                if states.EndChoice == "NEXT" or states.EndChoice == "AGAIN" then
-                    if states.AgainBeforeHomeActive then
-                        states.CurrentRounds = states.CurrentRounds + 1
-                        roundCountLabel.Text = tostring(states.TargetRounds)
-                        roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
-                        if states.CurrentRounds >= states.TargetRounds then
-                            states.CurrentRounds = 0
-                            roundCountLabel.Text = tostring(states.TargetRounds)
-                            roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
-                            setEndChoice("HOME")
-                            pcall(function()
-                                local mRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
-                                local retRemote = mRemotes and mRemotes:FindFirstChild("ReturnToHub")
-                                if retRemote then retRemote:FireServer() end
-                            end)
-                        else
-                            runEndMatchSequence(states.EndChoice)
-                        end
-                    else
-                        runEndMatchSequence(states.EndChoice)
+            if not isGameOver then
+                matchHandled = false
+            else
+                if not matchHandled and states.EndChoice == "AGAIN" then
+                    matchHandled = true
+                    task.wait(1)
+                    
+                    local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
+                    local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
+                    
+                    if actRemote and actRemote:IsA("RemoteFunction") then
+                        print("[AutoAgain] เกมจบแล้ว ส่งคำสั่ง Again ผ่าน Remote...")
+                        actRemote:InvokeServer("again")
                     end
-                elseif states.EndChoice == "HOME" then
-                    pcall(function()
-                        local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
-                        local retRemote = matchRemotes and matchRemotes:FindFirstChild("ReturnToHub")
-                        if retRemote then retRemote:FireServer() end
-                    end)
                 end
             end
-        end
+        end)
     end
 end)
 
