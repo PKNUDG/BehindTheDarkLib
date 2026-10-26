@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (PAGE SYSTEM & TOP 3D)
+-- BEHIND THE DARK : CORE UI LIBRARY (PAGE & CARTOON SCROLLBAR)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -20,7 +20,8 @@ Library.Settings = {
     ClickRipple = true,
     AnimeGlint = true,
     SoundEffects = true,
-    WindowPos = nil
+    WindowPos = nil,
+    SelectedStage = nil
 }
 
 local SOUND_CLICK = "rbxassetid://6895079853"
@@ -37,6 +38,16 @@ function Library.PlaySound(soundId: string)
         s.Ended:Wait()
         s:Destroy()
     end)
+end
+
+function Library.SaveSettings()
+    local wf = (type(writefile) == "function" and writefile) or nil
+    if wf then
+        pcall(function()
+            local encoded = HttpService:JSONEncode(Library.Settings)
+            wf(SETTINGS_FILE, encoded)
+        end)
+    end
 end
 
 local function loadSavedSettings()
@@ -56,16 +67,6 @@ local function loadSavedSettings()
     end
 end
 
-local function saveCurrentSettings()
-    local wf = (type(writefile) == "function" and writefile) or nil
-    if wf then
-        pcall(function()
-            local encoded = HttpService:JSONEncode(Library.Settings)
-            wf(SETTINGS_FILE, encoded)
-        end)
-    end
-end
-
 loadSavedSettings()
 
 local springBounce = TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
@@ -75,6 +76,15 @@ local rippleTween = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirect
 local toggleSlide = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local windowPopOpen = TweenInfo.new(0.38, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local windowSquishClose = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+
+-- ฟังก์ชันจัดรูปแบบแถบเลื่อนสไตล์การ์ตูน 3D
+function Library.ApplyCartoonScrollbar(scroll: ScrollingFrame)
+    scroll.ScrollBarThickness = 6
+    scroll.ScrollBarImageColor3 = Color3.fromRGB(182, 130, 248)
+    scroll.TopImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
+    scroll.BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
+    scroll.MidImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
+end
 
 local function applyCartoonSurface(target: GuiObject, zIndex: number, cornerRad: number, withMovingDots: boolean)
     local grain = Instance.new("ImageLabel")
@@ -479,7 +489,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
                 YScale = finalPos.Y.Scale,
                 YOffset = finalPos.Y.Offset
             }
-            saveCurrentSettings()
+            Library.SaveSettings()
         end
     end)
 
@@ -506,7 +516,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", titlePlate).CornerRadius = UDim.new(0, 13)
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -190, 1, 0)
+    titleLabel.Size = UDim2.new(1, -270, 1, 0)
     titleLabel.Position = UDim2.fromOffset(14, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = config.Title or "BEHIND THE DARK"
@@ -546,6 +556,19 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
             end
         end
     end)
+
+    -- ข้อความแสดงปุ่มลัด [RightShift] จางๆ สไตล์การ์ตูน
+    local shortcutHint = Instance.new("TextLabel")
+    shortcutHint.Size = UDim2.fromOffset(80, 20)
+    shortcutHint.Position = UDim2.new(1, -242, 0.5, -10)
+    shortcutHint.BackgroundTransparency = 1
+    shortcutHint.Text = "[RightShift]"
+    shortcutHint.TextColor3 = Color3.fromRGB(180, 160, 210)
+    shortcutHint.TextTransparency = 0.35
+    shortcutHint.TextSize = 11
+    shortcutHint.Font = Enum.Font.FredokaOne
+    shortcutHint.ZIndex = 6
+    shortcutHint.Parent = titlePlate
 
     -- 1. ปุ่มปิดสีแดง (Close)
     local closeBtnRim = Instance.new("Frame")
@@ -611,7 +634,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 8)
     Library.AttachInteractiveEffects(settingsBtn, setBtnRim)
 
-    -- 3. ปุ่ม 3D Toggle ย้ายขึ้นมาบน Title Bar ซ้ายปุ่มตั้งค่าสีเหลือง
+    -- 3. ปุ่ม 3D Toggle ด้านซ้ายปุ่มตั้งค่าสีเหลือง
     local btn3DRim = Instance.new("Frame")
     btn3DRim.Size = UDim2.fromOffset(74, 30)
     btn3DRim.Position = UDim2.new(1, -152, 0.5, -15)
@@ -744,11 +767,11 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     self.RightColumn = createColumnTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 1, -12))
     self.CenterColumn = self.LeftColumn
 
-    -- หน้าต่าง Visual & Sound Settings Modal
+    -- หน้าต่าง Visual & Sound Settings Modal พร้อม Scrollbar สไตล์การ์ตูน
     local settingsModal = Instance.new("Frame")
     settingsModal.Name = "SettingsModal"
-    settingsModal.Size = UDim2.fromOffset(270, 290)
-    settingsModal.Position = UDim2.new(0.5, -135, 0.5, -145)
+    settingsModal.Size = UDim2.fromOffset(280, 290)
+    settingsModal.Position = UDim2.new(0.5, -140, 0.5, -145)
     settingsModal.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
     settingsModal.BorderSizePixel = 0
     settingsModal.ZIndex = 70
@@ -774,14 +797,26 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smts.Thickness = 3
     smts.Color = Color3.fromRGB(22, 5, 36)
 
-    local function createSettingRow(text: string, yPos: number, settingKey: string, onToggle: ((boolean) -> ())?)
+    local settingsScroll = Instance.new("ScrollingFrame")
+    settingsScroll.Size = UDim2.new(1, -16, 1, -48)
+    settingsScroll.Position = UDim2.fromOffset(8, 42)
+    settingsScroll.BackgroundTransparency = 1
+    settingsScroll.BorderSizePixel = 0
+    settingsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    settingsScroll.ZIndex = 71
+    settingsScroll.Parent = settingsModal
+    Library.ApplyCartoonScrollbar(settingsScroll)
+
+    local sLayout = Instance.new("UIListLayout", settingsScroll)
+    sLayout.Padding = UDim.new(0, 6)
+
+    local function createSettingRow(text: string, settingKey: string, onToggle: ((boolean) -> ())?)
         local row = Instance.new("Frame")
-        row.Size = UDim2.new(1, -24, 0, 36)
-        row.Position = UDim2.fromOffset(12, yPos)
+        row.Size = UDim2.new(1, -10, 0, 38)
         row.BackgroundColor3 = Color3.fromRGB(34, 10, 56)
         row.BorderSizePixel = 0
-        row.ZIndex = 71
-        row.Parent = settingsModal
+        row.ZIndex = 72
+        row.Parent = settingsScroll
         Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
         local rs = Instance.new("UIStroke", row)
         rs.Thickness = 2
@@ -796,7 +831,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         lbl.TextSize = 12.5
         lbl.Font = Enum.Font.FredokaOne
         lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.ZIndex = 72
+        lbl.ZIndex = 73
         lbl.Parent = row
         local ls = Instance.new("UIStroke", lbl)
         ls.Thickness = 2.5
@@ -809,7 +844,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         switchTrack.Text = ""
         switchTrack.BorderSizePixel = 0
         switchTrack.AutoButtonColor = false
-        switchTrack.ZIndex = 72
+        switchTrack.ZIndex = 73
         switchTrack.Parent = row
         Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
         local sts = Instance.new("UIStroke", switchTrack)
@@ -821,7 +856,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         thumb.Position = Library.Settings[settingKey] and UDim2.fromOffset(24, 2) or UDim2.fromOffset(2, 2)
         thumb.BackgroundColor3 = Library.Settings[settingKey] and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(255, 255, 255)
         thumb.BorderSizePixel = 0
-        thumb.ZIndex = 73
+        thumb.ZIndex = 74
         thumb.Parent = switchTrack
         Instance.new("UICorner", thumb).CornerRadius = UDim.new(1, 0)
 
@@ -829,7 +864,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
             Library.Settings[settingKey] = not Library.Settings[settingKey]
             local active = Library.Settings[settingKey]
             Library.PlaySound(SOUND_TOGGLE)
-            saveCurrentSettings()
+            Library.SaveSettings()
 
             TweenService:Create(switchTrack, toggleSlide, {
                 BackgroundColor3 = active and Color3.fromRGB(110, 215, 65) or Color3.fromRGB(85, 75, 105)
@@ -843,11 +878,11 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end)
     end
 
-    createSettingRow("All Animations", 45, "Animations")
-    createSettingRow("Looping Pattern", 88, "MovingPattern")
-    createSettingRow("Click Ripple", 131, "ClickRipple")
-    createSettingRow("Anime Glint", 174, "AnimeGlint")
-    createSettingRow("Sound Effects", 217, "SoundEffects")
+    createSettingRow("All Animations", "Animations")
+    createSettingRow("Looping Pattern", "MovingPattern")
+    createSettingRow("Click Ripple", "ClickRipple")
+    createSettingRow("Anime Glint", "AnimeGlint")
+    createSettingRow("Sound Effects", "SoundEffects")
 
     settingsBtn.Activated:Connect(function()
         settingsModal.Visible = not settingsModal.Visible
@@ -1166,7 +1201,6 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
     scroll.Position = UDim2.fromOffset(0, 46)
     scroll.BackgroundColor3 = Color3.fromRGB(34, 10, 58)
     scroll.BorderSizePixel = 0
-    scroll.ScrollBarThickness = 4
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     scroll.Visible = false
     scroll.ZIndex = zBase + 20
@@ -1175,6 +1209,8 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
     local ss = Instance.new("UIStroke", scroll)
     ss.Thickness = 3
     ss.Color = Color3.fromRGB(22, 5, 36)
+    Library.ApplyCartoonScrollbar(scroll)
+
     local list = Instance.new("UIListLayout", scroll)
     list.Padding = UDim.new(0, 4)
 
