@@ -139,10 +139,13 @@ local Window = Library:CreateWindow({
 })
 Controller.Gui = Window.Gui
 
--- ซ่อนกรอบเดิมฝั่งขวาเพื่อไม่ให้มีกรอบซ้อนทับ
-if Window.RightColumn and Window.RightColumn.Parent and Window.RightColumn.Parent.Parent then
-    Window.RightColumn.Parent.Parent.Visible = false
-end
+-- ลบ Tray ฝั่งขวาเดิมออกทันที ไม่ให้เหลือซากกรอบซ้อน
+pcall(function()
+    local rightRim = Window.RightColumn.Parent.Parent
+    if rightRim then
+        rightRim:Destroy()
+    end
+end)
 
 -- ========================================================
 -- ฝั่งซ้าย: AUTO SUMMON & AUTO DELETE SETTINGS
@@ -184,19 +187,19 @@ Window:CreateToggle("Left", "Delete Legendary", 236, { On = Color3.fromRGB(245, 
 end)
 
 -- ========================================================
--- ฝั่งขวา: แยกเป็น 2 กล่องพื้นหลังเหมือนหน้า IN-MATCH
+-- ฝั่งขวา: 2 กล่องแยกอิสระ (CHALLENGE TRAY & SHOP TRAY)
 -- ========================================================
 
--- 1. กล่องบน (Challenge Tray): สำหรับ Auto Challenge
-local challengeTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 72))
+-- 1. กล่องบน: Auto Challenge (ขนาดกะทัดรัดพอดี 1 ปุ่ม)
+local challengeSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 68))
 
-Window:CreateToggle(challengeTray, "Auto Challenge", 0, { On = Color3.fromRGB(255, 90, 150), Off = Color3.fromRGB(120, 120, 130) }, states.AutoChallenge, function(v)
+Window:CreateToggle(challengeSubTray, "Auto Challenge", 0, { On = Color3.fromRGB(255, 90, 150), Off = Color3.fromRGB(120, 120, 130) }, states.AutoChallenge, function(v)
     states.AutoChallenge = v
     saveConfigState()
 end)
 
--- 2. กล่องล่าง (Candy Shop Tray): สำหรับปุ่มซื้อของด่วน
-local shopTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 80), UDim2.new(0.5, -20, 1, -92))
+-- 2. กล่องล่าง: ซื้อไอเทมร้านค้า (แยกเป็นอีกกล่องอย่างชัดเจน)
+local shopSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 76), UDim2.new(0.5, -20, 1, -88))
 
 local function createShopActionButton(parentTarget: Instance, text: string, yPos: number, rimColor: Color3, btnColor: Color3, callback: () -> ())
     local shadow = Instance.new("Frame")
@@ -241,11 +244,11 @@ local function createShopActionButton(parentTarget: Instance, text: string, yPos
     btn.Activated:Connect(callback)
 end
 
-createShopActionButton(shopTray, "Buy Trait Crystal x10", 0, Color3.fromRGB(140, 240, 180), Color3.fromRGB(60, 210, 140), function()
+createShopActionButton(shopSubTray, "Buy Trait Crystal x10", 0, Color3.fromRGB(140, 240, 180), Color3.fromRGB(60, 210, 140), function()
     buyItemFromTeller("crystal", 10)
 end)
 
-createShopActionButton(shopTray, "Buy Unit of Juice x10", 46, Color3.fromRGB(255, 185, 110), Color3.fromRGB(255, 140, 40), function()
+createShopActionButton(shopSubTray, "Buy Unit of Juice x10", 46, Color3.fromRGB(255, 185, 110), Color3.fromRGB(255, 140, 40), function()
     buyItemFromTeller("statroll", 10)
 end)
 
@@ -279,21 +282,18 @@ task.spawn(function()
             pcall(function()
                 local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
                 if hubRemotes then
-                    -- 1. เปิด Training / Challenge
                     local funnel = hubRemotes:FindFirstChild("Funnel")
                     if funnel and funnel:IsA("RemoteEvent") then
                         funnel:FireServer("open_train")
                         task.wait(0.3)
                     end
 
-                    -- 2. สร้างห้องแมตช์
                     local createMatch = hubRemotes:FindFirstChild("CreateMatch")
                     if createMatch and createMatch:IsA("RemoteFunction") then
                         createMatch:InvokeServer(2, "c996114_1", false)
                         task.wait(0.3)
                     end
 
-                    -- 3. เริ่มเกม/เริ่มชาเลนจ์
                     local startMatch = hubRemotes:FindFirstChild("StartMatch")
                     if startMatch and startMatch:IsA("RemoteFunction") then
                         startMatch:InvokeServer()
