@@ -404,19 +404,23 @@ local function findAndPlayFirstWinCar()
     local playButtons = {}
     local firstWinBadges = {}
 
+    print("[AutoChallenge-Scan] กำลังตรวจสอบองค์ประกอบทั้งหมดใน: " .. scanRoot.Name)
+    local elementCount = 0
+
     -- สแกนทุก Descendant ภายใน scanRoot
     for _, desc in ipairs(scanRoot:GetDescendants()) do
+        elementCount = elementCount + 1
         if desc:IsA("TextLabel") then
             local txt = desc.Text:upper():gsub("%s+", " ")
-            if txt:find("FIRST") and txt:find("WIN") then
+            if txt:find("FIRST") or txt:find("WIN") then
                 table.insert(firstWinBadges, desc)
-                print("[AutoChallenge] >> เจอป้าย FIRST WIN:", desc:GetFullName(), "ข้อความ:", desc.Text)
+                print("[AutoChallenge] >> เจอป้าย (TextLabel):", desc.Name, "Text:", desc.Text, "Path:", desc:GetFullName())
             end
         elseif desc:IsA("ImageLabel") or desc:IsA("Frame") then
             local n = desc.Name:upper()
-            if n:find("FIRST") and n:find("WIN") then
+            if n:find("FIRST") or n:find("WIN") or n:find("BADGE") or n:find("STAR") then
                 table.insert(firstWinBadges, desc)
-                print("[AutoChallenge] >> เจอป้าย First Win (จากชื่อ Object):", desc:GetFullName())
+                print("[AutoChallenge] >> เจอป้าย (Object):", desc.Name, "Path:", desc:GetFullName())
             end
         end
 
@@ -430,15 +434,12 @@ local function findAndPlayFirstWinCar()
             local bName = desc.Name:upper()
             if bText:find("PLAY") or bName:find("PLAY") then
                 table.insert(playButtons, { Button = desc, PosX = desc.AbsolutePosition.X })
-                print("[AutoChallenge] >> เจอปุ่ม PLAY:", desc:GetFullName(), "ตำแหน่ง X:", desc.AbsolutePosition.X)
+                print("[AutoChallenge] >> เจอปุ่ม PLAY:", desc.Name, "Path:", desc:GetFullName(), "PosX:", desc.AbsolutePosition.X)
             end
         end
     end
 
-    -- หากยังไม่พบปุ่ม PLAY หรือ FIRST WIN เลย ให้ Print ตัวอย่าง 10 รายการใน scanRoot ออกมาวิเคราะห์
-    if #playButtons == 0 or #firstWinBadges == 0 then
-        print(string.format("[AutoChallenge-Debug] สแกนเสร็จ: เจอปุ่ม PLAY %d ปุ่ม, เจอป้าย FIRST WIN %d ป้าย", #playButtons, #firstWinBadges))
-    end
+    print(string.format("[AutoChallenge-Debug] ตรวจสอบวัตถุทั้งหมด %d รายการ | เจอปุ่ม PLAY %d ปุ่ม | เจอป้าย FIRST WIN %d ป้าย", elementCount, #playButtons, #firstWinBadges))
 
     -- เรียงลำดับปุ่ม PLAY ตามตำแหน่งแนวนอน (ซ้ายไปขวา: Car 1 -> Car 2 -> Car 3)
     table.sort(playButtons, function(a, b) return a.PosX < b.PosX end)
