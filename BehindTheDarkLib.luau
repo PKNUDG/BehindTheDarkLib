@@ -415,6 +415,50 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
+    -- Ghost Drag Frame (เงาลากสีม่วงไล่สีซ้ายไปขวาลูป)
+    local ghostFrame = Instance.new("Frame")
+    ghostFrame.Name = "GhostDragFrame"
+    ghostFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    ghostFrame.Size = UDim2.fromOffset(width, height)
+    ghostFrame.Position = defaultPos
+    ghostFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ghostFrame.BackgroundTransparency = 0.65
+    ghostFrame.BorderSizePixel = 0
+    ghostFrame.ZIndex = 1
+    ghostFrame.Visible = false
+    ghostFrame.Parent = screenGui
+    Instance.new("UICorner", ghostFrame).CornerRadius = UDim.new(0, 26)
+
+    local ghostStroke = Instance.new("UIStroke")
+    ghostStroke.Parent = ghostFrame
+    ghostStroke.Thickness = 3
+    ghostStroke.Color = Color3.fromRGB(215, 175, 255)
+    ghostStroke.Transparency = 0.3
+
+    local ghostGrad = Instance.new("UIGradient")
+    ghostGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(150, 80, 230)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(220, 160, 255)),
+        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(150, 80, 230))
+    })
+    ghostGrad.Offset = Vector2.new(-1, 0)
+    ghostGrad.Parent = ghostFrame
+
+    task.spawn(function()
+        while ghostFrame and ghostFrame.Parent do
+            if ghostFrame.Visible and Library.Settings.Animations then
+                ghostGrad.Offset = Vector2.new(-1, 0)
+                local twGrad = TweenService:Create(ghostGrad, TweenInfo.new(1.8, Enum.EasingStyle.Linear), {
+                    Offset = Vector2.new(1, 0)
+                })
+                twGrad:Play()
+                twGrad.Completed:Wait()
+            else
+                task.wait(0.3)
+            end
+        end
+    end)
+
     local isDragging = false
     local dragStartMouse = Vector3.new()
     local dragStartPos = UDim2.new()
@@ -424,25 +468,40 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
             isDragging = true
             dragStartMouse = input.Position
             dragStartPos = outerBorder.Position
+
+            ghostFrame.Size = outerBorder.Size
+            ghostFrame.Position = outerBorder.Position
+            ghostFrame.Visible = true
         end
     end)
 
     UserInputService.InputChanged:Connect(function(input)
         if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStartMouse
-            outerBorder.Position = UDim2.new(dragStartPos.X.Scale, dragStartPos.X.Offset + delta.X, dragStartPos.Y.Scale, dragStartPos.Y.Offset + delta.Y)
+            ghostFrame.Position = UDim2.new(dragStartPos.X.Scale, dragStartPos.X.Offset + delta.X, dragStartPos.Y.Scale, dragStartPos.Y.Offset + delta.Y)
         end
     end)
 
     UserInputService.InputEnded:Connect(function(input)
         if isDragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
             isDragging = false
-            local finalPos = outerBorder.Position
+            ghostFrame.Visible = false
+
+            local targetPos = ghostFrame.Position
+            if Library.Settings.Animations then
+                local twMove = TweenService:Create(outerBorder, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                    Position = targetPos
+                })
+                twMove:Play()
+            else
+                outerBorder.Position = targetPos
+            end
+
             Library.Settings.WindowPos = {
-                XScale = finalPos.X.Scale,
-                XOffset = finalPos.X.Offset,
-                YScale = finalPos.Y.Scale,
-                YOffset = finalPos.Y.Offset
+                XScale = targetPos.X.Scale,
+                XOffset = targetPos.X.Offset,
+                YScale = targetPos.Y.Scale,
+                YOffset = targetPos.Y.Offset
             }
             Library.SaveSettings()
         end
@@ -644,7 +703,7 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     btn3D.Position = UDim2.fromOffset(2, 2)
     btn3D.BackgroundColor3 = Color3.fromRGB(115, 225, 70)
     btn3D.Text = "3D"
-    btn3D.TextColor3 = Color3.fromRGB(24, 6, 38)
+    btn3D.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn3D.TextSize = 12.5
     btn3D.Font = Enum.Font.FredokaOne
     btn3D.BorderSizePixel = 0
@@ -708,7 +767,7 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
             self.BlackoutFrame.Visible = false
             btn3DRim.BackgroundColor3 = Color3.fromRGB(190, 255, 145)
             btn3D.BackgroundColor3 = Color3.fromRGB(115, 225, 70)
-            btn3D.TextColor3 = Color3.fromRGB(24, 6, 38)
+            btn3D.TextColor3 = Color3.fromRGB(255, 255, 255)
         end
     end)
 
@@ -804,7 +863,45 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smInner.ZIndex = 71
     smInner.Parent = smOuter
     Instance.new("UICorner", smInner).CornerRadius = UDim.new(0, 19)
-    applyCartoonSurface(smInner, 71, 19, false)
+
+    -- พื้นหลังลวดลายขยับไล่จากขวาบนลงซ้ายล่างแบบลูป (Top-Right to Bottom-Left)
+    local smPatternClipper = Instance.new("Frame")
+    smPatternClipper.Name = "SettingsPatternClipper"
+    smPatternClipper.Size = UDim2.fromScale(1, 1)
+    smPatternClipper.BackgroundTransparency = 1
+    smPatternClipper.ClipsDescendants = true
+    smPatternClipper.ZIndex = 71
+    smPatternClipper.Parent = smInner
+    Instance.new("UICorner", smPatternClipper).CornerRadius = UDim.new(0, 19)
+
+    local smMovingPattern = Instance.new("ImageLabel")
+    smMovingPattern.Name = "SettingsMovingPattern"
+    smMovingPattern.Size = UDim2.new(1, 56, 1, 56)
+    smMovingPattern.Position = UDim2.fromOffset(0, -28)
+    smMovingPattern.BackgroundTransparency = 1
+    smMovingPattern.Image = "rbxassetid://6071575925"
+    smMovingPattern.ImageColor3 = Color3.fromRGB(215, 175, 255)
+    smMovingPattern.ImageTransparency = 0.88
+    smMovingPattern.ScaleType = Enum.ScaleType.Tile
+    smMovingPattern.TileSize = UDim2.fromOffset(28, 28)
+    smMovingPattern.ZIndex = 71
+    smMovingPattern.Parent = smPatternClipper
+
+    task.spawn(function()
+        local loopTime = 4.5
+        while smMovingPattern and smMovingPattern.Parent do
+            if Library.Settings.Animations and Library.Settings.MovingPattern then
+                smMovingPattern.Position = UDim2.fromOffset(0, -28)
+                local twDiag = TweenService:Create(smMovingPattern, TweenInfo.new(loopTime, Enum.EasingStyle.Linear), {
+                    Position = UDim2.fromOffset(-28, 0)
+                })
+                twDiag:Play()
+                task.wait(loopTime)
+            else
+                task.wait(0.5)
+            end
+        end
+    end)
 
     local smTitleRim = Instance.new("Frame")
     smTitleRim.Size = UDim2.new(1, -20, 0, 38)
@@ -832,7 +929,7 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smTitle.Size = UDim2.new(1, -40, 1, 0)
     smTitle.Position = UDim2.fromOffset(12, 0)
     smTitle.BackgroundTransparency = 1
-    smTitle.Text = "HUB SETTINGS"
+    smTitle.Text = "SETTINGS"
     smTitle.TextColor3 = Color3.fromRGB(255, 225, 95)
     smTitle.TextSize = 14.5
     smTitle.Font = Enum.Font.FredokaOne
@@ -945,7 +1042,18 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         thumb.Parent = switchTrack
         Instance.new("UICorner", thumb).CornerRadius = UDim.new(1, 0)
 
-        switchTrack.Activated:Connect(function()
+        Library.AttachInteractiveEffects(switchTrack, rowRim)
+
+        local rowClickBtn = Instance.new("TextButton")
+        rowClickBtn.Size = UDim2.fromScale(1, 1)
+        rowClickBtn.BackgroundTransparency = 1
+        rowClickBtn.Text = ""
+        rowClickBtn.AutoButtonColor = false
+        rowClickBtn.ZIndex = 75
+        rowClickBtn.Parent = row
+        Library.AttachInteractiveEffects(rowClickBtn, rowRim)
+
+        local function doToggle()
             Library.Settings[settingKey] = not Library.Settings[settingKey]
             local active = Library.Settings[settingKey]
             Library.PlaySound(SOUND_TOGGLE)
@@ -957,7 +1065,10 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
             }):Play()
 
             if onToggle then onToggle(active) end
-        end)
+        end
+
+        switchTrack.Activated:Connect(doToggle)
+        rowClickBtn.Activated:Connect(doToggle)
     end
 
     createSettingRow("All Animations", "Animations")
