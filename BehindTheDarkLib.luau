@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (GHOST DRAG & NEON GLOW)
+-- BEHIND THE DARK : CORE UI LIBRARY (GHOST DRAG & NEON LIME)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -214,28 +214,36 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
     end)
 end
 
--- ระบบแกว่งทีละครั้ง: กดครั้งหนึ่งแกว่งซ้าย กดอีกครั้งแกว่งขวา
-local wiggleDirections = {}
+-- ระบบแกว่งสลับฝั่งทีละครั้ง (แก้บั๊กตัวอักษรหดเล็กลงถาวร)
+local wiggleData = {}
 function Library.StepWiggle(label: TextLabel)
     if not Library.Settings.Animations then return end
-    local origSize = label.TextSize
-    local dir = wiggleDirections[label] or -1
-    dir = -dir
-    wiggleDirections[label] = dir
+    if not wiggleData[label] then
+        wiggleData[label] = {
+            BaseSize = label.TextSize,
+            Dir = -1,
+            TwTilt = nil,
+            TwBack = nil
+        }
+    end
+    local data = wiggleData[label]
+    data.Dir = -data.Dir
 
-    task.spawn(function()
-        local twTilt = TweenService:Create(label, TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            Rotation = dir * 13,
-            TextSize = origSize + 3
-        })
-        twTilt:Play()
-        twTilt.Completed:Wait()
+    if data.TwTilt then data.TwTilt:Cancel() end
+    if data.TwBack then data.TwBack:Cancel() end
 
-        local twBack = TweenService:Create(label, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    data.TwTilt = TweenService:Create(label, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Rotation = data.Dir * 14,
+        TextSize = data.BaseSize + 3.5
+    })
+    data.TwTilt:Play()
+
+    task.delay(0.08, function()
+        data.TwBack = TweenService:Create(label, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
             Rotation = 0,
-            TextSize = origSize
+            TextSize = data.BaseSize
         })
-        twBack:Play()
+        data.TwBack:Play()
     end)
 end
 
@@ -289,7 +297,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     blackout.Parent = blackoutGui
     self.BlackoutFrame = blackout
 
-    -- 1. กรอบหน้าต่างหลัก (ตั้ง AnchorPoint ตรงกลางเพื่อให้ Pop & Squish ทำงานที่จุดศูนย์กลาง)
+    -- 1. กรอบหน้าต่างหลัก (AnchorPoint ตรงกลาง)
     local outerBorder = Instance.new("Frame")
     outerBorder.Name = "MainOuterBorder"
     outerBorder.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -334,7 +342,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     applyCartoonSurface(card, 2, 23, true)
     self.MainCard = outerBorder
 
-    -- 2. โครงร่างเงาโปร่งแสงเวลาลากเมาส์ (Ghost Drag Outline + Looping Purple Gradient)
+    -- 2. โครงเงาโปร่งแสงเวลาลากเมาส์ (Ghost Drag Outline + Looping Purple Gradient)
     local dragGhost = Instance.new("Frame")
     dragGhost.Name = "GhostDragFrame"
     dragGhost.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -376,7 +384,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    -- อนิเมชันเปิด/ปิดหน้าต่างตรงกลาง (Pop & Squish Disappear Center)
+    -- อนิเมชันเปิด/ปิดหน้าต่างตรงกลาง (Pop & Squish Center)
     local isToggling = false
     local function setWindowVisibilityAnimated(show: boolean)
         if isToggling then return end
@@ -404,36 +412,35 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         isToggling = false
     end
 
-    -- ระบบลาก UI: ลากเงาตามเมาส์ -> ปล่อยเมาส์แล้วย้ายตัวจริงมาวาง
-    local dragging = false
-    local dragOffset = Vector2.new()
+    -- ระบบ Ghost Drag: ตรวจจับทั่วทั้งหน้าจอผ่าน UserInputService
+    local isDragging = false
+    local dragStartMouse = Vector3.new()
+    local dragStartPos = UDim2.new()
 
     outerBorder.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragOffset = Vector2.new(input.Position.X - outerBorder.AbsolutePosition.X - (width / 2), input.Position.Y - outerBorder.AbsolutePosition.Y - (height / 2))
-            dragGhost.Position = outerBorder.Position
+            isDragging = true
+            dragStartMouse = input.Position
+            dragStartPos = outerBorder.Position
+            dragGhost.Position = dragStartPos
             dragGhost.Visible = true
-
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    if dragging then
-                        dragging = false
-                        dragGhost.Visible = false
-                        TweenService:Create(outerBorder, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                            Position = dragGhost.Position
-                        }):Play()
-                    end
-                end
-            end)
         end
     end)
 
-    outerBorder.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            if dragging then
-                dragGhost.Position = UDim2.fromOffset(input.Position.X - dragOffset.X, input.Position.Y - dragOffset.Y)
-            end
+    UserInputService.InputChanged:Connect(function(input)
+        if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStartMouse
+            dragGhost.Position = UDim2.new(dragStartPos.X.Scale, dragStartPos.X.Offset + delta.X, dragStartPos.Y.Scale, dragStartPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if isDragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            isDragging = false
+            dragGhost.Visible = false
+            TweenService:Create(outerBorder, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Position = dragGhost.Position
+            }):Play()
         end
     end)
 
@@ -721,7 +728,7 @@ function Library:GetColumn(side: string): Frame
 end
 
 -- ========================================================
--- TOGGLE BUTTON (ปุ่ม 3D + ON วงกลมเขียว + อักษรเขียวเรืองแสงวิ่งวนลูป)
+-- TOGGLE BUTTON (ปุ่ม 3D + ON วงกลมเขียว + อักษรเขียวมะนาวสดเรืองแสงลูป)
 -- ========================================================
 function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: Color3, Off: Color3}, default: boolean, callback: (boolean) -> ())
     local parent = self:GetColumn(side)
@@ -803,11 +810,15 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     gloss.Parent = btn
     Instance.new("UICorner", gloss).CornerRadius = UDim.new(0, 9)
 
+    -- ข้อความฟังก์ชัน: ON สีมะนาวสดใส / OFF สีเทา
+    local LIME_COLOR = Color3.fromRGB(180, 255, 75)
+    local OFF_COLOR = Color3.fromRGB(175, 175, 185)
+
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -66, 1, 0)
     label.Position = UDim2.fromOffset(12, 0)
     label.BackgroundTransparency = 1
-    label.TextColor3 = state and Color3.fromRGB(115, 255, 135) or Color3.fromRGB(175, 175, 185)
+    label.TextColor3 = state and LIME_COLOR or OFF_COLOR
     label.TextSize = 14
     label.Font = Enum.Font.FredokaOne
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -818,26 +829,26 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     ts.Thickness = 3.2
     ts.Color = Color3.fromRGB(24, 5, 38)
 
-    -- Gradient สีเขียวนีออนเรืองแสงวิ่งวนลูปจากซ้ายไปขวา
-    local neonGrad = Instance.new("UIGradient")
-    neonGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(115, 255, 135)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(235, 255, 235)),
-        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(115, 255, 135))
+    -- Gradient สีมะนาวสดเรืองแสงวิ่งวนลูปจากซ้ายไปขวา
+    local limeGrad = Instance.new("UIGradient")
+    limeGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(175, 255, 65)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(245, 255, 215)),
+        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(175, 255, 65))
     })
-    neonGrad.Offset = Vector2.new(-1, 0)
-    neonGrad.Enabled = state
-    neonGrad.Parent = label
+    limeGrad.Offset = Vector2.new(-1, 0)
+    limeGrad.Enabled = state
+    limeGrad.Parent = label
 
     task.spawn(function()
         while label and label.Parent do
             if state and Library.Settings.Animations then
-                neonGrad.Offset = Vector2.new(-1, 0)
-                local twNeon = TweenService:Create(neonGrad, TweenInfo.new(2.4, Enum.EasingStyle.Linear), {
+                limeGrad.Offset = Vector2.new(-1, 0)
+                local twLime = TweenService:Create(limeGrad, TweenInfo.new(2.4, Enum.EasingStyle.Linear), {
                     Offset = Vector2.new(1, 0)
                 })
-                twNeon:Play()
-                twNeon.Completed:Wait()
+                twLime:Play()
+                twLime.Completed:Wait()
             else
                 task.wait(0.4)
             end
@@ -870,8 +881,8 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
 
     local function setVisual(val: boolean)
         state = val
-        neonGrad.Enabled = state
-        local labelColor = state and Color3.fromRGB(115, 255, 135) or Color3.fromRGB(175, 175, 185)
+        limeGrad.Enabled = state
+        local labelColor = state and LIME_COLOR or OFF_COLOR
         local thumbColor = state and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(175, 175, 185)
 
         TweenService:Create(label, toggleSlide, { TextColor3 = labelColor }):Play()
