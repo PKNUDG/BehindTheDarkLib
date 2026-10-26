@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (PERSISTENT & SUB-CONTAINER)
+-- BEHIND THE DARK : CORE UI LIBRARY (CPU | GPU | PING MONITOR)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -8,6 +8,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local SoundService = game:GetService("SoundService")
+local StatsService = game:GetService("Stats")
 
 local Library = {}
 Library.__index = Library
@@ -74,8 +75,8 @@ local pressSquish = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirect
 local glintTween = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local rippleTween = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local toggleSlide = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-local windowPopOpen = TweenInfo.new(0.38, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-local windowSquishClose = TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+local windowPopOpen = TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local windowSquishClose = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 function Library.ApplyCartoonScrollbar(scroll: ScrollingFrame)
     scroll.ScrollBarThickness = 6
@@ -191,15 +192,6 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
     glint.Parent = btn
     Instance.new("UICorner", glint).CornerRadius = UDim.new(1, 0)
 
-    local sharpLine = Instance.new("Frame")
-    sharpLine.Size = UDim2.new(0.2, 0, 1, 0)
-    sharpLine.Position = UDim2.new(1.15, 0, 0, 0)
-    sharpLine.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    sharpLine.BackgroundTransparency = 0.35
-    sharpLine.BorderSizePixel = 0
-    sharpLine.ZIndex = btn.ZIndex + 3
-    sharpLine.Parent = glint
-
     btn.MouseEnter:Connect(function()
         isHovered = true
         if Library.Settings.Animations then
@@ -239,38 +231,6 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
                 TweenService:Create(uiScale, springBounce, { Scale = targetScale }):Play()
             end
         end
-    end)
-end
-
-local wiggleData = {}
-function Library.StepWiggle(label: TextLabel)
-    if not Library.Settings.Animations then return end
-    if not wiggleData[label] then
-        wiggleData[label] = {
-            BaseSize = label.TextSize,
-            Dir = -1,
-            TwTilt = nil,
-            TwBack = nil
-        }
-    end
-    local data = wiggleData[label]
-    data.Dir = -data.Dir
-
-    if data.TwTilt then data.TwTilt:Cancel() end
-    if data.TwBack then data.TwBack:Cancel() end
-
-    data.TwTilt = TweenService:Create(label, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Rotation = data.Dir * 14,
-        TextSize = data.BaseSize + 3.5
-    })
-    data.TwTilt:Play()
-
-    task.delay(0.08, function()
-        data.TwBack = TweenService:Create(label, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Rotation = 0,
-            TextSize = data.BaseSize
-        })
-        data.TwBack:Play()
     end)
 end
 
@@ -381,62 +341,42 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     self.MainCard = outerBorder
     self.CardInner = card
 
-    local dragGhost = Instance.new("Frame")
-    dragGhost.Name = "GhostDragFrame"
-    dragGhost.AnchorPoint = Vector2.new(0.5, 0.5)
-    dragGhost.Size = UDim2.fromOffset(width, height)
-    dragGhost.BackgroundColor3 = Color3.fromRGB(140, 75, 215)
-    dragGhost.BackgroundTransparency = 0.65
-    dragGhost.BorderSizePixel = 0
-    dragGhost.Visible = false
-    dragGhost.ZIndex = 9999
-    dragGhost.Parent = screenGui
-    Instance.new("UICorner", dragGhost).CornerRadius = UDim.new(0, 26)
+    -- ระบบคีย์ลัดซ่อน/แสดงหน้าต่าง
+    local isToggling = false
+    function self:ToggleVisibility()
+        if isToggling then return end
+        isToggling = true
+        Library.PlaySound(SOUND_TOGGLE)
 
-    local ghostStroke = Instance.new("UIStroke", dragGhost)
-    ghostStroke.Thickness = 3.5
-    ghostStroke.Color = Color3.fromRGB(225, 175, 255)
+        if outerBorder.Visible then
+            if Library.Settings.Animations then
+                local tw = TweenService:Create(windowScale, windowSquishClose, { Scale = 0.05 })
+                tw:Play()
+                tw.Completed:Wait()
+            end
+            outerBorder.Visible = false
+            windowScale.Scale = 1
+        else
+            windowScale.Scale = 0.05
+            outerBorder.Visible = true
+            if Library.Settings.Animations then
+                local tw = TweenService:Create(windowScale, windowPopOpen, { Scale = 1 })
+                tw:Play()
+                tw.Completed:Wait()
+            else
+                windowScale.Scale = 1
+            end
+        end
+        isToggling = false
+    end
 
-    local isDragging = false
-    local dragStartMouse = Vector3.new()
-    local dragStartPos = UDim2.new()
-
-    outerBorder.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = true
-            dragStartMouse = input.Position
-            dragStartPos = outerBorder.Position
-            dragGhost.Position = dragStartPos
-            dragGhost.Visible = true
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if not gpe and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.RightShift then
+            self:ToggleVisibility()
         end
     end)
 
-    UserInputService.InputChanged:Connect(function(input)
-        if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStartMouse
-            dragGhost.Position = UDim2.new(dragStartPos.X.Scale, dragStartPos.X.Offset + delta.X, dragStartPos.Y.Scale, dragStartPos.Y.Offset + delta.Y)
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if isDragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
-            isDragging = false
-            dragGhost.Visible = false
-            local finalPos = dragGhost.Position
-            TweenService:Create(outerBorder, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Position = finalPos
-            }):Play()
-
-            Library.Settings.WindowPos = {
-                XScale = finalPos.X.Scale,
-                XOffset = finalPos.X.Offset,
-                YScale = finalPos.Y.Scale,
-                YOffset = finalPos.Y.Offset
-            }
-            Library.SaveSettings()
-        end
-    end)
-
+    -- แถบ Title Bar
     local titleRim = Instance.new("Frame")
     titleRim.Size = UDim2.new(1, -28, 0, 44)
     titleRim.Position = UDim2.fromOffset(14, 12)
@@ -459,12 +399,12 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", titlePlate).CornerRadius = UDim.new(0, 13)
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, -270, 1, 0)
+    titleLabel.Size = UDim2.new(0, 175, 1, 0)
     titleLabel.Position = UDim2.fromOffset(14, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = config.Title or "BEHIND THE DARK"
     titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextSize = 16
+    titleLabel.TextSize = 15.5
     titleLabel.Font = Enum.Font.FredokaOne
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.ZIndex = 6
@@ -500,18 +440,55 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    local shortcutHint = Instance.new("TextLabel")
-    shortcutHint.Size = UDim2.fromOffset(80, 20)
-    shortcutHint.Position = UDim2.new(1, -242, 0.5, -10)
-    shortcutHint.BackgroundTransparency = 1
-    shortcutHint.Text = "[RightShift]"
-    shortcutHint.TextColor3 = Color3.fromRGB(180, 160, 210)
-    shortcutHint.TextTransparency = 0.35
-    shortcutHint.TextSize = 11
-    shortcutHint.Font = Enum.Font.FredokaOne
-    shortcutHint.ZIndex = 6
-    shortcutHint.Parent = titlePlate
+    -- Widget แสดงค่าการทำงาน CPU | GPU | Ping (แทนที่ RightShift เดิม)
+    local perfBadge = Instance.new("Frame")
+    perfBadge.Size = UDim2.new(0, 195, 0, 28)
+    perfBadge.Position = UDim2.new(1, -356, 0.5, -14)
+    perfBadge.BackgroundColor3 = Color3.fromRGB(28, 8, 48)
+    perfBadge.BorderSizePixel = 0
+    perfBadge.ZIndex = 6
+    perfBadge.Parent = titlePlate
+    Instance.new("UICorner", perfBadge).CornerRadius = UDim.new(0, 8)
+    local pbStroke = Instance.new("UIStroke", perfBadge)
+    pbStroke.Thickness = 2
+    pbStroke.Color = Color3.fromRGB(22, 5, 36)
 
+    local perfLabel = Instance.new("TextLabel")
+    perfLabel.Size = UDim2.fromScale(1, 1)
+    perfLabel.BackgroundTransparency = 1
+    perfLabel.Text = "CPU: -- | GPU: -- | 0ms"
+    perfLabel.TextColor3 = Color3.fromRGB(255, 225, 95)
+    perfLabel.TextSize = 11.5
+    perfLabel.Font = Enum.Font.FredokaOne
+    perfLabel.ZIndex = 7
+    perfLabel.Parent = perfBadge
+
+    task.spawn(function()
+        local frameCount = 0
+        local lastTime = os.clock()
+        local fps = 60
+        RunService.RenderStepped:Connect(function()
+            frameCount = frameCount + 1
+            local cur = os.clock()
+            if cur - lastTime >= 1 then
+                fps = frameCount / (cur - lastTime)
+                frameCount = 0
+                lastTime = cur
+            end
+        end)
+
+        while perfLabel and perfLabel.Parent do
+            local ping = 0
+            pcall(function()
+                ping = math.floor(StatsService.Network.ServerStatsItem["Data Ping"]:GetValue())
+            end)
+            local mem = math.floor(StatsService:GetTotalMemoryUsageMb())
+            perfLabel.Text = string.format("CPU: %d FPS | GPU: %dM | %dms", math.floor(fps), mem, ping)
+            task.wait(1)
+        end
+    end)
+
+    -- ปุ่มปิด ✕
     local closeBtnRim = Instance.new("Frame")
     closeBtnRim.Size = UDim2.fromOffset(30, 30)
     closeBtnRim.Position = UDim2.new(1, -36, 0.5, -15)
@@ -549,6 +526,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         screenGui:Destroy()
     end)
 
+    -- ปุ่ม Settings
     local setBtnRim = Instance.new("Frame")
     setBtnRim.Size = UDim2.fromOffset(30, 30)
     setBtnRim.Position = UDim2.new(1, -72, 0.5, -15)
@@ -573,6 +551,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 8)
     Library.AttachInteractiveEffects(settingsBtn, setBtnRim)
 
+    -- ปุ่ม 3D Toggle
     local btn3DRim = Instance.new("Frame")
     btn3DRim.Size = UDim2.fromOffset(74, 30)
     btn3DRim.Position = UDim2.new(1, -152, 0.5, -15)
@@ -873,12 +852,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
 
     settingsBtn.Activated:Connect(toggleSettings)
     settingDim.Activated:Connect(toggleSettings)
-
-    UserInputService.InputBegan:Connect(function(input, gpe)
-        if not gpe and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Enum.KeyCode.RightShift then
-            setWindowVisibilityAnimated(not outerBorder.Visible)
-        end
-    end)
 
     return self
 end
@@ -1245,10 +1218,6 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     end)
 
     return {
-        Set = function(newVal: any)
-            selected = newVal
-            selectLabel.Text = string.format("%s: %s", title, tostring(selected))
-        end,
         SetOptions = function(newOptions: {any})
             options = newOptions
             if not table.find(options, selected) and #options > 0 then
