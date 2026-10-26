@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : IN-MATCH CONTROLLER (FULL SEPARATE PAGE & LIVE LOG)
+-- CANDY TD : IN-MATCH CONTROLLER (FULL PRESET, LOG & REORDER)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -275,7 +275,7 @@ local states = {
 local refreshRecordUI: (() -> ())? = nil
 local lastRecordTick = 0
 
--- ระบบดึงและประมวลผลตำแหน่งยูนิตแบบยืดหยุ่น
+-- ระบบดึงและประมวลผลตำแหน่งยูนิต
 local function handleRecordInput(...)
     if not states.RecordMode then return end
     local rawArgs = { ... }
@@ -377,14 +377,11 @@ local function handleRecordInput(...)
     end
 end
 
--- ซิงก์ Handler เข้าตัวแปร Global เสมอ
 _G.CandyTD_ActiveRecordHandler = function(...)
     handleRecordInput(...)
 end
 
--- ติดตั้งตัวดักฟังคำสั่ง Remote ทุกช่องทาง
 local function installPlacementHook()
-    -- 1. Hook MatchNet.request
     if matchNet and type(matchNet.request) == "function" and not _G.CandyTD_MatchNetHooked then
         _G.CandyTD_MatchNetHooked = true
         local oldReq = matchNet.request
@@ -399,7 +396,6 @@ local function installPlacementHook()
         end
     end
 
-    -- 2. Hook __namecall (แบบไม่สนตัวพิมพ์เล็ก-ใหญ่)
     if not _G.CandyTD_PlacementHookInstalled then
         _G.CandyTD_PlacementHookInstalled = true
         local hookMeta = (type(hookmetamethod) == "function" and hookmetamethod) or nil
@@ -427,7 +423,6 @@ local function installPlacementHook()
         end
     end
 
-    -- 3. Hook RemoteFunction.InvokeServer ตรงๆ
     local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
     local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
     if actRemote and typeof(hookfunction) == "function" and not _G.CandyTD_ActInvokeHooked then
@@ -456,6 +451,12 @@ if not libChunk then
     error("[BehindTheDark] โหลด Library ไม่สำเร็จ: " .. tostring(libErr))
 end
 local Library = libChunk()
+
+-- โหลดด่านที่เคยเลือกล่าสุดจาก Settings
+if Library.Settings.SelectedStage and StagePresets[Library.Settings.SelectedStage] then
+    states.CurrentStage = Library.Settings.SelectedStage
+    states.RecordStageName = Library.Settings.SelectedStage
+end
 
 local Window = Library:CreateWindow({
     Title = "BEHIND THE DARK",
@@ -674,6 +675,8 @@ end)
 local stageDropdown = Window:CreateDropdown("Right", "Stage", 190, getStageNames(), states.CurrentStage, 10, function(selected)
     states.CurrentStage = selected
     states.RecordStageName = selected
+    Library.Settings.SelectedStage = selected
+    Library.SaveSettings()
 end)
 
 -- ========================================================
@@ -681,7 +684,7 @@ end)
 -- ========================================================
 local RecordPage = Window:CreatePage("RecordView")
 
--- 1. แถบ Header (ปุ่มย้อนกลับ + หัวข้อ)
+-- 1. แถบ Header
 local recHeader = Instance.new("Frame")
 recHeader.Size = UDim2.new(1, 0, 0, 36)
 recHeader.Position = UDim2.fromOffset(0, 0)
@@ -735,9 +738,9 @@ local rts = Instance.new("UIStroke", recTitle)
 rts.Thickness = 2.5
 rts.Color = Color3.fromRGB(22, 5, 36)
 
--- 2. ช่องใส่ชื่อด่านใหม่ (Stage Name Input)
+-- 2. ช่องใส่ชื่อด่านใหม่
 local inputShadow = Instance.new("Frame")
-inputShadow.Size = UDim2.new(0.6, -8, 0, 38)
+inputShadow.Size = UDim2.new(0.58, -6, 0, 38)
 inputShadow.Position = UDim2.fromOffset(0, 44)
 inputShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
 inputShadow.BorderSizePixel = 0
@@ -764,10 +767,10 @@ local sis = Instance.new("UIStroke", stageInput)
 sis.Thickness = 2
 sis.Color = Color3.fromRGB(22, 5, 36)
 
--- 3. ปุ่มสลับ Record (Record Toggle Button)
+-- 3. ปุ่มสลับ Record
 local recToggleShadow = Instance.new("Frame")
-recToggleShadow.Size = UDim2.new(0.4, 0, 0, 38)
-recToggleShadow.Position = UDim2.new(0.6, 0, 0, 44)
+recToggleShadow.Size = UDim2.new(0.42, 0, 0, 38)
+recToggleShadow.Position = UDim2.new(0.58, 6, 0, 44)
 recToggleShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
 recToggleShadow.BorderSizePixel = 0
 recToggleShadow.ZIndex = 6
@@ -792,9 +795,9 @@ rts2.Thickness = 2
 rts2.Color = Color3.fromRGB(22, 5, 36)
 Library.AttachInteractiveEffects(recToggleBtn, recToggleShadow)
 
--- 4. กรอบแสดงรายการตัวละครที่วาง (Recorded Units Scrolling List)
+-- 4. กรอบแสดงรายการตัวละครที่วาง
 local listShadow = Instance.new("Frame")
-listShadow.Size = UDim2.new(1, 0, 1, -128)
+listShadow.Size = UDim2.new(1, 0, 1, -132)
 listShadow.Position = UDim2.fromOffset(0, 88)
 listShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
 listShadow.BorderSizePixel = 0
@@ -807,7 +810,6 @@ unitScroll.Size = UDim2.new(1, 0, 1, -3)
 unitScroll.Position = UDim2.fromOffset(0, 0)
 unitScroll.BackgroundColor3 = Color3.fromRGB(30, 8, 48)
 unitScroll.BorderSizePixel = 0
-unitScroll.ScrollBarThickness = 5
 unitScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 unitScroll.ZIndex = 7
 unitScroll.Parent = listShadow
@@ -815,6 +817,7 @@ Instance.new("UICorner", unitScroll).CornerRadius = UDim.new(0, 11)
 local uss = Instance.new("UIStroke", unitScroll)
 uss.Thickness = 2
 uss.Color = Color3.fromRGB(22, 5, 36)
+Library.ApplyCartoonScrollbar(unitScroll)
 
 local uListLayout = Instance.new("UIListLayout", unitScroll)
 uListLayout.Padding = UDim.new(0, 4)
@@ -824,6 +827,20 @@ uListPad.PaddingLeft = UDim.new(0, 6)
 uListPad.PaddingRight = UDim.new(0, 6)
 uListPad.PaddingBottom = UDim.new(0, 6)
 
+-- ฟังก์ชันสลับลำดับยูนิต (Reorder)
+local function swapUnits(stageName: string, idx1: number, idx2: number)
+    local q = StagePresets[stageName]
+    if q and q[idx1] and q[idx2] then
+        local temp = q[idx1]
+        q[idx1] = q[idx2]
+        q[idx2] = temp
+        savePresetsToFile()
+        Library.PlaySound(SOUND_CLICK)
+        if refreshRecordUI then refreshRecordUI() end
+    end
+end
+
+-- ฟังก์ชันรีเฟรชรายการ
 refreshRecordUI = function()
     local cName = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
     if cName == "" then cName = states.CurrentStage end
@@ -846,15 +863,18 @@ refreshRecordUI = function()
     else
         for i, u in ipairs(q) do
             local card = Instance.new("Frame")
-            card.Size = UDim2.new(1, 0, 0, 28)
+            card.Size = UDim2.new(1, -6, 0, 32)
             card.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
             card.BorderSizePixel = 0
             card.ZIndex = 8
             card.Parent = unitScroll
-            Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
+            Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+            local cs = Instance.new("UIStroke", card)
+            cs.Thickness = 1.5
+            cs.Color = Color3.fromRGB(22, 5, 36)
 
             local txt = Instance.new("TextLabel")
-            txt.Size = UDim2.fromScale(1, 1)
+            txt.Size = UDim2.new(1, -68, 1, 0)
             txt.Position = UDim2.fromOffset(8, 0)
             txt.BackgroundTransparency = 1
             txt.Text = string.format("#%d  %s  |  (X: %.1f, Z: %.1f)  |  Target: %s", i, u.unit, u.x or 0, u.z or 0, u.setTarget or "first")
@@ -864,6 +884,48 @@ refreshRecordUI = function()
             txt.TextXAlignment = Enum.TextXAlignment.Left
             txt.ZIndex = 9
             txt.Parent = card
+
+            -- ปุ่มเลื่อนขึ้น (▲)
+            local btnUp = Instance.new("TextButton")
+            btnUp.Size = UDim2.fromOffset(26, 24)
+            btnUp.Position = UDim2.new(1, -58, 0.5, -12)
+            btnUp.BackgroundColor3 = (i > 1) and Color3.fromRGB(80, 180, 245) or Color3.fromRGB(60, 45, 80)
+            btnUp.Text = "▲"
+            btnUp.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btnUp.TextSize = 11
+            btnUp.Font = Enum.Font.FredokaOne
+            btnUp.BorderSizePixel = 0
+            btnUp.AutoButtonColor = false
+            btnUp.ZIndex = 10
+            btnUp.Parent = card
+            Instance.new("UICorner", btnUp).CornerRadius = UDim.new(0, 6)
+            if i > 1 then
+                Library.AttachInteractiveEffects(btnUp)
+                btnUp.Activated:Connect(function()
+                    swapUnits(cName, i, i - 1)
+                end)
+            end
+
+            -- ปุ่มเลื่อนลง (▼)
+            local btnDown = Instance.new("TextButton")
+            btnDown.Size = UDim2.fromOffset(26, 24)
+            btnDown.Position = UDim2.new(1, -28, 0.5, -12)
+            btnDown.BackgroundColor3 = (i < #q) and Color3.fromRGB(240, 150, 40) or Color3.fromRGB(60, 45, 80)
+            btnDown.Text = "▼"
+            btnDown.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btnDown.TextSize = 11
+            btnDown.Font = Enum.Font.FredokaOne
+            btnDown.BorderSizePixel = 0
+            btnDown.AutoButtonColor = false
+            btnDown.ZIndex = 10
+            btnDown.Parent = card
+            Instance.new("UICorner", btnDown).CornerRadius = UDim.new(0, 6)
+            if i < #q then
+                Library.AttachInteractiveEffects(btnDown)
+                btnDown.Activated:Connect(function()
+                    swapUnits(cName, i, i + 1)
+                end)
+            end
         end
     end
 end
@@ -895,28 +957,76 @@ recToggleBtn.Activated:Connect(function()
         recToggleBtn.Text = "● START RECORD"
         savePresetsToFile()
         states.CurrentStage = clean
+        Library.Settings.SelectedStage = clean
+        Library.SaveSettings()
         stageDropdown.SetOptions(getStageNames())
     end
     refreshRecordUI()
 end)
 
--- 5. ปุ่มล้างข้อมูลด่านนี้ (Clear Current Stage)
+-- 5. แถบควบคุมด้านล่าง (ปุ่ม UNDO / ลบตัวล่าสุด และ ปุ่ม CLEAR ทั้งหมด)
+local bottomBar = Instance.new("Frame")
+bottomBar.Size = UDim2.new(1, 0, 0, 36)
+bottomBar.Position = UDim2.new(0, 0, 1, -36)
+bottomBar.BackgroundTransparency = 1
+bottomBar.ZIndex = 6
+bottomBar.Parent = RecordPage.Container
+
+-- ปุ่มลบตัวล่าสุด (UNDO / DELETE LAST)
+local undoShadow = Instance.new("Frame")
+undoShadow.Size = UDim2.new(0.48, -4, 1, 0)
+undoShadow.Position = UDim2.fromOffset(0, 0)
+undoShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+undoShadow.BorderSizePixel = 0
+undoShadow.ZIndex = 6
+undoShadow.Parent = bottomBar
+Instance.new("UICorner", undoShadow).CornerRadius = UDim.new(0, 10)
+
+local undoBtn = Instance.new("TextButton")
+undoBtn.Size = UDim2.new(1, 0, 1, -3)
+undoBtn.Position = UDim2.fromOffset(0, 0)
+undoBtn.BackgroundColor3 = Color3.fromRGB(215, 115, 45)
+undoBtn.Text = "⟲ UNDO LAST UNIT"
+undoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+undoBtn.TextSize = 12
+undoBtn.Font = Enum.Font.FredokaOne
+undoBtn.BorderSizePixel = 0
+undoBtn.AutoButtonColor = false
+undoBtn.ZIndex = 7
+undoBtn.Parent = undoShadow
+Instance.new("UICorner", undoBtn).CornerRadius = UDim.new(0, 9)
+local ubs = Instance.new("UIStroke", undoBtn)
+ubs.Thickness = 2
+ubs.Color = Color3.fromRGB(22, 5, 36)
+Library.AttachInteractiveEffects(undoBtn, undoShadow)
+
+undoBtn.Activated:Connect(function()
+    local clean = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
+    if clean ~= "" and StagePresets[clean] and #StagePresets[clean] > 0 then
+        table.remove(StagePresets[clean], #StagePresets[clean])
+        savePresetsToFile()
+        Library.PlaySound(SOUND_CLICK)
+        refreshRecordUI()
+    end
+end)
+
+-- ปุ่มลบทั้งหมดของด่านนี้ (CLEAR ALL)
 local clearShadow = Instance.new("Frame")
-clearShadow.Size = UDim2.new(1, 0, 0, 34)
-clearShadow.Position = UDim2.new(0, 0, 1, -34)
+clearShadow.Size = UDim2.new(0.52, -4, 1, 0)
+clearShadow.Position = UDim2.new(0.48, 4, 0, 0)
 clearShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
 clearShadow.BorderSizePixel = 0
 clearShadow.ZIndex = 6
-clearShadow.Parent = RecordPage.Container
+clearShadow.Parent = bottomBar
 Instance.new("UICorner", clearShadow).CornerRadius = UDim.new(0, 10)
 
 local clearBtn = Instance.new("TextButton")
 clearBtn.Size = UDim2.new(1, 0, 1, -3)
 clearBtn.Position = UDim2.fromOffset(0, 0)
 clearBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 60)
-clearBtn.Text = "CLEAR UNITS IN THIS STAGE"
+clearBtn.Text = "CLEAR ALL IN STAGE"
 clearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-clearBtn.TextSize = 12.5
+clearBtn.TextSize = 12
 clearBtn.Font = Enum.Font.FredokaOne
 clearBtn.BorderSizePixel = 0
 clearBtn.AutoButtonColor = false
@@ -984,7 +1094,7 @@ local function createNavButton(text: string, yPos: number, rimColor: Color3, btn
     btn.Activated:Connect(callback)
 end
 
--- 1. ปุ่มเปิดหน้า Record View (สลับหน้าเต็ม)
+-- 1. ปุ่มเปิดหน้า Record View
 createNavButton("Setup Record & Presets ⚙", 236, Color3.fromRGB(255, 145, 160), Color3.fromRGB(235, 65, 85), function()
     stageInput.Text = states.CurrentStage
     states.RecordStageName = states.CurrentStage
@@ -992,7 +1102,7 @@ createNavButton("Setup Record & Presets ⚙", 236, Color3.fromRGB(255, 145, 160)
     RecordPage.Show()
 end)
 
--- 2. ปุ่ม Reload Presets จากไฟล์
+-- 2. ปุ่ม Reload Presets
 createNavButton("Reload Presets ↺", 282, Color3.fromRGB(255, 220, 110), Color3.fromRGB(240, 160, 45), function()
     loadPresetsFromFile()
     stageDropdown.SetOptions(getStageNames())
