@@ -68,6 +68,7 @@ local states = {
     AutoSummon = false,
     BannerType = "Standard",
     RollAmount = 10,
+    AutoChallenge = false,
     AutoDelete = {
         Rare = false,
         Epic = false,
@@ -163,9 +164,14 @@ Window:CreateToggle("Left", "Delete Legendary", 236, { On = Color3.fromRGB(245, 
 end)
 
 -- ========================================================
--- ฝั่งขวา: CANDY SHOP INSTANT BUY BUTTONS
+-- ฝั่งขวา: AUTO CHALLENGE & CANDY SHOP INSTANT BUY
 -- ========================================================
 local rightCol = Window:GetColumn("Right")
+
+-- Toggle สำหรับ Auto Challenge
+Window:CreateToggle("Right", "Auto Challenge", 0, { On = Color3.fromRGB(255, 90, 150), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
+    states.AutoChallenge = v
+end)
 
 local function createInstantBuyButton(text: string, yPos: number, btnColor: Color3, callback: () -> ())
     local base = Instance.new("Frame")
@@ -219,11 +225,11 @@ local function createInstantBuyButton(text: string, yPos: number, btnColor: Colo
     btn.Activated:Connect(callback)
 end
 
-createInstantBuyButton("Buy Trait Crystal x10", 0, Color3.fromRGB(60, 210, 140), function()
+createInstantBuyButton("Buy Trait Crystal x10", 46, Color3.fromRGB(60, 210, 140), function()
     buyItemFromTeller("crystal", 10)
 end)
 
-createInstantBuyButton("Buy Unit of Juice x10", 46, Color3.fromRGB(255, 140, 40), function()
+createInstantBuyButton("Buy Unit of Juice x10", 92, Color3.fromRGB(255, 140, 40), function()
     buyItemFromTeller("statroll", 10)
 end)
 
@@ -243,6 +249,42 @@ task.spawn(function()
                     task.wait(0.8)
                 end
             end
+        end
+    end
+end)
+
+-- ========================================================
+-- AUTO CHALLENGE LOOP (ยิง Remote ตามที่คุณให้มา)
+-- ========================================================
+task.spawn(function()
+    while Controller.Running do
+        task.wait(1.5)
+        if states.AutoChallenge then
+            pcall(function()
+                local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
+                if hubRemotes then
+                    -- 1. เปิด Training / Challenge
+                    local funnel = hubRemotes:FindFirstChild("Funnel")
+                    if funnel and funnel:IsA("RemoteEvent") then
+                        funnel:FireServer("open_train")
+                        task.wait(0.3)
+                    end
+
+                    -- 2. สร้างห้องแมตช์
+                    local createMatch = hubRemotes:FindFirstChild("CreateMatch")
+                    if createMatch and createMatch:IsA("RemoteFunction") then
+                        createMatch:InvokeServer(2, "c996114_1", false)
+                        task.wait(0.3)
+                    end
+
+                    -- 3. เริ่มเกม/เริ่มชาเลนจ์
+                    local startMatch = hubRemotes:FindFirstChild("StartMatch")
+                    if startMatch and startMatch:IsA("RemoteFunction") then
+                        startMatch:InvokeServer()
+                    end
+                end
+            end)
+            task.wait(3) -- หน่วงเวลาสั้น ๆ รอเข้าแมพหรือลูปเช็คใหม่
         end
     end
 end)
