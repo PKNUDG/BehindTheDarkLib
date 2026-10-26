@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (ENHANCED SETTINGS & DIM)
+-- BEHIND THE DARK : CORE UI LIBRARY (SUB-COLUMN SUPPORT)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -141,7 +141,6 @@ end
 
 local function spawnClickRipple(btn: GuiButton, inputPos: Vector3)
     if not (Library.Settings.Animations and Library.Settings.ClickRipple) then return end
-    
     local relX = inputPos.X - btn.AbsolutePosition.X
     local relY = inputPos.Y - btn.AbsolutePosition.Y
 
@@ -492,7 +491,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    -- Title Bar
     local titleRim = Instance.new("Frame")
     titleRim.Size = UDim2.new(1, -28, 0, 44)
     titleRim.Position = UDim2.fromOffset(14, 12)
@@ -568,7 +566,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     shortcutHint.ZIndex = 6
     shortcutHint.Parent = titlePlate
 
-    -- ปุ่มปิดสีแดง (Close)
     local closeBtnRim = Instance.new("Frame")
     closeBtnRim.Size = UDim2.fromOffset(30, 30)
     closeBtnRim.Position = UDim2.new(1, -36, 0.5, -15)
@@ -607,7 +604,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         screenGui:Destroy()
     end)
 
-    -- ปุ่ม Settings สีเหลือง
     local setBtnRim = Instance.new("Frame")
     setBtnRim.Size = UDim2.fromOffset(30, 30)
     setBtnRim.Position = UDim2.new(1, -72, 0.5, -15)
@@ -632,7 +628,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 8)
     Library.AttachInteractiveEffects(settingsBtn, setBtnRim)
 
-    -- ปุ่ม 3D Toggle
     local btn3DRim = Instance.new("Frame")
     btn3DRim.Size = UDim2.fromOffset(74, 30)
     btn3DRim.Position = UDim2.new(1, -152, 0.5, -15)
@@ -717,7 +712,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    -- หน้าหลัก (Main View)
     local mainView = Instance.new("Frame")
     mainView.Name = "MainView"
     mainView.Size = UDim2.new(1, 0, 1, -64)
@@ -765,9 +759,11 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     self.RightColumn = createColumnTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 1, -12))
     self.CenterColumn = self.LeftColumn
 
-    -- ========================================================
-    -- ม่าน Dim (Dark Backdrop) สำหรับหน้า Setting
-    -- ========================================================
+    -- ฟังก์ชันสำหรับสร้างกรอบ Tray ย่อยแบบแยกอิสระ (ไม่ซ้อนกรอบเดิม)
+    function self:CreateSubColumn(pos: UDim2, size: UDim2)
+        return createColumnTray(pos, size)
+    end
+
     local settingDim = Instance.new("TextButton")
     settingDim.Name = "SettingDimBackdrop"
     settingDim.Size = UDim2.fromScale(1, 1)
@@ -780,7 +776,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     settingDim.Visible = false
     settingDim.Parent = card
 
-    -- หน้าต่าง Visual & Sound Settings Modal (เพิ่มเงาปุ่ม 3 ชั้น)
     local settingsModal = Instance.new("Frame")
     settingsModal.Name = "SettingsModal"
     settingsModal.Size = UDim2.fromOffset(290, 310)
@@ -797,7 +792,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smStroke.Thickness = 4.5
     smStroke.Color = Color3.fromRGB(22, 5, 36)
 
-    -- ผิวด้านใน Modal
     local smInner = Instance.new("Frame")
     smInner.Size = UDim2.new(1, -6, 1, -6)
     smInner.Position = UDim2.fromOffset(3, 3)
@@ -835,9 +829,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     local sLayout = Instance.new("UIListLayout", settingsScroll)
     sLayout.Padding = UDim.new(0, 8)
 
-    -- ฟังก์ชันสร้างแถว Setting พร้อมเงาปุ่ม 3 ชั้น (3D Layered Shadow)
     local function createSettingRow(text: string, settingKey: string, onToggle: ((boolean) -> ())?)
-        -- ชั้นที่ 1: เงาดำเข้มด้านล่างสุด
         local rowShadow = Instance.new("Frame")
         rowShadow.Size = UDim2.new(1, -10, 0, 42)
         rowShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
@@ -846,7 +838,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         rowShadow.Parent = settingsScroll
         Instance.new("UICorner", rowShadow).CornerRadius = UDim.new(0, 12)
 
-        -- ชั้นที่ 2: ขอบนูนกลาง
         local rowRim = Instance.new("Frame")
         rowRim.Size = UDim2.new(1, 0, 0, 39)
         rowRim.Position = UDim2.fromOffset(0, 0)
@@ -859,7 +850,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         rs.Thickness = 2.5
         rs.Color = Color3.fromRGB(22, 5, 36)
 
-        -- ชั้นที่ 3: พื้นผิวปุ่มหลัก
         local row = Instance.new("Frame")
         row.Size = UDim2.new(1, -6, 1, -5)
         row.Position = UDim2.fromOffset(3, 2)
@@ -867,7 +857,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         row.BorderSizePixel = 0
         row.ZIndex = 74
         row.Parent = rowRim
-        Instance.new("UICorner", row.Parent == rowRim and row or row).CornerRadius = UDim.new(0, 10)
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
 
         local lbl = Instance.new("TextLabel")
         lbl.Size = UDim2.new(1, -64, 1, 0)
@@ -1000,8 +990,8 @@ function Library:CreatePage(name: string)
     }
 end
 
-function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: Color3, Off: Color3}, default: boolean, callback: (boolean) -> ())
-    local parent = self:GetColumn(side)
+function Library:CreateToggle(target: any, text: string, yPos: number, _: {On: Color3, Off: Color3}, default: boolean, callback: (boolean) -> ())
+    local parent: Frame = (typeof(target) == "Instance") and target or self:GetColumn(target)
     local state = default or false
 
     local btnShadow = Instance.new("Frame")
@@ -1081,7 +1071,7 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     Instance.new("UICorner", gloss).CornerRadius = UDim.new(0, 9)
 
     local LIME_COLOR = Color3.fromRGB(180, 255, 75)
-    local OFF_COLOR = Color3.fromRGB(175, 175, 185)
+    local OFF_COLOR = Color3.fromRGB(255, 255, 255)
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -66, 1, 0)
@@ -1169,8 +1159,8 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     return setVisual
 end
 
-function Library:CreateDropdown(side: string, title: string, yPos: number, options: {any}, default: any, zIndexOffset: number, callback: (any) -> ())
-    local parent = self:GetColumn(side)
+function Library:CreateDropdown(target: any, title: string, yPos: number, options: {any}, default: any, zIndexOffset: number, callback: (any) -> ())
+    local parent: Frame = (typeof(target) == "Instance") and target or self:GetColumn(target)
     local selected = default
     local zBase = 15 + (zIndexOffset or 0)
 
