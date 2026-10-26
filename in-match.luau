@@ -190,7 +190,18 @@ local DefaultStagePresets = {
         { unit = "VampireKingCloud", x = -6.147939205169678, z = -28.48414421081543, setTarget = "strongest" },
         { unit = "PrismRainicorn", x = -19.20961570739746, z = -27.122318267822266, setTarget = "strongest" },
         { unit = "PrismRainicorn", x = -18.643310546875, z = -30.057519912719727, setTarget = "strongest" }
-    }
+    },
+    -- Dungeon Train Challenge Acts (Empty presets for auto detection & user recording)
+    ["Act 1: Penguin Parade"] = {},
+    ["Act 2: Gumdrop Gauntlet"] = {},
+    ["Act 3: Frosty Fudge Pass"] = {},
+    ["Act 4: Goliad's Reign"] = {},
+    -- Common Challenge & Story Stages
+    ["Candy Kingdom"] = {},
+    ["Ice Kingdom"] = {},
+    ["Fire Kingdom"] = {},
+    ["Treehouse"] = {},
+    ["Nightosphere"] = {}
 }
 
 local StagePresets = {}
@@ -293,18 +304,99 @@ pcall(function()
 end)
 
 local matchedPlaceStage = false
-if Library.Settings.PlaceIdStageMap and Library.Settings.PlaceIdStageMap[currentPlaceId] then
+
+local function findMatchingPresetName(query: string?): string?
+    if not query or query == "" then return nil end
+    local cleanQuery = query:lower():gsub("[%p%s]", "")
+    for presetName, _ in pairs(StagePresets) do
+        local cleanPreset = presetName:lower():gsub("[%p%s]", "")
+        if cleanPreset == cleanQuery or cleanPreset:find(cleanQuery, 1, true) or cleanQuery:find(cleanPreset, 1, true) then
+            return presetName
+        end
+    end
+    -- ตรวจสอบ Keyword เฉพาะของด่าน เช่น penguin, gumdrop, frosty, fudge, goliad
+    local actKeywords = {
+        ["penguin"] = "Act 1: Penguin Parade",
+        ["parade"] = "Act 1: Penguin Parade",
+        ["gumdrop"] = "Act 2: Gumdrop Gauntlet",
+        ["gauntlet"] = "Act 2: Gumdrop Gauntlet",
+        ["frosty"] = "Act 3: Frosty Fudge Pass",
+        ["fudge"] = "Act 3: Frosty Fudge Pass",
+        ["goliad"] = "Act 4: Goliad's Reign",
+        ["reign"] = "Act 4: Goliad's Reign",
+        ["halloween"] = "Raid Halloween",
+        ["bug milk"] = "Inf Bug Milk"
+    }
+    local lowerQuery = query:lower()
+    for kw, targetName in pairs(actKeywords) do
+        if lowerQuery:find(kw, 1, true) and StagePresets[targetName] then
+            return targetName
+        end
+    end
+    return nil
+end
+
+-- 1. ตรวจสอบจากการส่งค่าข้ามห้อง (Genv / Library.Settings)
+local candidateStage = _G.CandyTD_SelectedStage or Library.Settings.SelectedStage
+local matchedName = findMatchingPresetName(candidateStage)
+
+-- 2. หากยังไม่พบ ตรวจสอบจากข้อความในหน้าจอ In-Match (CandyTD UI)
+if not matchedName and candyTD then
+    for _, desc in ipairs(candyTD:GetDescendants()) do
+        if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" then
+            local found = findMatchingPresetName(desc.Text)
+            if found then
+                matchedName = found
+                print(string.format("[AutoStage] สแกนพบชื่อด่านจาก UI ('%s' -> '%s')", desc.Text, found))
+                break
+            end
+        end
+    end
+end
+
+-- 3. หากยังไม่พบ ตรวจสอบจาก Workspace / Map
+if not matchedName then
+    local mapFolder = workspace:FindFirstChild("Map") or workspace:FindFirstChild("Stage") or workspace:FindFirstChild("Arena")
+    if mapFolder then
+        local found = findMatchingPresetName(mapFolder.Name)
+        if found then
+            matchedName = found
+        else
+            for _, ch in ipairs(mapFolder:GetChildren()) do
+                local chFound = findMatchingPresetName(ch.Name)
+                if chFound then
+                    matchedName = chFound
+                    break
+                end
+            end
+        end
+    end
+end
+
+-- 4. นำผลลัพธ์มาตั้งค่า CurrentStage & AutoPlace
+if matchedName then
+    states.CurrentStage = matchedName
+    states.RecordStageName = matchedName
+    matchedPlaceStage = true
+    local presetUnits = StagePresets[matchedName]
+    if presetUnits and #presetUnits > 0 then
+        states.AutoPlace = true
+        print(string.format("[AutoStage] ด่าน '%s' มีพรีเซ็ตยูนิต %d ตัว -> เปิดใช้งาน Auto Place อัตโนมัติ", matchedName, #presetUnits))
+    else
+        print(string.format("[AutoStage] ตรวจพบด่าน '%s' (พรีเซ็ตว่าง พร้อมสำหรับการ Record ยูนิตใหม่)", matchedName))
+    end
+elseif Library.Settings.PlaceIdStageMap and Library.Settings.PlaceIdStageMap[currentPlaceId] then
     local mapped = Library.Settings.PlaceIdStageMap[currentPlaceId]
     if StagePresets[mapped] then
         states.CurrentStage = mapped
         states.RecordStageName = mapped
-        states.AutoPlace = true
         matchedPlaceStage = true
-        print(string.format("[AutoStage] พบ PlaceId '%s' ตรงกับด่าน '%s' -> เปิดใช้งาน Auto Place อัตโนมัติ", currentPlaceId, mapped))
+        local presetUnits = StagePresets[mapped]
+        if presetUnits and #presetUnits > 0 then
+            states.AutoPlace = true
+        end
+        print(string.format("[AutoStage] พบ PlaceId '%s' ตรงกับด่าน '%s'", currentPlaceId, mapped))
     end
-elseif Library.Settings.SelectedStage and StagePresets[Library.Settings.SelectedStage] then
-    states.CurrentStage = Library.Settings.SelectedStage
-    states.RecordStageName = Library.Settings.SelectedStage
 end
 
 local refreshRecordUI: (() -> ())? = nil

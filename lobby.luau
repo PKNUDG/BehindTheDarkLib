@@ -478,6 +478,35 @@ local function findAndPlayFirstWinCar()
 
     -- 4. สั่งเริ่มเกมโดยการกดปุ่ม PLAY ที่ถูกต้อง
     if targetPlayButton then
+        -- ตรวจสอบและดึงชื่อด่าน/Act จากตู้ที่กำลังจะกดเล่น
+        local detectedStageName = nil
+        local targetCar = targetPlayButton:FindFirstAncestor("Car1")
+            or targetPlayButton:FindFirstAncestor("Car2")
+            or targetPlayButton:FindFirstAncestor("Car3")
+            or targetPlayButton.Parent
+
+        if targetCar then
+            for _, desc in ipairs(targetCar:GetDescendants()) do
+                if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" then
+                    local t = desc.Text:gsub("^%s+", ""):gsub("%s+$", "")
+                    local upperT = t:upper()
+                    if upperT:find("ACT %d") or upperT:find("PENGUIN") or upperT:find("GUMDROP")
+                        or upperT:find("FROSTY") or upperT:find("GOLIAD") or upperT:find("FUDGE")
+                        or upperT:find("GAUNTLET") or upperT:find("PARADE") or upperT:find("REIGN") then
+                        detectedStageName = t
+                        break
+                    end
+                end
+            end
+        end
+
+        if detectedStageName then
+            print(string.format("[AutoChallenge] >> บันทึกชื่อด่านเป้าหมาย: '%s'", detectedStageName))
+            _G.CandyTD_SelectedStage = detectedStageName
+            Library.Settings.SelectedStage = detectedStageName
+            Library.SaveSettings()
+        end
+
         print("[AutoChallenge] กำลังกดปุ่ม PLAY เพื่อเข้าห้อง...")
         triggerButton(targetPlayButton)
         task.wait(1.5)
