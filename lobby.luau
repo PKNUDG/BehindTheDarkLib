@@ -62,19 +62,40 @@ local connIdle = player.Idled:Connect(function()
 end)
 
 -- ========================================================
--- STATES
+-- โหลดและใช้งาน BEHINDTHEDARKLIB
 -- ========================================================
+local libUrl = "https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/BehindTheDarkLib.luau?v=" .. os.time()
+local libRaw = game:HttpGet(libUrl)
+local libChunk, libErr = loadstring(libRaw)
+if not libChunk then
+    error("[BehindTheDark] โหลด Library ไม่สำเร็จ: " .. tostring(libErr))
+end
+local Library = libChunk()
+
+local savedCfg = Library.Settings.Configs or {}
+
 local states = {
-    AutoSummon = false,
-    BannerType = "Standard",
-    RollAmount = 10,
-    AutoChallenge = false,
+    AutoSummon = (savedCfg.AutoSummon ~= nil) and savedCfg.AutoSummon or false,
+    BannerType = savedCfg.BannerType or "Standard",
+    RollAmount = savedCfg.RollAmount or 10,
+    AutoChallenge = (savedCfg.AutoChallenge ~= nil) and savedCfg.AutoChallenge or false,
     AutoDelete = {
-        Rare = false,
-        Epic = false,
-        Legendary = false
+        Rare = (savedCfg.AutoDelete and savedCfg.AutoDelete.Rare ~= nil) and savedCfg.AutoDelete.Rare or false,
+        Epic = (savedCfg.AutoDelete and savedCfg.AutoDelete.Epic ~= nil) and savedCfg.AutoDelete.Epic or false,
+        Legendary = (savedCfg.AutoDelete and savedCfg.AutoDelete.Legendary ~= nil) and savedCfg.AutoDelete.Legendary or false
     }
 }
+
+local function saveConfigState()
+    Library.Settings.Configs = {
+        AutoSummon = states.AutoSummon,
+        BannerType = states.BannerType,
+        RollAmount = states.RollAmount,
+        AutoChallenge = states.AutoChallenge,
+        AutoDelete = states.AutoDelete
+    }
+    Library.SaveSettings()
+end
 
 -- Remote Action Helpers
 local function setServerAutoDelete(rarity: string, enable: boolean)
@@ -106,17 +127,6 @@ local function buyItemFromTeller(itemId: string, amount: number)
     end
 end
 
--- ========================================================
--- โหลดและใช้งาน BEHINDTHEDARKLIB
--- ========================================================
-local libUrl = "https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/BehindTheDarkLib.luau?v=" .. os.time()
-local libRaw = game:HttpGet(libUrl)
-local libChunk, libErr = loadstring(libRaw)
-if not libChunk then
-    error("[BehindTheDark] โหลด Library ไม่สำเร็จ: " .. tostring(libErr))
-end
-local Library = libChunk()
-
 local Window = Library:CreateWindow({
     Title = "BEHIND THE DARK - LOBBY",
     Name = "CandyTD_BehindTheDarkLobby",
@@ -129,11 +139,17 @@ local Window = Library:CreateWindow({
 })
 Controller.Gui = Window.Gui
 
+-- ซ่อนกล่องพื้นหลังรวมเดิมของฝั่งขวาเพื่อไม่ให้เกิดการซ้อนทับ
+if Window.RightColumn and Window.RightColumn.Parent and Window.RightColumn.Parent.Parent then
+    Window.RightColumn.Parent.Parent.Visible = false
+end
+
 -- ========================================================
 -- ฝั่งซ้าย: AUTO SUMMON & AUTO DELETE SETTINGS
 -- ========================================================
-Window:CreateToggle("Left", "Auto Summon", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
+Window:CreateToggle("Left", "Auto Summon", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoSummon, function(v)
     states.AutoSummon = v
+    saveConfigState()
     if v then
         syncAllAutoDelete()
     end
@@ -141,131 +157,92 @@ end)
 
 Window:CreateDropdown("Left", "Banner", 46, { "Standard", "Event" }, states.BannerType, 20, function(selected)
     states.BannerType = selected
+    saveConfigState()
 end)
 
 Window:CreateDropdown("Left", "Amount", 92, { 10, 1 }, states.RollAmount, 10, function(selected)
     states.RollAmount = tonumber(selected) or 10
+    saveConfigState()
 end)
 
--- Auto Delete Toggles
-Window:CreateToggle("Left", "Delete Rare", 144, { On = Color3.fromRGB(80, 160, 240), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
+Window:CreateToggle("Left", "Delete Rare", 144, { On = Color3.fromRGB(80, 160, 240), Off = Color3.fromRGB(120, 120, 130) }, states.AutoDelete.Rare, function(v)
     states.AutoDelete.Rare = v
+    saveConfigState()
     setServerAutoDelete("Rare", v)
 end)
 
-Window:CreateToggle("Left", "Delete Epic", 190, { On = Color3.fromRGB(175, 75, 230), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
+Window:CreateToggle("Left", "Delete Epic", 190, { On = Color3.fromRGB(175, 75, 230), Off = Color3.fromRGB(120, 120, 130) }, states.AutoDelete.Epic, function(v)
     states.AutoDelete.Epic = v
+    saveConfigState()
     setServerAutoDelete("Epic", v)
 end)
 
-Window:CreateToggle("Left", "Delete Legendary", 236, { On = Color3.fromRGB(245, 185, 45), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
+Window:CreateToggle("Left", "Delete Legendary", 236, { On = Color3.fromRGB(245, 185, 45), Off = Color3.fromRGB(120, 120, 130) }, states.AutoDelete.Legendary, function(v)
     states.AutoDelete.Legendary = v
+    saveConfigState()
     setServerAutoDelete("Legendary", v)
 end)
 
 -- ========================================================
--- ฝั่งขวา: แยกกล่องพื้นหลัง (SubTray) สำหรับปุ่มชาเลนจ์และร้านค้า
+-- ฝั่งขวา: กล่องเดี่ยวแยกอิสระ (CHALLENGE & CANDY SHOP TRAY)
 -- ========================================================
-local rightCol = Window:GetColumn("Right")
+local rightSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 154))
 
-local subTrayRim = Instance.new("Frame")
-subTrayRim.Size = UDim2.new(1, 0, 0, 140)
-subTrayRim.Position = UDim2.fromOffset(0, 0)
-subTrayRim.BackgroundColor3 = Color3.fromRGB(85, 42, 135)
-subTrayRim.BorderSizePixel = 0
-subTrayRim.ZIndex = 5
-subTrayRim.Parent = rightCol
-Instance.new("UICorner", subTrayRim).CornerRadius = UDim.new(0, 16)
-local strStroke = Instance.new("UIStroke", subTrayRim)
-strStroke.Thickness = 2.5
-strStroke.Color = Color3.fromRGB(22, 5, 36)
-
-local subTrayInner = Instance.new("Frame")
-subTrayInner.Size = UDim2.new(1, -6, 1, -6)
-subTrayInner.Position = UDim2.fromOffset(3, 3)
-subTrayInner.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
-subTrayInner.BorderSizePixel = 0
-subTrayInner.ZIndex = 5
-subTrayInner.Parent = subTrayRim
-Instance.new("UICorner", subTrayInner).CornerRadius = UDim.new(0, 14)
-
--- ปุ่ม Toggle Auto Challenge ภายในกล่องแยก
-local challengeToggleShadow = Instance.new("Frame")
-challengeToggleShadow.Size = UDim2.new(1, -16, 0, 38)
-challengeToggleShadow.Position = UDim2.fromOffset(8, 8)
-challengeToggleShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
-challengeToggleShadow.BorderSizePixel = 0
-challengeToggleShadow.ZIndex = 6
-challengeToggleShadow.Parent = subTrayInner
-Instance.new("UICorner", challengeToggleShadow).CornerRadius = UDim.new(0, 10)
-
-local challengeBtn = Instance.new("TextButton")
-challengeBtn.Size = UDim2.new(1, 0, 1, -3)
-challengeBtn.Position = UDim2.fromOffset(0, 0)
-challengeBtn.BackgroundColor3 = Color3.fromRGB(255, 90, 150)
-challengeBtn.Text = "Auto Challenge: OFF"
-challengeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-challengeBtn.TextSize = 13
-challengeBtn.Font = Enum.Font.FredokaOne
-challengeBtn.BorderSizePixel = 0
-challengeBtn.AutoButtonColor = false
-challengeBtn.ZIndex = 7
-challengeBtn.Parent = challengeToggleShadow
-Instance.new("UICorner", challengeBtn).CornerRadius = UDim.new(0, 9)
-local cbStroke = Instance.new("UIStroke", challengeBtn)
-cbStroke.Thickness = 2
-cbStroke.Color = Color3.fromRGB(22, 5, 36)
-Library.AttachInteractiveEffects(challengeBtn, challengeToggleShadow)
-
-challengeBtn.Activated:Connect(function()
-    states.AutoChallenge = not states.AutoChallenge
-    Library.PlaySound("rbxassetid://9069609268")
-    if states.AutoChallenge then
-        challengeBtn.BackgroundColor3 = Color3.fromRGB(110, 215, 65)
-        challengeBtn.Text = "Auto Challenge: ON"
-    else
-        challengeBtn.BackgroundColor3 = Color3.fromRGB(255, 90, 150)
-        challengeBtn.Text = "Auto Challenge: OFF"
-    end
+-- 1. ปุ่ม Auto Challenge 3D Toggle
+Window:CreateToggle(rightSubTray, "Auto Challenge", 0, { On = Color3.fromRGB(255, 90, 150), Off = Color3.fromRGB(120, 120, 130) }, states.AutoChallenge, function(v)
+    states.AutoChallenge = v
+    saveConfigState()
 end)
 
--- ปุ่มซื้อของด่วนภายในกล่องแยก
-local function createInstantBuyButton(text: string, yPos: number, btnColor: Color3, callback: () -> ())
-    local base = Instance.new("Frame")
-    base.Size = UDim2.new(1, -16, 0, 36)
-    base.Position = UDim2.fromOffset(8, yPos)
-    base.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
-    base.BorderSizePixel = 0
-    base.ZIndex = 6
-    base.Parent = subTrayInner
-    Instance.new("UICorner", base).CornerRadius = UDim.new(0, 10)
+-- 2. ฟังก์ชันสร้างปุ่มซื้อของด่วนแบบ 3D มาตรฐาน
+local function createShopActionButton(parentTarget: Instance, text: string, yPos: number, rimColor: Color3, btnColor: Color3, callback: () -> ())
+    local shadow = Instance.new("Frame")
+    shadow.Size = UDim2.new(1, 0, 0, 44)
+    shadow.Position = UDim2.fromOffset(0, yPos)
+    shadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+    shadow.BorderSizePixel = 0
+    shadow.ZIndex = 5
+    shadow.Parent = parentTarget
+    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 14)
+
+    local rim = Instance.new("Frame")
+    rim.Size = UDim2.new(1, 0, 0, 41)
+    rim.Position = UDim2.fromOffset(0, 0)
+    rim.BackgroundColor3 = rimColor
+    rim.BorderSizePixel = 0
+    rim.ZIndex = 6
+    rim.Parent = shadow
+    Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 14)
+    local rs = Instance.new("UIStroke", rim)
+    rs.Thickness = 2.5
+    rs.Color = Color3.fromRGB(22, 5, 36)
 
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 1, -3)
-    btn.Position = UDim2.fromOffset(0, 0)
+    btn.Size = UDim2.new(1, -6, 1, -5)
+    btn.Position = UDim2.fromOffset(3, 2)
     btn.BackgroundColor3 = btnColor
-    btn.BorderSizePixel = 0
-    btn.AutoButtonColor = false
     btn.Text = text
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 13
+    btn.TextSize = 13.5
     btn.Font = Enum.Font.FredokaOne
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
     btn.ZIndex = 7
-    btn.Parent = base
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 9)
-    local ts = Instance.new("UIStroke", btn)
-    ts.Thickness = 2
-    ts.Color = Color3.fromRGB(22, 5, 36)
+    btn.Parent = rim
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 11)
+    local bts = Instance.new("UIStroke", btn)
+    bts.Thickness = 2.5
+    bts.Color = Color3.fromRGB(22, 5, 36)
 
-    Library.AttachInteractiveEffects(btn, base)
+    Library.AttachInteractiveEffects(btn, shadow)
     btn.Activated:Connect(callback)
 end
 
-createInstantBuyButton("Buy Trait Crystal x10", 52, Color3.fromRGB(60, 210, 140), function()
+createShopActionButton(rightSubTray, "Buy Trait Crystal x10", 46, Color3.fromRGB(140, 240, 180), Color3.fromRGB(60, 210, 140), function()
     buyItemFromTeller("crystal", 10)
 end)
 
-createInstantBuyButton("Buy Unit of Juice x10", 94, Color3.fromRGB(255, 140, 40), function()
+createShopActionButton(rightSubTray, "Buy Unit of Juice x10", 92, Color3.fromRGB(255, 185, 110), Color3.fromRGB(255, 140, 40), function()
     buyItemFromTeller("statroll", 10)
 end)
 
