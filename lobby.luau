@@ -164,72 +164,108 @@ Window:CreateToggle("Left", "Delete Legendary", 236, { On = Color3.fromRGB(245, 
 end)
 
 -- ========================================================
--- ฝั่งขวา: AUTO CHALLENGE & CANDY SHOP INSTANT BUY
+-- ฝั่งขวา: แยกกล่องพื้นหลัง (SubTray) สำหรับปุ่มชาเลนจ์และร้านค้า
 -- ========================================================
 local rightCol = Window:GetColumn("Right")
 
--- Toggle สำหรับ Auto Challenge (เพิ่มเข้ามาใหม่)
-Window:CreateToggle("Right", "Auto Challenge", 0, { On = Color3.fromRGB(255, 90, 150), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
-    states.AutoChallenge = v
+local subTrayRim = Instance.new("Frame")
+subTrayRim.Size = UDim2.new(1, 0, 0, 140)
+subTrayRim.Position = UDim2.fromOffset(0, 0)
+subTrayRim.BackgroundColor3 = Color3.fromRGB(85, 42, 135)
+subTrayRim.BorderSizePixel = 0
+subTrayRim.ZIndex = 5
+subTrayRim.Parent = rightCol
+Instance.new("UICorner", subTrayRim).CornerRadius = UDim.new(0, 16)
+local strStroke = Instance.new("UIStroke", subTrayRim)
+strStroke.Thickness = 2.5
+strStroke.Color = Color3.fromRGB(22, 5, 36)
+
+local subTrayInner = Instance.new("Frame")
+subTrayInner.Size = UDim2.new(1, -6, 1, -6)
+subTrayInner.Position = UDim2.fromOffset(3, 3)
+subTrayInner.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
+subTrayInner.BorderSizePixel = 0
+subTrayInner.ZIndex = 5
+subTrayInner.Parent = subTrayRim
+Instance.new("UICorner", subTrayInner).CornerRadius = UDim.new(0, 14)
+
+-- ปุ่ม Toggle Auto Challenge ภายในกล่องแยก
+local challengeToggleShadow = Instance.new("Frame")
+challengeToggleShadow.Size = UDim2.new(1, -16, 0, 38)
+challengeToggleShadow.Position = UDim2.fromOffset(8, 8)
+challengeToggleShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+challengeToggleShadow.BorderSizePixel = 0
+challengeToggleShadow.ZIndex = 6
+challengeToggleShadow.Parent = subTrayInner
+Instance.new("UICorner", challengeToggleShadow).CornerRadius = UDim.new(0, 10)
+
+local challengeBtn = Instance.new("TextButton")
+challengeBtn.Size = UDim2.new(1, 0, 1, -3)
+challengeBtn.Position = UDim2.fromOffset(0, 0)
+challengeBtn.BackgroundColor3 = Color3.fromRGB(255, 90, 150)
+challengeBtn.Text = "Auto Challenge: OFF"
+challengeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+challengeBtn.TextSize = 13
+challengeBtn.Font = Enum.Font.FredokaOne
+challengeBtn.BorderSizePixel = 0
+challengeBtn.AutoButtonColor = false
+challengeBtn.ZIndex = 7
+challengeBtn.Parent = challengeToggleShadow
+Instance.new("UICorner", challengeBtn).CornerRadius = UDim.new(0, 9)
+local cbStroke = Instance.new("UIStroke", challengeBtn)
+cbStroke.Thickness = 2
+cbStroke.Color = Color3.fromRGB(22, 5, 36)
+Library.AttachInteractiveEffects(challengeBtn, challengeToggleShadow)
+
+challengeBtn.Activated:Connect(function()
+    states.AutoChallenge = not states.AutoChallenge
+    Library.PlaySound("rbxassetid://9069609268")
+    if states.AutoChallenge then
+        challengeBtn.BackgroundColor3 = Color3.fromRGB(110, 215, 65)
+        challengeBtn.Text = "Auto Challenge: ON"
+    else
+        challengeBtn.BackgroundColor3 = Color3.fromRGB(255, 90, 150)
+        challengeBtn.Text = "Auto Challenge: OFF"
+    end
 end)
 
+-- ปุ่มซื้อของด่วนภายในกล่องแยก
 local function createInstantBuyButton(text: string, yPos: number, btnColor: Color3, callback: () -> ())
     local base = Instance.new("Frame")
-    base.Size = UDim2.new(1, 0, 0, 38)
-    base.Position = UDim2.fromOffset(0, yPos)
-    base.BackgroundColor3 = Color3.fromRGB(35, 10, 55)
+    base.Size = UDim2.new(1, -16, 0, 36)
+    base.Position = UDim2.fromOffset(8, yPos)
+    base.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
     base.BorderSizePixel = 0
-    base.ZIndex = 4
-    base.Parent = rightCol
-    Instance.new("UICorner", base).CornerRadius = UDim.new(1, 0)
-    local bs = Instance.new("UIStroke", base)
-    bs.Thickness = 2.5
-    bs.Color = Color3.fromRGB(35, 10, 55)
+    base.ZIndex = 6
+    base.Parent = subTrayInner
+    Instance.new("UICorner", base).CornerRadius = UDim.new(0, 10)
 
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -2, 1, -4)
-    btn.Position = UDim2.fromOffset(1, 1)
+    btn.Size = UDim2.new(1, 0, 1, -3)
+    btn.Position = UDim2.fromOffset(0, 0)
     btn.BackgroundColor3 = btnColor
     btn.BorderSizePixel = 0
     btn.AutoButtonColor = false
-    btn.Text = ""
-    btn.ClipsDescendants = true
-    btn.ZIndex = 5
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 13
+    btn.Font = Enum.Font.FredokaOne
+    btn.ZIndex = 7
     btn.Parent = base
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 9)
+    local ts = Instance.new("UIStroke", btn)
+    ts.Thickness = 2
+    ts.Color = Color3.fromRGB(22, 5, 36)
 
-    local gloss = Instance.new("Frame")
-    gloss.Size = UDim2.new(1, -14, 0.45, 0)
-    gloss.Position = UDim2.fromOffset(7, 1)
-    gloss.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    gloss.BackgroundTransparency = 0.72
-    gloss.BorderSizePixel = 0
-    gloss.ZIndex = 6
-    gloss.Parent = btn
-    Instance.new("UICorner", gloss).CornerRadius = UDim.new(1, 0)
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.fromScale(1, 1)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.TextSize = 14
-    label.Font = Enum.Font.FredokaOne
-    label.ZIndex = 7
-    label.Parent = btn
-    local ts = Instance.new("UIStroke", label)
-    ts.Thickness = 2.5
-    ts.Color = Color3.fromRGB(40, 10, 60)
-
-    Library.AttachInteractiveEffects(btn, UDim2.fromOffset(1, 1))
+    Library.AttachInteractiveEffects(btn, base)
     btn.Activated:Connect(callback)
 end
 
-createInstantBuyButton("Buy Trait Crystal x10", 46, Color3.fromRGB(60, 210, 140), function()
+createInstantBuyButton("Buy Trait Crystal x10", 52, Color3.fromRGB(60, 210, 140), function()
     buyItemFromTeller("crystal", 10)
 end)
 
-createInstantBuyButton("Buy Unit of Juice x10", 92, Color3.fromRGB(255, 140, 40), function()
+createInstantBuyButton("Buy Unit of Juice x10", 94, Color3.fromRGB(255, 140, 40), function()
     buyItemFromTeller("statroll", 10)
 end)
 
