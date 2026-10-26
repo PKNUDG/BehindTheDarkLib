@@ -191,17 +191,14 @@ local DefaultStagePresets = {
         { unit = "PrismRainicorn", x = -19.20961570739746, z = -27.122318267822266, setTarget = "strongest" },
         { unit = "PrismRainicorn", x = -18.643310546875, z = -30.057519912719727, setTarget = "strongest" }
     },
-    -- Dungeon Train Challenge Acts (Empty presets for auto detection & user recording)
-    ["Act 1: Penguin Parade"] = {},
-    ["Act 2: Gumdrop Gauntlet"] = {},
-    ["Act 3: Frosty Fudge Pass"] = {},
-    ["Act 4: Goliad's Reign"] = {},
-    -- Common Challenge & Story Stages
-    ["Candy Kingdom"] = {},
-    ["Ice Kingdom"] = {},
-    ["Fire Kingdom"] = {},
-    ["Treehouse"] = {},
-    ["Nightosphere"] = {}
+    -- 7 Main Stages (Candy TD Core Worlds)
+    ["CANDY KINGDOM"] = {},
+    ["ICE KINGDOM"] = {},
+    ["FIRE KINGDOM"] = {},
+    ["MO FACTORY"] = {},
+    ["CASTLE LEMONGRAB"] = {},
+    ["NIGHTOSPHERE"] = {},
+    ["CRYSTAL DIMENSION"] = {}
 }
 
 local StagePresets = {}
@@ -308,27 +305,66 @@ local matchedPlaceStage = false
 local function findMatchingPresetName(query: string?): string?
     if not query or query == "" then return nil end
     local cleanQuery = query:lower():gsub("[%p%s]", "")
+
+    -- ตรวจสอบชื่อตรงตัวกับ StagePresets
     for presetName, _ in pairs(StagePresets) do
         local cleanPreset = presetName:lower():gsub("[%p%s]", "")
         if cleanPreset == cleanQuery or cleanPreset:find(cleanQuery, 1, true) or cleanQuery:find(cleanPreset, 1, true) then
             return presetName
         end
     end
-    -- ตรวจสอบ Keyword เฉพาะของด่าน เช่น penguin, gumdrop, frosty, fudge, goliad
-    local actKeywords = {
-        ["penguin"] = "Act 1: Penguin Parade",
-        ["parade"] = "Act 1: Penguin Parade",
-        ["gumdrop"] = "Act 2: Gumdrop Gauntlet",
-        ["gauntlet"] = "Act 2: Gumdrop Gauntlet",
-        ["frosty"] = "Act 3: Frosty Fudge Pass",
-        ["fudge"] = "Act 3: Frosty Fudge Pass",
-        ["goliad"] = "Act 4: Goliad's Reign",
-        ["reign"] = "Act 4: Goliad's Reign",
+
+    -- จับคู่ Act, World, หรือ Keyword พิเศษ เข้าสู่ 7 Main Stages
+    local stageKeywords = {
+        -- ICE KINGDOM
+        ["ice"] = "ICE KINGDOM",
+        ["frost"] = "ICE KINGDOM",
+        ["penguin"] = "ICE KINGDOM",
+        ["fudge"] = "ICE KINGDOM",
+        ["goliad"] = "ICE KINGDOM",
+        ["snow"] = "ICE KINGDOM",
+
+        -- CANDY KINGDOM
+        ["candy"] = "CANDY KINGDOM",
+        ["gumdrop"] = "CANDY KINGDOM",
+        ["peppermint"] = "CANDY KINGDOM",
+        ["parade"] = "CANDY KINGDOM",
+        ["gauntlet"] = "CANDY KINGDOM",
+        ["gumball"] = "CANDY KINGDOM",
+
+        -- FIRE KINGDOM
+        ["fire"] = "FIRE KINGDOM",
+        ["flame"] = "FIRE KINGDOM",
+        ["lava"] = "FIRE KINGDOM",
+        ["inferno"] = "FIRE KINGDOM",
+
+        -- MO FACTORY
+        ["mo factory"] = "MO FACTORY",
+        ["factory"] = "MO FACTORY",
+        ["bmo"] = "MO FACTORY",
+        ["robot"] = "MO FACTORY",
+
+        -- CASTLE LEMONGRAB
+        ["lemongrab"] = "CASTLE LEMONGRAB",
+        ["lemon"] = "CASTLE LEMONGRAB",
+        ["castle lemon"] = "CASTLE LEMONGRAB",
+
+        -- NIGHTOSPHERE
+        ["nightosphere"] = "NIGHTOSPHERE",
+        ["demon"] = "NIGHTOSPHERE",
+        ["hunson"] = "NIGHTOSPHERE",
+
+        -- CRYSTAL DIMENSION
+        ["crystal"] = "CRYSTAL DIMENSION",
+        ["dimension"] = "CRYSTAL DIMENSION",
+
+        -- Special Raids / Events
         ["halloween"] = "Raid Halloween",
         ["bug milk"] = "Inf Bug Milk"
     }
+
     local lowerQuery = query:lower()
-    for kw, targetName in pairs(actKeywords) do
+    for kw, targetName in pairs(stageKeywords) do
         if lowerQuery:find(kw, 1, true) and StagePresets[targetName] then
             return targetName
         end

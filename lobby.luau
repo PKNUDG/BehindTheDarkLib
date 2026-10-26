@@ -478,30 +478,72 @@ local function findAndPlayFirstWinCar()
 
     -- 4. สั่งเริ่มเกมโดยการกดปุ่ม PLAY ที่ถูกต้อง
     if targetPlayButton then
-        -- ตรวจสอบและดึงชื่อด่าน/Act จากตู้ที่กำลังจะกดเล่น
+        -- ตรวจสอบและดึงชื่อ Stage หลักจากตู้รถไฟที่กำลังจะกดเล่น
         local detectedStageName = nil
         local targetCar = targetPlayButton:FindFirstAncestor("Car1")
             or targetPlayButton:FindFirstAncestor("Car2")
             or targetPlayButton:FindFirstAncestor("Car3")
             or targetPlayButton.Parent
 
+        local knownStages = {
+            "CANDY KINGDOM",
+            "ICE KINGDOM",
+            "FIRE KINGDOM",
+            "MO FACTORY",
+            "CASTLE LEMONGRAB",
+            "NIGHTOSPHERE",
+            "CRYSTAL DIMENSION"
+        }
+
         if targetCar then
             for _, desc in ipairs(targetCar:GetDescendants()) do
                 if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" then
-                    local t = desc.Text:gsub("^%s+", ""):gsub("%s+$", "")
-                    local upperT = t:upper()
-                    if upperT:find("ACT %d") or upperT:find("PENGUIN") or upperT:find("GUMDROP")
-                        or upperT:find("FROSTY") or upperT:find("GOLIAD") or upperT:find("FUDGE")
-                        or upperT:find("GAUNTLET") or upperT:find("PARADE") or upperT:find("REIGN") then
-                        detectedStageName = t
-                        break
+                    local upperT = desc.Text:upper():gsub("%s+", " ")
+                    for _, sName in ipairs(knownStages) do
+                        if upperT:find(sName, 1, true) then
+                            detectedStageName = sName
+                            break
+                        end
+                    end
+                    if detectedStageName then break end
+                end
+            end
+
+            -- Fallback ดึงชื่อ Act หรือข้อความสำคัญถ้ายังไม่เจอชื่อ Stage ตรงๆ
+            if not detectedStageName then
+                for _, desc in ipairs(targetCar:GetDescendants()) do
+                    if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" then
+                        local t = desc.Text:gsub("^%s+", ""):gsub("%s+$", "")
+                        local upperT = t:upper()
+                        if upperT:find("PENGUIN") or upperT:find("FROSTY") then
+                            detectedStageName = "ICE KINGDOM"
+                            break
+                        elseif upperT:find("GUMDROP") or upperT:find("PEPPERMINT") then
+                            detectedStageName = "CANDY KINGDOM"
+                            break
+                        elseif upperT:find("LEMONGRAB") or upperT:find("LEMON") then
+                            detectedStageName = "CASTLE LEMONGRAB"
+                            break
+                        elseif upperT:find("MO ") or upperT:find("FACTORY") then
+                            detectedStageName = "MO FACTORY"
+                            break
+                        elseif upperT:find("NIGHTOSPHERE") or upperT:find("DEMON") then
+                            detectedStageName = "NIGHTOSPHERE"
+                            break
+                        elseif upperT:find("CRYSTAL") then
+                            detectedStageName = "CRYSTAL DIMENSION"
+                            break
+                        elseif upperT:find("FIRE") or upperT:find("FLAME") then
+                            detectedStageName = "FIRE KINGDOM"
+                            break
+                        end
                     end
                 end
             end
         end
 
         if detectedStageName then
-            print(string.format("[AutoChallenge] >> บันทึกชื่อด่านเป้าหมาย: '%s'", detectedStageName))
+            print(string.format("[AutoChallenge] >> บันทึกชื่อ Stage เป้าหมาย: '%s'", detectedStageName))
             _G.CandyTD_SelectedStage = detectedStageName
             Library.Settings.SelectedStage = detectedStageName
             Library.SaveSettings()
