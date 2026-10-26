@@ -168,7 +168,7 @@ end)
 -- ========================================================
 local rightCol = Window:GetColumn("Right")
 
--- Toggle สำหรับ Auto Challenge
+-- Toggle สำหรับ Auto Challenge (เพิ่มเข้ามาใหม่)
 Window:CreateToggle("Right", "Auto Challenge", 0, { On = Color3.fromRGB(255, 90, 150), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
     states.AutoChallenge = v
 end)
@@ -254,7 +254,7 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- AUTO CHALLENGE LOOP (ยิง Remote ตามที่คุณให้มา)
+-- AUTO CHALLENGE LOOP
 -- ========================================================
 task.spawn(function()
     while Controller.Running do
@@ -284,7 +284,7 @@ task.spawn(function()
                     end
                 end
             end)
-            task.wait(3) -- หน่วงเวลาสั้น ๆ รอเข้าแมพหรือลูปเช็คใหม่
+            task.wait(3)
         end
     end
 end)
