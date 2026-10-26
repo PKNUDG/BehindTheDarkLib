@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : IN-MATCH CONTROLLER (CLEAN SEPARATED TRAYS)
+-- CANDY TD : IN-MATCH CONTROLLER (AUTO PERSIST & PURE SUB-TRAYS)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -122,24 +122,6 @@ pcall(function()
     end
 end)
 
-task.spawn(function()
-    local banner = candyTD:WaitForChild("Banner", 15)
-    if banner then
-        local textLabel = banner:FindFirstChildWhichIsA("TextLabel", true)
-        local function checkBannerText()
-            if textLabel and banner.Visible then
-                local txt = (textLabel.Text or ""):upper()
-                if txt:find("NOT ENOUGH MONEY") or txt:find("FULLY UPGRADED") or txt:find("ANOTHER UPGRADE") then
-                    banner.Visible = false
-                    banner.Position = UDim2.new(2, 0, 2, 0)
-                end
-            end
-        end
-        banner:GetPropertyChangedSignal("Visible"):Connect(checkBannerText)
-        if textLabel then textLabel:GetPropertyChangedSignal("Text"):Connect(checkBannerText) end
-    end
-end)
-
 local function triggerInternalButton(btn: Instance?)
     if not btn then return false end
     pcall(function()
@@ -258,188 +240,6 @@ local function getStageNames(): {string}
     return names
 end
 
-local states = {
-    EndChoice = "AGAIN",
-    AutoUpgrade = true,
-    AgainBeforeHomeActive = false,
-    AutoSkipWave = true,
-    BoostFPS = false,
-    AutoPlace = false,
-    RecordMode = false,
-    CurrentStage = "Inf Bug Milk",
-    RecordStageName = "Inf Bug Milk",
-    TargetRounds = 10,
-    CurrentRounds = 0
-}
-
-local refreshRecordUI: (() -> ())? = nil
-local lastRecordTick = 0
-
-local function handleRecordInput(...)
-    if not states.RecordMode then return end
-    local rawArgs = { ... }
-    if #rawArgs == 0 then return end
-
-    local isPlace = false
-    local isTarget = false
-    local unitName = nil
-    local posX, posZ = nil, nil
-    local targetMode = nil
-
-    for _, arg in ipairs(rawArgs) do
-        local str = tostring(arg):lower()
-        if str == "place" then
-            isPlace = true
-        elseif str == "target" then
-            isTarget = true
-        elseif typeof(arg) == "Vector3" then
-            posX, posZ = arg.X, arg.Z
-        elseif typeof(arg) == "CFrame" then
-            posX, posZ = arg.Position.X, arg.Position.Z
-        elseif type(arg) == "table" then
-            if arg.unit or arg.name or arg.Name or arg.Unit then
-                unitName = tostring(arg.unit or arg.name or arg.Name or arg.Unit)
-            end
-            if arg.x or arg.X then posX = tonumber(arg.x or arg.X) end
-            if arg.z or arg.Z then posZ = tonumber(arg.z or arg.Z) end
-            if tostring(arg.action or arg.Action):lower() == "place" then isPlace = true end
-            if tostring(arg.action or arg.Action):lower() == "target" then isTarget = true end
-        end
-    end
-
-    if isPlace then
-        if not unitName then
-            for _, arg in ipairs(rawArgs) do
-                if type(arg) == "string" and arg:lower() ~= "place" and not tonumber(arg) then
-                    unitName = arg
-                    break
-                end
-            end
-        end
-
-        if not posX or not posZ then
-            local nums = {}
-            for _, arg in ipairs(rawArgs) do
-                if type(arg) == "number" then
-                    table.insert(nums, arg)
-                end
-            end
-            if #nums >= 2 then
-                posX, posZ = nums[1], nums[2]
-            end
-        end
-
-        if unitName and posX and posZ then
-            local targetStage = (states.RecordStageName and states.RecordStageName ~= "") and states.RecordStageName or states.CurrentStage
-            StagePresets[targetStage] = StagePresets[targetStage] or {}
-            local currentQueue = StagePresets[targetStage]
-
-            if tick() - lastRecordTick < 0.15 then
-                local last = currentQueue[#currentQueue]
-                if last and last.unit == unitName and math.abs((last.x or 0) - posX) < 0.05 and math.abs((last.z or 0) - posZ) < 0.05 then
-                    return
-                end
-            end
-            lastRecordTick = tick()
-
-            table.insert(currentQueue, {
-                unit = unitName,
-                x = posX,
-                z = posZ
-            })
-
-            task.spawn(function()
-                savePresetsToFile()
-                if refreshRecordUI then refreshRecordUI() end
-            end)
-            print(string.format("[Recorder] บันทึกสำเร็จ: #%d %s (X: %.1f, Z: %.1f) ในด่าน '%s'", #currentQueue, unitName, posX, posZ, targetStage))
-        end
-
-    elseif isTarget then
-        for _, arg in ipairs(rawArgs) do
-            if type(arg) == "string" and arg:lower() ~= "target" then
-                targetMode = arg
-            end
-        end
-        if targetMode then
-            local targetStage = (states.RecordStageName and states.RecordStageName ~= "") and states.RecordStageName or states.CurrentStage
-            local currentQueue = StagePresets[targetStage]
-            if currentQueue and #currentQueue > 0 then
-                currentQueue[#currentQueue].setTarget = targetMode
-                task.spawn(function()
-                    savePresetsToFile()
-                    if refreshRecordUI then refreshRecordUI() end
-                end)
-                print(string.format("[Recorder] บันทึก Target สำเร็จ: #%d %s -> %s", #currentQueue, currentQueue[#currentQueue].unit, targetMode))
-            end
-        end
-    end
-end
-
-_G.CandyTD_ActiveRecordHandler = function(...)
-    handleRecordInput(...)
-end
-
-local function installPlacementHook()
-    if matchNet and type(matchNet.request) == "function" and not _G.CandyTD_MatchNetHooked then
-        _G.CandyTD_MatchNetHooked = true
-        local oldReq = matchNet.request
-        matchNet.request = function(...)
-            local args = { ... }
-            task.spawn(function()
-                if _G.CandyTD_ActiveRecordHandler then
-                    _G.CandyTD_ActiveRecordHandler(unpack(args))
-                end
-            end)
-            return oldReq(...)
-        end
-    end
-
-    if not _G.CandyTD_PlacementHookInstalled then
-        _G.CandyTD_PlacementHookInstalled = true
-        local hookMeta = (type(hookmetamethod) == "function" and hookmetamethod) or nil
-        local newCClosure = (type(newcclosure) == "function" and newcclosure) or function(f) return f end
-
-        if hookMeta then
-            local oldNamecall
-            oldNamecall = hookMeta(game, "__namecall", newCClosure(function(self, ...)
-                local method = getnamecallmethod()
-                local m = tostring(method):lower()
-                if (m == "invokeserver" or m == "fireserver") then
-                    local rName = tostring(self.Name):lower()
-                    local isMatchRemote = (rName == "act" or rName == "request" or (self.Parent and tostring(self.Parent.Name):lower() == "matchremotes"))
-                    if isMatchRemote then
-                        local args = { ... }
-                        task.spawn(function()
-                            if _G.CandyTD_ActiveRecordHandler then
-                                _G.CandyTD_ActiveRecordHandler(unpack(args))
-                            end
-                        end)
-                    end
-                end
-                return oldNamecall(self, ...)
-            end))
-        end
-    end
-
-    local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
-    local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
-    if actRemote and typeof(hookfunction) == "function" and not _G.CandyTD_ActInvokeHooked then
-        _G.CandyTD_ActInvokeHooked = true
-        local oldInvoke
-        oldInvoke = hookfunction(actRemote.InvokeServer, function(self, ...)
-            local args = { ... }
-            task.spawn(function()
-                if _G.CandyTD_ActiveRecordHandler then
-                    _G.CandyTD_ActiveRecordHandler(unpack(args))
-                end
-            end)
-            return oldInvoke(self, ...)
-        end)
-    end
-end
-pcall(installPlacementHook)
-
 -- ========================================================
 -- โหลดและใช้งาน BEHINDTHEDARKLIB
 -- ========================================================
@@ -451,13 +251,51 @@ if not libChunk then
 end
 local Library = libChunk()
 
+local savedCfg = Library.Settings.Configs or {}
+
+local states = {
+    EndChoice = savedCfg.EndChoice or "AGAIN",
+    AutoUpgrade = (savedCfg.AutoUpgrade ~= nil) and savedCfg.AutoUpgrade or true,
+    AgainBeforeHomeActive = (savedCfg.AgainBeforeHomeActive ~= nil) and savedCfg.AgainBeforeHomeActive or false,
+    AutoSkipWave = (savedCfg.AutoSkipWave ~= nil) and savedCfg.AutoSkipWave or true,
+    BoostFPS = (savedCfg.BoostFPS ~= nil) and savedCfg.BoostFPS or false,
+    AutoPlace = (savedCfg.AutoPlace ~= nil) and savedCfg.AutoPlace or false,
+    RecordMode = false,
+    CurrentStage = "Inf Bug Milk",
+    RecordStageName = "Inf Bug Milk",
+    TargetRounds = savedCfg.TargetRounds or 10,
+    CurrentRounds = 0
+}
+
+local function saveConfigState()
+    Library.Settings.Configs = {
+        EndChoice = states.EndChoice,
+        AutoUpgrade = states.AutoUpgrade,
+        AgainBeforeHomeActive = states.AgainBeforeHomeActive,
+        AutoSkipWave = states.AutoSkipWave,
+        BoostFPS = states.BoostFPS,
+        AutoPlace = states.AutoPlace,
+        TargetRounds = states.TargetRounds
+    }
+    Library.SaveSettings()
+end
+
+-- ระบบตรวจจับ PlaceId และเปิด Auto Place เองอัตโนมัติ
 local currentPlaceId = tostring(game.PlaceId)
+while (not currentPlaceId or currentPlaceId == "0") do
+    task.wait(0.2)
+    currentPlaceId = tostring(game.PlaceId)
+end
+
+local placeIdMatched = false
 if Library.Settings.PlaceIdStageMap and Library.Settings.PlaceIdStageMap[currentPlaceId] then
     local mapped = Library.Settings.PlaceIdStageMap[currentPlaceId]
     if StagePresets[mapped] then
         states.CurrentStage = mapped
         states.RecordStageName = mapped
-        print(string.format("[AutoStage] จำค่าด่านตาม PlaceId: %s -> %s", currentPlaceId, mapped))
+        states.AutoPlace = true
+        placeIdMatched = true
+        print(string.format("[AutoStage] แมปตรงกับ PlaceId: %s -> ด่าน %s (เปิด Auto Place ให้ทันที)", currentPlaceId, mapped))
     end
 elseif Library.Settings.SelectedStage and StagePresets[Library.Settings.SelectedStage] then
     states.CurrentStage = Library.Settings.SelectedStage
@@ -480,12 +318,14 @@ local Window = Library:CreateWindow({
 })
 Controller.Gui = Window.Gui
 
-if Library.Settings.LastEndChoice then states.EndChoice = Library.Settings.LastEndChoice end
-if Library.Settings.AutoUpgradeSetting ~= nil then states.AutoUpgrade = Library.Settings.AutoUpgradeSetting end
-if Library.Settings.AutoSkipWaveSetting ~= nil then states.AutoSkipWave = Library.Settings.AutoSkipWaveSetting end
-if Library.Settings.BoostFPSSetting ~= nil then states.BoostFPS = Library.Settings.BoostFPSSetting end
-if Library.Settings.AutoPlaceSetting ~= nil then states.AutoPlace = Library.Settings.AutoPlaceSetting end
+-- ซ่อนกรอบเดิมฝั่งขวา เพื่อให้เหลือเฉพาะ 2 กล่องแยกที่สร้างใหม่
+if Window.RightColumn and Window.RightColumn.Parent and Window.RightColumn.Parent.Parent then
+    Window.RightColumn.Parent.Parent.Visible = false
+end
 
+-- ========================================================
+-- ฝั่งซ้าย (LEFT COLUMN)
+-- ========================================================
 local visualUpdaters = {}
 
 local function updateEndChoiceVisuals()
@@ -497,8 +337,7 @@ end
 local function setEndChoice(choice: string)
     states.EndChoice = (states.EndChoice == choice) and "NONE" or choice
     updateEndChoiceVisuals()
-    Library.Settings.LastEndChoice = states.EndChoice
-    Library.SaveSettings()
+    saveConfigState()
 end
 
 visualUpdaters["NEXT"] = Window:CreateToggle("Left", "Auto Next", 0, { On = Color3.fromRGB(235, 65, 135), Off = Color3.fromRGB(120, 120, 130) }, states.EndChoice == "NEXT", function() setEndChoice("NEXT") end)
@@ -506,9 +345,9 @@ visualUpdaters["AGAIN"] = Window:CreateToggle("Left", "Auto Again", 46, { On = C
 visualUpdaters["HOME"] = Window:CreateToggle("Left", "Auto Home", 92, { On = Color3.fromRGB(60, 180, 245), Off = Color3.fromRGB(120, 120, 130) }, states.EndChoice == "HOME", function() setEndChoice("HOME") end)
 updateEndChoiceVisuals()
 
-local againLimitUpdater = nil
-againLimitUpdater = Window:CreateToggle("Left", "Again Count Limit", 144, { On = Color3.fromRGB(255, 140, 40), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
+local againLimitUpdater = Window:CreateToggle("Left", "Again Count Limit", 144, { On = Color3.fromRGB(255, 140, 40), Off = Color3.fromRGB(120, 120, 130) }, states.AgainBeforeHomeActive, function(v)
     states.AgainBeforeHomeActive = v
+    saveConfigState()
 end)
 
 local leftCol = Window:GetColumn("Left")
@@ -653,6 +492,7 @@ btnMinus.Activated:Connect(function()
         roundCountLabel.Text = tostring(states.TargetRounds)
         roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
         Library.StepWiggle(roundStatus)
+        saveConfigState()
     end
 end)
 
@@ -662,48 +502,41 @@ btnPlus.Activated:Connect(function()
     roundCountLabel.Text = tostring(states.TargetRounds)
     roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
     Library.StepWiggle(roundStatus)
+    saveConfigState()
 end)
 
 -- ========================================================
--- ควบคุมฝั่งขวา: แยกเป็น 2 กรอบพื้นหลังอิสระ ไม่ซ้อนกัน
+-- ฝั่งขวา: 2 กล่องแยกอิสระ ไม่มีกรอบซ้อน (SEPARATED TRAYS)
 -- ========================================================
--- ซ่อน Tray รวมเดิมของฝั่งขวา
-local origRightTray = Window.RightColumn.Parent.Parent
-origRightTray.Visible = false
+-- 1. กล่องบน: Auto Upgrade, Auto Skip Wave, Boost FPS
+local topSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 154))
 
--- 1. กล่องบน: สำหรับ Auto Upgrade, Auto Skip, Boost FPS
-local topTray = Window:CreateSubColumn(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 152))
-
-Window:CreateToggle(topTray, "Auto Upgrade All", 0, { On = Color3.fromRGB(90, 195, 60), Off = Color3.fromRGB(120, 120, 130) }, states.AutoUpgrade, function(v)
+Window:CreateToggle(topSubTray, "Auto Upgrade All", 0, { On = Color3.fromRGB(90, 195, 60), Off = Color3.fromRGB(120, 120, 130) }, states.AutoUpgrade, function(v)
     states.AutoUpgrade = v
-    Library.Settings.AutoUpgradeSetting = v
-    Library.SaveSettings()
+    saveConfigState()
 end)
 
-Window:CreateToggle(topTray, "Auto Skip Wave", 46, { On = Color3.fromRGB(160, 75, 235), Off = Color3.fromRGB(120, 120, 130) }, states.AutoSkipWave, function(v)
+Window:CreateToggle(topSubTray, "Auto Skip Wave", 46, { On = Color3.fromRGB(160, 75, 235), Off = Color3.fromRGB(120, 120, 130) }, states.AutoSkipWave, function(v)
     states.AutoSkipWave = v
-    Library.Settings.AutoSkipWaveSetting = v
-    Library.SaveSettings()
+    saveConfigState()
 end)
 
-Window:CreateToggle(topTray, "Boost FPS", 92, { On = Color3.fromRGB(50, 205, 150), Off = Color3.fromRGB(120, 120, 130) }, states.BoostFPS, function(v)
+Window:CreateToggle(topSubTray, "Boost FPS", 92, { On = Color3.fromRGB(50, 205, 150), Off = Color3.fromRGB(120, 120, 130) }, states.BoostFPS, function(v)
     states.BoostFPS = v
-    Library.Settings.BoostFPSSetting = v
-    Library.SaveSettings()
+    saveConfigState()
     applyUltraBoostFPS(v)
 end)
 
--- 2. กล่องล่าง: สำหรับ Auto Place และกลุ่ม Stage Presets
-local bottomTray = Window:CreateSubColumn(UDim2.new(0.5, 6, 0, 160), UDim2.new(0.5, -20, 1, -172))
+-- 2. กล่องล่าง: เริ่มตั้งแต่ Auto Place ลงไป
+local bottomSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 162), UDim2.new(0.5, -20, 1, -174))
 
-local autoPlaceToggle = nil
-autoPlaceToggle = Window:CreateToggle(bottomTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
+local autoPlaceToggleUpdater = nil
+autoPlaceToggleUpdater = Window:CreateToggle(bottomSubTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
     states.AutoPlace = v
-    Library.Settings.AutoPlaceSetting = v
-    Library.SaveSettings()
+    saveConfigState()
 end)
 
-local stageDropdown = Window:CreateDropdown(bottomTray, "Stage", 46, getStageNames(), states.CurrentStage, 10, function(selected)
+local stageDropdown = Window:CreateDropdown(bottomSubTray, "Stage", 46, getStageNames(), states.CurrentStage, 10, function(selected)
     states.CurrentStage = selected
     states.RecordStageName = selected
     Library.Settings.SelectedStage = selected
@@ -714,22 +547,22 @@ end)
 
 local function createBottomActionButton(text: string, yPos: number, rimColor: Color3, btnColor: Color3, callback: () -> ())
     local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(1, 0, 0, 40)
+    shadow.Size = UDim2.new(1, 0, 0, 42)
     shadow.Position = UDim2.fromOffset(0, yPos)
     shadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
     shadow.BorderSizePixel = 0
     shadow.ZIndex = 8
-    shadow.Parent = bottomTray
-    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 12)
+    shadow.Parent = bottomSubTray
+    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 14)
 
     local rim = Instance.new("Frame")
-    rim.Size = UDim2.new(1, 0, 0, 37)
+    rim.Size = UDim2.new(1, 0, 0, 39)
     rim.Position = UDim2.fromOffset(0, 0)
     rim.BackgroundColor3 = rimColor
     rim.BorderSizePixel = 0
     rim.ZIndex = 9
     rim.Parent = shadow
-    Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 12)
+    Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 14)
     local rs = Instance.new("UIStroke", rim)
     rs.Thickness = 2.5
     rs.Color = Color3.fromRGB(22, 5, 36)
@@ -746,7 +579,7 @@ local function createBottomActionButton(text: string, yPos: number, rimColor: Co
     btn.AutoButtonColor = false
     btn.ZIndex = 10
     btn.Parent = rim
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 9)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 11)
     local bts = Instance.new("UIStroke", btn)
     bts.Thickness = 2.5
     bts.Color = Color3.fromRGB(22, 5, 36)
@@ -1011,7 +844,7 @@ recToggleBtn.Activated:Connect(function()
 
     Library.PlaySound("rbxassetid://9069609268")
     if states.RecordMode then
-        if states.AutoPlace and autoPlaceToggle then autoPlaceToggle(false) end
+        if states.AutoPlace and autoPlaceToggleUpdater then autoPlaceToggleUpdater(false) end
         recToggleBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
         recToggleBtn.Text = "● RECORDING... (STOP)"
     else
@@ -1109,14 +942,14 @@ clearBtn.Activated:Connect(function()
     end
 end)
 
-createBottomActionButton("Setup Record & Presets ⚙", 96, Color3.fromRGB(255, 145, 160), Color3.fromRGB(235, 65, 85), function()
+createBottomActionButton("Setup Record & Presets ⚙", 92, Color3.fromRGB(255, 145, 160), Color3.fromRGB(235, 65, 85), function()
     stageInput.Text = states.CurrentStage
     states.RecordStageName = states.CurrentStage
     refreshRecordUI()
     RecordPage.Show()
 end)
 
-createBottomActionButton("Reload Presets ↺", 140, Color3.fromRGB(255, 220, 110), Color3.fromRGB(240, 160, 45), function()
+createBottomActionButton("Reload Presets ↺", 136, Color3.fromRGB(255, 220, 110), Color3.fromRGB(240, 160, 45), function()
     loadPresetsFromFile()
     stageDropdown.SetOptions(getStageNames())
     Library.PlaySound("rbxassetid://6895079853")
