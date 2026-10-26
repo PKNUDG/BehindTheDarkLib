@@ -581,7 +581,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     closeBtn.Size = UDim2.new(1, -4, 1, -4)
     closeBtn.Position = UDim2.fromOffset(2, 2)
     closeBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
-    closeBtn.Text = "✕"
     closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     closeBtn.TextSize = 14
     closeBtn.Font = Enum.Font.FredokaOne
@@ -619,7 +618,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     settingsBtn.Size = UDim2.new(1, -4, 1, -4)
     settingsBtn.Position = UDim2.fromOffset(2, 2)
     settingsBtn.BackgroundColor3 = Color3.fromRGB(250, 195, 45)
-    settingsBtn.Text = "⚙"
     settingsBtn.TextColor3 = Color3.fromRGB(35, 10, 55)
     settingsBtn.TextSize = 15
     settingsBtn.Font = Enum.Font.FredokaOne
@@ -647,7 +645,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     btn3D.Size = UDim2.new(1, -4, 1, -4)
     btn3D.Position = UDim2.fromOffset(2, 2)
     btn3D.BackgroundColor3 = Color3.fromRGB(115, 225, 70)
-    btn3D.Text = "3D: ON"
+    btn3D.Text = "3D"
     btn3D.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn3D.TextSize = 12
     btn3D.Font = Enum.Font.FredokaOne
@@ -1226,7 +1224,6 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     local arrowLbl = Instance.new("TextLabel")
     arrowLbl.Size = UDim2.fromScale(1, 1)
     arrowLbl.BackgroundTransparency = 1
-    arrowLbl.Text = "▾"
     arrowLbl.TextColor3 = Color3.fromRGB(255, 225, 95)
     arrowLbl.TextSize = 14
     arrowLbl.Font = Enum.Font.FredokaOne
