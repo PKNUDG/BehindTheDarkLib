@@ -483,7 +483,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    -- Title Bar
+    -- แถบ Title Bar
     local titleRim = Instance.new("Frame")
     titleRim.Size = UDim2.new(1, -28, 0, 44)
     titleRim.Position = UDim2.fromOffset(14, 12)
@@ -611,7 +611,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 8)
     Library.AttachInteractiveEffects(settingsBtn, setBtnRim)
 
-    -- 3. ปุ่ม 3D Toggle (ย้ายมาไว้ข้างซ้ายของปุ่มตั้งค่าสีเหลือง)
+    -- 3. ปุ่ม 3D Toggle ย้ายขึ้นมาบน Title Bar ซ้ายปุ่มตั้งค่าสีเหลือง
     local btn3DRim = Instance.new("Frame")
     btn3DRim.Size = UDim2.fromOffset(74, 30)
     btn3DRim.Position = UDim2.new(1, -152, 0.5, -15)
@@ -744,7 +744,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     self.RightColumn = createColumnTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 1, -12))
     self.CenterColumn = self.LeftColumn
 
-    -- หน้าต่าง Visual & Sound Settings
+    -- หน้าต่าง Visual & Sound Settings Modal
     local settingsModal = Instance.new("Frame")
     settingsModal.Name = "SettingsModal"
     settingsModal.Size = UDim2.fromOffset(270, 290)
@@ -870,7 +870,7 @@ function Library:GetColumn(side: string): Frame
 end
 
 -- ========================================================
--- ระบบแยกหน้า (SEPARATE FULL VIEW)
+-- ระบบแยกหน้า (SEPARATE FULL PAGE SYSTEM)
 -- ========================================================
 function Library:CreatePage(name: string)
     local pageView = Instance.new("Frame")
