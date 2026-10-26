@@ -265,7 +265,7 @@ local states = {
     AgainBeforeHomeActive = (savedCfg.AgainBeforeHomeActive ~= nil) and savedCfg.AgainBeforeHomeActive or false,
     AutoSkipWave = (savedCfg.AutoSkipWave ~= nil) and savedCfg.AutoSkipWave or true,
     BoostFPS = (savedCfg.BoostFPS ~= nil) and savedCfg.BoostFPS or false,
-    AutoPlace = (savedCfg.AutoPlace ~= nil) and savedCfg.AutoPlace or false,
+    AutoPlace = false, -- เริ่มต้นเป็น OFF เสมอ เพื่อป้องกันการวางยูนิตมั่วก่อนตรวจเจอด่านจริง
     RecordMode = false,
     CurrentStage = savedCfg.CurrentStage or Library.Settings.SelectedStage or "Inf Bug Milk",
     RecordStageName = savedCfg.CurrentStage or Library.Settings.SelectedStage or "Inf Bug Milk",
@@ -1236,8 +1236,9 @@ bottomBar.BackgroundTransparency = 1
 bottomBar.ZIndex = 6
 bottomBar.Parent = RecordPage.Container
 
+-- ปุ่ม 1: UNDO LAST
 local undoShadow = Instance.new("Frame")
-undoShadow.Size = UDim2.new(0.48, -4, 1, 0)
+undoShadow.Size = UDim2.new(0.31, -3, 1, 0)
 undoShadow.Position = UDim2.fromOffset(0, 0)
 undoShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
 undoShadow.BorderSizePixel = 0
@@ -1249,9 +1250,9 @@ local undoBtn = Instance.new("TextButton")
 undoBtn.Size = UDim2.new(1, 0, 1, -3)
 undoBtn.Position = UDim2.fromOffset(0, 0)
 undoBtn.BackgroundColor3 = Color3.fromRGB(215, 115, 45)
-undoBtn.Text = "UNDO LAST"
+undoBtn.Text = "UNDO"
 undoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-undoBtn.TextSize = 12
+undoBtn.TextSize = 11.5
 undoBtn.Font = Enum.Font.FredokaOne
 undoBtn.BorderSizePixel = 0
 undoBtn.AutoButtonColor = false
@@ -1274,9 +1275,10 @@ undoBtn.Activated:Connect(function()
     end
 end)
 
+-- ปุ่ม 2: CLEAR ALL (ล้างยูนิตในด่านนี้)
 local clearShadow = Instance.new("Frame")
-clearShadow.Size = UDim2.new(0.52, -4, 1, 0)
-clearShadow.Position = UDim2.new(0.48, 4, 0, 0)
+clearShadow.Size = UDim2.new(0.34, -4, 1, 0)
+clearShadow.Position = UDim2.new(0.31, 3, 0, 0)
 clearShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
 clearShadow.BorderSizePixel = 0
 clearShadow.ZIndex = 6
@@ -1289,7 +1291,7 @@ clearBtn.Position = UDim2.fromOffset(0, 0)
 clearBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 60)
 clearBtn.Text = "CLEAR ALL"
 clearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-clearBtn.TextSize = 12
+clearBtn.TextSize = 11.5
 clearBtn.Font = Enum.Font.FredokaOne
 clearBtn.BorderSizePixel = 0
 clearBtn.AutoButtonColor = false
@@ -1308,6 +1310,59 @@ clearBtn.Activated:Connect(function()
         StagePresets[clean] = {}
         savePresetsToFile()
         Library.PlaySound("rbxassetid://6895079853")
+        refreshRecordUI()
+    end
+end)
+
+-- ปุ่ม 3: DELETE PRESET (ลบทั้งพรีเซ็ตด่านออกจากระบบ)
+local delPresetShadow = Instance.new("Frame")
+delPresetShadow.Size = UDim2.new(0.35, -3, 1, 0)
+delPresetShadow.Position = UDim2.new(0.65, 3, 0, 0)
+delPresetShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+delPresetShadow.BorderSizePixel = 0
+delPresetShadow.ZIndex = 6
+delPresetShadow.Parent = bottomBar
+Instance.new("UICorner", delPresetShadow).CornerRadius = UDim.new(0, 10)
+
+local delPresetBtn = Instance.new("TextButton")
+delPresetBtn.Size = UDim2.new(1, 0, 1, -3)
+delPresetBtn.Position = UDim2.fromOffset(0, 0)
+delPresetBtn.BackgroundColor3 = Color3.fromRGB(135, 25, 45)
+delPresetBtn.Text = "DELETE PRESET"
+delPresetBtn.TextColor3 = Color3.fromRGB(255, 215, 225)
+delPresetBtn.TextSize = 10.5
+delPresetBtn.Font = Enum.Font.FredokaOne
+delPresetBtn.BorderSizePixel = 0
+delPresetBtn.AutoButtonColor = false
+delPresetBtn.ZIndex = 7
+delPresetBtn.Parent = delPresetShadow
+Instance.new("UICorner", delPresetBtn).CornerRadius = UDim.new(0, 9)
+local dps = Instance.new("UIStroke")
+dps.Parent = delPresetBtn
+dps.Thickness = 2
+dps.Color = Color3.fromRGB(22, 5, 36)
+Library.AttachInteractiveEffects(delPresetBtn, delPresetShadow)
+
+delPresetBtn.Activated:Connect(function()
+    local clean = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
+    if clean ~= "" and StagePresets[clean] ~= nil then
+        StagePresets[clean] = nil
+        savePresetsToFile()
+        Library.PlaySound("rbxassetid://6895079853")
+        print(string.format("[PresetManager] ลบพรีเซ็ตด่าน '%s' ออกจากระบบเรียบร้อย", clean))
+
+        local names = getStageNames()
+        if stageDropdown and stageDropdown.SetOptions then
+            stageDropdown.SetOptions(names)
+        end
+
+        local fallbackStage = names[1] or "CANDY KINGDOM"
+        states.CurrentStage = fallbackStage
+        states.RecordStageName = fallbackStage
+        stageInput.Text = fallbackStage
+        if stageDropdown and stageDropdown.Set then
+            stageDropdown.Set(fallbackStage)
+        end
         refreshRecordUI()
     end
 end)
