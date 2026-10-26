@@ -317,22 +317,24 @@ local function findMatchingPresetName(query: string?): string?
     -- จับคู่ Act, World, หรือ Keyword พิเศษ เข้าสู่ 7 Main Stages
     local stageKeywords = {
         -- ICE KINGDOM
+        ["ice kingdom"] = "ICE KINGDOM",
         ["ice"] = "ICE KINGDOM",
         ["frost"] = "ICE KINGDOM",
+        ["frosty"] = "ICE KINGDOM",
         ["penguin"] = "ICE KINGDOM",
         ["fudge"] = "ICE KINGDOM",
         ["goliad"] = "ICE KINGDOM",
         ["snow"] = "ICE KINGDOM",
 
         -- CANDY KINGDOM
-        ["candy"] = "CANDY KINGDOM",
+        ["candy kingdom"] = "CANDY KINGDOM",
         ["gumdrop"] = "CANDY KINGDOM",
         ["peppermint"] = "CANDY KINGDOM",
-        ["parade"] = "CANDY KINGDOM",
         ["gauntlet"] = "CANDY KINGDOM",
         ["gumball"] = "CANDY KINGDOM",
 
         -- FIRE KINGDOM
+        ["fire kingdom"] = "FIRE KINGDOM",
         ["fire"] = "FIRE KINGDOM",
         ["flame"] = "FIRE KINGDOM",
         ["lava"] = "FIRE KINGDOM",
@@ -345,6 +347,7 @@ local function findMatchingPresetName(query: string?): string?
         ["robot"] = "MO FACTORY",
 
         -- CASTLE LEMONGRAB
+        ["castle lemongrab"] = "CASTLE LEMONGRAB",
         ["lemongrab"] = "CASTLE LEMONGRAB",
         ["lemon"] = "CASTLE LEMONGRAB",
         ["castle lemon"] = "CASTLE LEMONGRAB",
@@ -355,6 +358,7 @@ local function findMatchingPresetName(query: string?): string?
         ["hunson"] = "NIGHTOSPHERE",
 
         -- CRYSTAL DIMENSION
+        ["crystal dimension"] = "CRYSTAL DIMENSION",
         ["crystal"] = "CRYSTAL DIMENSION",
         ["dimension"] = "CRYSTAL DIMENSION",
 
@@ -375,14 +379,13 @@ end
 -- ฟังก์ชันอัปเดตสเตจและ UI อัตโนมัติเมื่อตรวจพบด่าน
 local stageDropdown: any = nil
 local autoPlaceToggleUpdater: any = nil
+local isStageVerified = false
 
 local function applyDetectedStage(targetStage: string, sourceDesc: string)
     if not targetStage or not StagePresets[targetStage] then return end
-    if states.CurrentStage == targetStage and states.RecordStageName == targetStage then
-        return
-    end
 
-    print(string.format("[AutoStage] >> สลับไปยังด่าน: '%s' (ตรวจพบจาก: %s)", targetStage, sourceDesc))
+    isStageVerified = true
+    print(string.format("[AutoStage] >> ตรวจพบด่านเป้าหมาย: '%s' (ตรวจพบจาก: %s)", targetStage, sourceDesc))
     states.CurrentStage = targetStage
     states.RecordStageName = targetStage
     Library.Settings.SelectedStage = targetStage
@@ -402,34 +405,23 @@ local function applyDetectedStage(targetStage: string, sourceDesc: string)
     -- หากมี Preset ยูนิตในด่านนี้อยู่แล้ว และยังไม่ได้เปิด Auto Place ให้เปิดอัตโนมัติ
     local presetUnits = StagePresets[targetStage]
     if presetUnits and #presetUnits > 0 then
-        if not states.AutoPlace then
-            states.AutoPlace = true
-            if autoPlaceToggleUpdater then
-                autoPlaceToggleUpdater(true)
-            end
-            print(string.format("[AutoStage] พรีเซ็ตด่าน '%s' มีข้อมูลยูนิต %d ตัว -> เปิด Auto Place อัตโนมัติ", targetStage, #presetUnits))
-        end
-    else
-        print(string.format("[AutoStage] ด่าน '%s' ยังเป็นพรีเซ็ตว่าง (พร้อมสำหรับการ Record)", targetStage))
-    end
-end
-
--- ตรวจสอบรอบแรกทันที
-local initCandidate = _G.CandyTD_SelectedStage or Library.Settings.SelectedStage
-local initMatched = findMatchingPresetName(initCandidate)
-if initMatched then
-    states.CurrentStage = initMatched
-    states.RecordStageName = initMatched
-    local pUnits = StagePresets[initMatched]
-    if pUnits and #pUnits > 0 then
         states.AutoPlace = true
+        if autoPlaceToggleUpdater then
+            autoPlaceToggleUpdater(true)
+        end
+        print(string.format("[AutoStage] พรีเซ็ตด่าน '%s' มีข้อมูลยูนิต %d ตัว -> เปิด Auto Place อัตโนมัติ", targetStage, #presetUnits))
+    else
+        states.AutoPlace = false
+        if autoPlaceToggleUpdater then
+            autoPlaceToggleUpdater(false)
+        end
+        print(string.format("[AutoStage] ด่าน '%s' ยังเป็นพรีเซ็ตว่าง (Auto Place ปิดอยู่ รอให้คุณบันทึกยูนิต)", targetStage))
     end
 end
 
 -- ลูปสแกนตรวจจับด่านแบบต่อเนื่อง (Continuous Scanner)
 task.spawn(function()
-    local detected = false
-    while Controller.Running and not detected do
+    while Controller.Running and not isStageVerified do
         task.wait(0.75)
 
         -- 1. ตรวจสอบค่าจาก Genv / Library.Settings
@@ -437,11 +429,29 @@ task.spawn(function()
         local m1 = findMatchingPresetName(fromLobby)
         if m1 then
             applyDetectedStage(m1, "Lobby Handshake")
-            detected = true
             break
         end
 
-        -- 2. ตรวจสอบ ReplicatedStorage / MatchRemotes / CandyTD
+        -- 2. ตรวจสอบ Workspace Models / Map (แม่นยำสูงสุดใน In-Match)
+        local mapFolder = workspace:FindFirstChild("Map") or workspace:FindFirstChild("Stage") or workspace:FindFirstChild("Arena")
+        if mapFolder then
+            local m = findMatchingPresetName(mapFolder.Name)
+            if m then
+                applyDetectedStage(m, "Workspace.Map (" .. mapFolder.Name .. ")")
+                break
+            else
+                for _, ch in ipairs(mapFolder:GetChildren()) do
+                    local chM = findMatchingPresetName(ch.Name)
+                    if chM then
+                        applyDetectedStage(chM, "Workspace.Map." .. ch.Name)
+                        break
+                    end
+                end
+            end
+        end
+        if isStageVerified then break end
+
+        -- 3. ตรวจสอบ ReplicatedStorage / MatchRemotes / CandyTD
         local matchFolder = ReplicatedStorage:FindFirstChild("CandyTD") or ReplicatedStorage:FindFirstChild("Match")
         if matchFolder then
             for _, child in ipairs(matchFolder:GetDescendants()) do
@@ -449,52 +459,32 @@ task.spawn(function()
                     local m = findMatchingPresetName(child.Value)
                     if m then
                         applyDetectedStage(m, "ReplicatedStorage." .. child.Name)
-                        detected = true
                         break
                     end
                 end
             end
         end
-        if detected then break end
+        if isStageVerified then break end
 
-        -- 3. ตรวจสอบข้อความบน UI (PlayerGui ทั้งหมด รวมถึง CandyTD HUD)
+        -- 4. ตรวจสอบข้อความบน UI เฉพาะข้อความที่เกี่ยวข้องกับ Stage (หลีกเลี่ยงชื่อเกม CandyTD)
         for _, gui in ipairs(playerGui:GetChildren()) do
-            if gui:IsA("ScreenGui") and gui.Enabled then
+            if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "CandyTD_BehindTheDarkHub" and gui.Name ~= "BehindTheDark_UI" then
                 for _, desc in ipairs(gui:GetDescendants()) do
-                    if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" and desc.TextSize >= 12 then
-                        local m = findMatchingPresetName(desc.Text)
-                        if m then
-                            applyDetectedStage(m, "UI (" .. desc.Name .. ": " .. desc.Text .. ")")
-                            detected = true
-                            break
+                    if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" and desc.TextSize >= 14 then
+                        local txt = desc.Text:upper()
+                        if not txt:find("CANDY TD") and not txt:find("CREDITS") and not txt:find("SHOP") then
+                            local m = findMatchingPresetName(desc.Text)
+                            if m then
+                                applyDetectedStage(m, "UI (" .. desc.Name .. ": " .. desc.Text .. ")")
+                                break
+                            end
                         end
                     end
                 end
-                if detected then break end
+                if isStageVerified then break end
             end
         end
-        if detected then break end
-
-        -- 4. ตรวจสอบจาก Workspace Models / Map
-        local mapFolder = workspace:FindFirstChild("Map") or workspace:FindFirstChild("Stage") or workspace:FindFirstChild("Arena")
-        if mapFolder then
-            local m = findMatchingPresetName(mapFolder.Name)
-            if m then
-                applyDetectedStage(m, "Workspace.Map (" .. mapFolder.Name .. ")")
-                detected = true
-                break
-            else
-                for _, ch in ipairs(mapFolder:GetChildren()) do
-                    local chM = findMatchingPresetName(ch.Name)
-                    if chM then
-                        applyDetectedStage(chM, "Workspace.Map." .. ch.Name)
-                        detected = true
-                        break
-                    end
-                end
-            end
-        end
-        if detected then break end
+        if isStageVerified then break end
     end
 end)
 
@@ -1420,7 +1410,7 @@ end
 task.spawn(function()
     while Controller.Running do
         task.wait(0.5)
-        if states.AutoPlace then
+        if states.AutoPlace and isStageVerified then
             local overlay = candyTD:FindFirstChild("Overlay")
             local isOverlayOpen = overlay and overlay.Visible
             local isPreMatch = false
