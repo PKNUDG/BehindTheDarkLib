@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (CLEAN 3D & MATCHED SETTINGS)
+-- BEHIND THE DARK : CORE UI LIBRARY (CLEAN TEXT & RESTORED UI)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -139,7 +139,38 @@ local function applyCartoonSurface(target: GuiObject, zIndex: number, cornerRad:
     end
 end
 
+local function spawnClickRipple(btn: GuiButton, inputPos: Vector3)
+    if not (Library.Settings.Animations and Library.Settings.ClickRipple) then return end
+    local relX = inputPos.X - btn.AbsolutePosition.X
+    local relY = inputPos.Y - btn.AbsolutePosition.Y
+
+    local ripple = Instance.new("Frame")
+    ripple.Name = "ClickRipple"
+    ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+    ripple.Position = UDim2.fromOffset(relX, relY)
+    ripple.Size = UDim2.fromOffset(0, 0)
+    ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ripple.BackgroundTransparency = 0.45
+    ripple.BorderSizePixel = 0
+    ripple.ZIndex = btn.ZIndex + 4
+    ripple.Parent = btn
+    Instance.new("UICorner", ripple).CornerRadius = UDim.new(1, 0)
+
+    local targetSize = math.max(btn.AbsoluteSize.X, btn.AbsoluteSize.Y) * 2.1
+    local tw = TweenService:Create(ripple, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = UDim2.fromOffset(targetSize, targetSize),
+        BackgroundTransparency = 1
+    })
+    tw:Play()
+    tw.Completed:Connect(function()
+        ripple:Destroy()
+    end)
+end
+
 function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
+    local isHovered = false
+    btn.ClipsDescendants = true
+
     local targetObj: Instance = (typeof(scaleTarget) == "Instance") and scaleTarget or btn
     local uiScale = targetObj:FindFirstChildOfClass("UIScale")
     if not uiScale then
@@ -149,11 +180,13 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
     end
 
     btn.MouseEnter:Connect(function()
+        isHovered = true
         if Library.Settings.Animations then
             TweenService:Create(uiScale, springBounce, { Scale = 1.025 }):Play()
         end
     end)
     btn.MouseLeave:Connect(function()
+        isHovered = false
         if Library.Settings.Animations then
             TweenService:Create(uiScale, springBounce, { Scale = 1 }):Play()
         end
@@ -161,6 +194,7 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
     btn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             Library.PlaySound(SOUND_CLICK)
+            spawnClickRipple(btn, input.Position)
             if Library.Settings.Animations then
                 TweenService:Create(uiScale, pressSquish, { Scale = 0.94 }):Play()
             end
@@ -169,9 +203,42 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
     btn.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             if Library.Settings.Animations then
-                TweenService:Create(uiScale, springBounce, { Scale = 1 }):Play()
+                local targetScale = isHovered and 1.025 or 1
+                TweenService:Create(uiScale, springBounce, { Scale = targetScale }):Play()
             end
         end
+    end)
+end
+
+local wiggleData = {}
+function Library.StepWiggle(label: TextLabel)
+    if not Library.Settings.Animations then return end
+    if not wiggleData[label] then
+        wiggleData[label] = {
+            BaseSize = label.TextSize,
+            Dir = -1,
+            TwTilt = nil,
+            TwBack = nil
+        }
+    end
+    local data = wiggleData[label]
+    data.Dir = -data.Dir
+
+    if data.TwTilt then data.TwTilt:Cancel() end
+    if data.TwBack then data.TwBack:Cancel() end
+
+    data.TwTilt = TweenService:Create(label, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Rotation = data.Dir * 14,
+        TextSize = data.BaseSize + 3.5
+    })
+    data.TwTilt:Play()
+
+    task.delay(0.08, function()
+        data.TwBack = TweenService:Create(label, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Rotation = 0,
+            TextSize = data.BaseSize
+        })
+        data.TwBack:Play()
     end)
 end
 
@@ -282,7 +349,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     self.MainCard = outerBorder
     self.CardInner = card
 
-    -- ระบบคีย์ลัดสลับการแสดงผลหน้าต่าง UI (RightShift)
     local isToggling = false
     function self:ToggleVisibility()
         if isToggling then return end
@@ -317,7 +383,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    -- แดร็กเคลื่อนย้ายหน้าต่าง
     local isDragging = false
     local dragStartMouse = Vector3.new()
     local dragStartPos = UDim2.new()
@@ -374,7 +439,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", titlePlate).CornerRadius = UDim.new(0, 13)
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(0, 175, 1, 0)
+    titleLabel.Size = UDim2.new(0, 185, 1, 0)
     titleLabel.Position = UDim2.fromOffset(14, 0)
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = config.Title or "BEHIND THE DARK"
@@ -463,7 +528,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    -- ปุ่มปิด ✕
+    -- ปุ่มปิด (ไม่มีข้อความ/ไอคอน)
     local closeBtnRim = Instance.new("Frame")
     closeBtnRim.Size = UDim2.fromOffset(30, 30)
     closeBtnRim.Position = UDim2.new(1, -36, 0.5, -15)
@@ -480,10 +545,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     closeBtn.Size = UDim2.new(1, -4, 1, -4)
     closeBtn.Position = UDim2.fromOffset(2, 2)
     closeBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
-    closeBtn.Text = "X"
-    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeBtn.TextSize = 13.5
-    closeBtn.Font = Enum.Font.FredokaOne
+    closeBtn.Text = ""
     closeBtn.BorderSizePixel = 0
     closeBtn.AutoButtonColor = false
     closeBtn.ZIndex = 7
@@ -501,7 +563,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         screenGui:Destroy()
     end)
 
-    -- ปุ่ม Settings
+    -- ปุ่ม Settings (ไม่มีข้อความ/ไอคอน)
     local setBtnRim = Instance.new("Frame")
     setBtnRim.Size = UDim2.fromOffset(30, 30)
     setBtnRim.Position = UDim2.new(1, -72, 0.5, -15)
@@ -518,10 +580,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     settingsBtn.Size = UDim2.new(1, -4, 1, -4)
     settingsBtn.Position = UDim2.fromOffset(2, 2)
     settingsBtn.BackgroundColor3 = Color3.fromRGB(250, 195, 45)
-    settingsBtn.Text = "SET"
-    settingsBtn.TextColor3 = Color3.fromRGB(40, 10, 60)
-    settingsBtn.TextSize = 10.5
-    settingsBtn.Font = Enum.Font.FredokaOne
+    settingsBtn.Text = ""
     settingsBtn.BorderSizePixel = 0
     settingsBtn.AutoButtonColor = false
     settingsBtn.ZIndex = 7
@@ -529,7 +588,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 8)
     Library.AttachInteractiveEffects(settingsBtn, setBtnRim)
 
-    -- ปุ่ม 3D (คงคำว่า 3D, ON=ตัวหนังสือเขียว, OFF=ตัวหนังสือแดง)
+    -- ปุ่ม 3D (คงโครงสร้างเดิม, ข้อความ "3D", ON=เขียว, OFF=แดง)
     local btn3DRim = Instance.new("Frame")
     btn3DRim.Size = UDim2.fromOffset(48, 30)
     btn3DRim.Position = UDim2.new(1, -126, 0.5, -15)
@@ -547,7 +606,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     btn3D.Position = UDim2.fromOffset(2, 2)
     btn3D.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
     btn3D.Text = "3D"
-    btn3D.TextColor3 = Color3.fromRGB(130, 255, 85) -- เริ่มต้น ON = สีเขียว
+    btn3D.TextColor3 = Color3.fromRGB(130, 255, 85)
     btn3D.TextSize = 13
     btn3D.Font = Enum.Font.FredokaOne
     btn3D.BorderSizePixel = 0
@@ -593,7 +652,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
                 end
             end)
 
-            btn3D.TextColor3 = Color3.fromRGB(255, 75, 75) -- OFF = สีแดง
+            btn3D.TextColor3 = Color3.fromRGB(255, 75, 75)
         else
             if self.LockConnection then
                 self.LockConnection:Disconnect()
@@ -606,7 +665,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
                 end
             end)
             self.BlackoutFrame.Visible = false
-            btn3D.TextColor3 = Color3.fromRGB(130, 255, 85) -- ON = สีเขียว
+            btn3D.TextColor3 = Color3.fromRGB(130, 255, 85)
         end
     end)
 
@@ -661,7 +720,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     end
 
     -- ========================================================
-    -- หน้าต่าง SETTINGS MODAL (ปรับสไตล์ 3D ให้เข้ากับ HUB หลัก)
+    -- SETTINGS MODAL
     -- ========================================================
     local settingDim = Instance.new("TextButton")
     settingDim.Name = "SettingDimBackdrop"
@@ -702,7 +761,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", smInner).CornerRadius = UDim.new(0, 19)
     applyCartoonSurface(smInner, 71, 19, false)
 
-    -- Title Bar ของ Settings
     local smTitleRim = Instance.new("Frame")
     smTitleRim.Size = UDim2.new(1, -20, 0, 38)
     smTitleRim.Position = UDim2.fromOffset(10, 10)
@@ -743,10 +801,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smCloseBtn.Size = UDim2.fromOffset(24, 24)
     smCloseBtn.Position = UDim2.new(1, -28, 0.5, -12)
     smCloseBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
-    smCloseBtn.Text = "X"
-    smCloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    smCloseBtn.TextSize = 12
-    smCloseBtn.Font = Enum.Font.FredokaOne
+    smCloseBtn.Text = ""
     smCloseBtn.BorderSizePixel = 0
     smCloseBtn.AutoButtonColor = false
     smCloseBtn.ZIndex = 75
@@ -1143,7 +1198,7 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     applyCartoonSurface(selectBtn, zBase + 2, 11, false)
 
     local selectLabel = Instance.new("TextLabel")
-    selectLabel.Size = UDim2.new(1, -40, 1, 0)
+    selectLabel.Size = UDim2.new(1, -20, 1, 0)
     selectLabel.Position = UDim2.fromOffset(12, 0)
     selectLabel.BackgroundTransparency = 1
     selectLabel.Text = string.format("%s: %s", title, tostring(selected))
@@ -1156,25 +1211,6 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     local sls = Instance.new("UIStroke", selectLabel)
     sls.Thickness = 3
     sls.Color = Color3.fromRGB(22, 5, 36)
-
-    local arrowBadge = Instance.new("Frame")
-    arrowBadge.Size = UDim2.fromOffset(24, 24)
-    arrowBadge.Position = UDim2.new(1, -30, 0.5, -12)
-    arrowBadge.BackgroundColor3 = Color3.fromRGB(32, 10, 56)
-    arrowBadge.BorderSizePixel = 0
-    arrowBadge.ZIndex = zBase + 3
-    arrowBadge.Parent = selectBtn
-    Instance.new("UICorner", arrowBadge).CornerRadius = UDim.new(0, 7)
-
-    local arrowLbl = Instance.new("TextLabel")
-    arrowLbl.Size = UDim2.fromScale(1, 1)
-    arrowLbl.BackgroundTransparency = 1
-    arrowLbl.Text = "v"
-    arrowLbl.TextColor3 = Color3.fromRGB(255, 225, 95)
-    arrowLbl.TextSize = 13
-    arrowLbl.Font = Enum.Font.FredokaOne
-    arrowLbl.ZIndex = zBase + 4
-    arrowLbl.Parent = arrowBadge
 
     Library.AttachInteractiveEffects(selectBtn, dropShadow)
 
