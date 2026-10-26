@@ -234,7 +234,8 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
     btn.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             if Library.Settings.Animations then
-                TweenService:Create(uiScale, springBounce, { Scale = 1 }):Play()
+                local targetScale = (targetObj:FindFirstChildOfClass("UIScale") and targetObj.UIScale.Scale > 1) and 1.025 or 1
+                TweenService:Create(uiScale, springBounce, { Scale = targetScale }):Play()
             end
         end
     end)
@@ -618,7 +619,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Instance.new("UICorner", settingsBtn).CornerRadius = UDim.new(0, 8)
     Library.AttachInteractiveEffects(settingsBtn, setBtnRim)
 
-    -- ปุ่ม 3D (โครงสร้างเดิม: ON สีเขียว อักษรดำ / OFF สีเทา อักษรขาว)
+    -- ปุ่ม 3D (ON สีเขียว อักษรดำ / OFF สีเทา อักษรขาว)
     local btn3DRim = Instance.new("Frame")
     btn3DRim.Size = UDim2.fromOffset(74, 30)
     btn3DRim.Position = UDim2.new(1, -152, 0.5, -15)
