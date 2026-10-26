@@ -266,12 +266,77 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- AUTO CHALLENGE LOOP (สแกนหาเฉพาะด่าน FIRST WIN)
+-- AUTO CHALLENGE (TELEPORT TO SPOT, OVERLAY SCAN & EXACT FIRST WIN)
 -- ========================================================
+local function teleportToChallengeSpot()
+    pcall(function()
+        local char = player.Character or player.CharacterAdded:Wait()
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        -- ค้นหาแท่น Challenge หรือ ป้าย TAKE A CHALLENGE ใน workspace
+        local targetCFrame = nil
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") and (obj.ActionText:upper():find("CHALLENGE") or obj.ObjectText:upper():find("TRAIN")) then
+                local part = obj.Parent
+                if part and part:IsA("BasePart") then
+                    targetCFrame = part.CFrame + Vector3.new(0, 3, 0)
+                    break
+                end
+            end
+        end
+
+        if not targetCFrame then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("TextLabel") and obj.Text:upper():find("TAKE A CHALLENGE") then
+                    local bb = obj:FindFirstAncestorWhichIsA("BillboardGui")
+                    if bb and bb.Adornee and bb.Adornee:IsA("BasePart") then
+                        targetCFrame = bb.Adornee.CFrame + Vector3.new(0, 3, 0)
+                        break
+                    elseif bb and bb.Parent and bb.Parent:IsA("BasePart") then
+                        targetCFrame = bb.Parent.CFrame + Vector3.new(0, 3, 0)
+                        break
+                    end
+                end
+            end
+        end
+
+        if targetCFrame then
+            local dist = (hrp.Position - targetCFrame.Position).Magnitude
+            if dist > 15 then
+                hrp.CFrame = targetCFrame
+                task.wait(0.3)
+            end
+        end
+    end)
+end
+
+local function triggerButton(btn: GuiButton)
+    pcall(function()
+        local firesig = (rawget(env, "firesignal") or firesignal) :: any
+        if firesig then
+            firesig(btn.Activated)
+            firesig(btn.MouseButton1Click)
+        else
+            local absPos = btn.AbsolutePosition
+            local absSize = btn.AbsoluteSize
+            local clickX = absPos.X + (absSize.X / 2)
+            local clickY = absPos.Y + (absSize.Y / 2) + 36
+            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
+            task.wait(0.05)
+            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
+        end
+    end)
+end
+
 local function findAndPlayFirstWinCar()
     local candyTDGui = playerGui:FindFirstChild("CandyTD")
     if not candyTDGui then return false end
 
+    -- 1. วาร์ปเข้าใกล้แท่น Challenge
+    teleportToChallengeSpot()
+
+    -- 2. ตรวจสอบว่าหน้าต่าง DUNGEON TRAIN เปิดอยู่หรือไม่
     local trainFrame = nil
     for _, desc in ipairs(candyTDGui:GetDescendants()) do
         if desc:IsA("TextLabel") and desc.Visible and desc.Text:upper():find("DUNGEON TRAIN") then
@@ -281,68 +346,94 @@ local function findAndPlayFirstWinCar()
     end
 
     if not trainFrame or not trainFrame.Visible then
-        local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
-        local funnel = hubRemotes and hubRemotes:FindFirstChild("Funnel")
-        if funnel and funnel:IsA("RemoteEvent") then
-            funnel:FireServer("open_train")
+        -- ยิง Remote เปิดหน้าต่างรถไฟ
+        pcall(function()
+            local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
+            local funnel = hubRemotes and hubRemotes:FindFirstChild("Funnel")
+            if funnel and funnel:IsA("RemoteEvent") then
+                funnel:FireServer("open_train")
+            end
+        end)
+        task.wait(1.2)
+
+        -- เช็คอีกครั้งว่าเปิดขึ้นมาหรือยัง
+        for _, desc in ipairs(candyTDGui:GetDescendants()) do
+            if desc:IsA("TextLabel") and desc.Visible and desc.Text:upper():find("DUNGEON TRAIN") then
+                trainFrame = desc:FindFirstAncestorWhichIsA("Frame") or desc.Parent
+                break
+            end
         end
-        task.wait(1.5)
     end
 
-    local targetPlayButton = nil
-    for _, desc in ipairs(candyTDGui:GetDescendants()) do
-        if desc:IsA("TextLabel") and desc.Visible then
-            local text = desc.Text:upper():gsub("%s+", " ")
-            if text:find("FIRST WIN") then
-                local cardParent = desc:FindFirstAncestorWhichIsA("Frame")
-                while cardParent and not cardParent:FindFirstChildWhichIsA("TextButton", true) do
-                    cardParent = cardParent.Parent
-                end
+    if not trainFrame or not trainFrame.Visible then
+        return false
+    end
 
-                if cardParent then
-                    for _, btn in ipairs(cardParent:GetDescendants()) do
-                        if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible then
-                            local bText = (btn:IsA("TextButton") and btn.Text:upper()) or ""
-                            for _, l in ipairs(btn:GetDescendants()) do
-                                if l:IsA("TextLabel") and l.Visible then
-                                    bText = bText .. " " .. l.Text:upper()
+    -- 3. ตรวจสอบตู้รถไฟแต่ละตู้ (CAR 1, CAR 2, CAR 3)
+    local targetPlayButton = nil
+    local hasAnyFirstWin = false
+
+    -- ค้นหาป้าย FIRST WIN ทั้งหมดที่มองเห็นได้บนหน้าจอ
+    for _, label in ipairs(trainFrame:GetDescendants()) do
+        if label:IsA("TextLabel") and label.Visible then
+            local txt = label.Text:upper():gsub("%s+", " ")
+            if txt:find("FIRST WIN") then
+                hasAnyFirstWin = true
+
+                -- หาการ์ดตู้รถไฟที่เป็น Container ของป้ายนี้
+                local carContainer = label.Parent
+                local foundPlay = nil
+
+                -- ไต่ขึ้นไปหาการ์ดตู้รถไฟที่มีปุ่ม PLAY
+                while carContainer and carContainer ~= trainFrame and carContainer ~= candyTDGui do
+                    for _, child in ipairs(carContainer:GetDescendants()) do
+                        if (child:IsA("TextButton") or child:IsA("ImageButton")) and child.Visible then
+                            local bText = (child:IsA("TextButton") and child.Text:upper()) or ""
+                            for _, t in ipairs(child:GetDescendants()) do
+                                if t:IsA("TextLabel") and t.Visible then
+                                    bText = bText .. " " .. t.Text:upper()
                                 end
                             end
                             if bText:find("PLAY") then
-                                targetPlayButton = btn
-                                print("[AutoChallenge] เจอด่าน First Win! ปุ่ม:", btn:GetFullName())
+                                foundPlay = child
                                 break
                             end
                         end
                     end
+                    if foundPlay then break end
+                    carContainer = carContainer.Parent
+                end
+
+                if foundPlay then
+                    targetPlayButton = foundPlay
+                    print("[AutoChallenge] เจอตู้ที่มี FIRST WIN! เตรียมกดปุ่ม:", foundPlay:GetFullName())
+                    break
                 end
             end
         end
-        if targetPlayButton then break end
     end
 
-    if targetPlayButton then
-        pcall(function()
-            local firesig = (rawget(env, "firesignal") or firesignal) :: any
-            if firesig then
-                firesig(targetPlayButton.Activated)
-                firesig(targetPlayButton.MouseButton1Click)
-            else
-                VirtualInputManager:SendMouseButtonEvent(
-                    targetPlayButton.AbsolutePosition.X + (targetPlayButton.AbsoluteSize.X / 2),
-                    targetPlayButton.AbsolutePosition.Y + (targetPlayButton.AbsoluteSize.Y / 2) + 36,
-                    0, true, game, 1
-                )
-                task.wait(0.05)
-                VirtualInputManager:SendMouseButtonEvent(
-                    targetPlayButton.AbsolutePosition.X + (targetPlayButton.AbsoluteSize.X / 2),
-                    targetPlayButton.AbsolutePosition.Y + (targetPlayButton.AbsoluteSize.Y / 2) + 36,
-                    0, false, game, 1
-                )
+    -- หากสแกนทั้ง 3 ตู้แล้วไม่พบ FIRST WIN เลย
+    if not hasAnyFirstWin then
+        -- หาเวลานับถอยหลังรอบถัดไป
+        local countdownText = ""
+        for _, l in ipairs(trainFrame:GetDescendants()) do
+            if l:IsA("TextLabel") and l.Visible and l.Text:upper():find("NEW CARS IN") then
+                countdownText = l.Text
+                break
             end
-        end)
+        end
+        print("[AutoChallenge] เล่นครบทุกด่านที่ได้ของ First Win แล้ว! " .. countdownText)
+        return false
+    end
 
-        task.wait(1)
+    -- 4. สั่งเริ่มเกมโดยการกดปุ่ม PLAY ที่ถูกต้อง
+    if targetPlayButton then
+        print("[AutoChallenge] กำลังกดปุ่ม PLAY เข้าสู่ห้อง...")
+        triggerButton(targetPlayButton)
+        task.wait(1.2)
+
+        -- ตรวจสอบว่ามีหน้าต่าง Party หรือ Start Match ปรากฏหรือไม่
         pcall(function()
             local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
             local startMatch = hubRemotes and hubRemotes:FindFirstChild("StartMatch")
@@ -350,17 +441,35 @@ local function findAndPlayFirstWinCar()
                 startMatch:InvokeServer()
             end
         end)
+
+        -- เช็คปุ่ม START หรือ START MATCH บน UI ถ้ามี
+        for _, btn in ipairs(candyTDGui:GetDescendants()) do
+            if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible then
+                local bText = (btn:IsA("TextButton") and btn.Text:upper()) or ""
+                for _, t in ipairs(btn:GetDescendants()) do
+                    if t:IsA("TextLabel") and t.Visible then
+                        bText = bText .. " " .. t.Text:upper()
+                    end
+                end
+                if bText:find("START") and not bText:find("RESTART") then
+                    triggerButton(btn)
+                    break
+                end
+            end
+        end
+
         return true
     end
+
     return false
 end
 
 task.spawn(function()
     while Controller.Running do
-        task.wait(2)
+        task.wait(2.5)
         if states.AutoChallenge then
             findAndPlayFirstWinCar()
-            task.wait(4)
+            task.wait(5)
         end
     end
 end)
