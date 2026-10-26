@@ -271,31 +271,47 @@ againLimitUpdater = Window:CreateToggle("Left", "Again Count Limit", 144, { On =
     states.AgainBeforeHomeActive = v
 end)
 
--- กล่อง Target Rounds
+-- ========================================================
+-- TARGET ROUNDS & 3D BUTTONS + INTENSE WIGGLE ANIMATION
+-- ========================================================
 local leftCol = Window:GetColumn("Left")
+
+-- 1. กรอบ Target Rounds (3D สไตล์การ์ตูน)
+local configBoxShadow = Instance.new("Frame")
+configBoxShadow.Size = UDim2.new(1, 0, 0, 44)
+configBoxShadow.Position = UDim2.fromOffset(0, 190)
+configBoxShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+configBoxShadow.BorderSizePixel = 0
+configBoxShadow.ZIndex = 4
+configBoxShadow.Parent = leftCol
+Instance.new("UICorner", configBoxShadow).CornerRadius = UDim.new(0, 14)
+
 local configBox = Instance.new("Frame")
-configBox.Size = UDim2.new(1, 0, 0, 38)
-configBox.Position = UDim2.fromOffset(0, 190)
-configBox.BackgroundColor3 = Color3.fromRGB(80, 35, 120)
+configBox.Size = UDim2.new(1, 0, 0, 41)
+configBox.Position = UDim2.fromOffset(0, 0)
+configBox.BackgroundColor3 = Color3.fromRGB(65, 22, 105)
 configBox.BorderSizePixel = 0
-configBox.ZIndex = 4
-configBox.Parent = leftCol
-Instance.new("UICorner", configBox).CornerRadius = UDim.new(0, 10)
+configBox.ZIndex = 5
+configBox.Parent = configBoxShadow
+Instance.new("UICorner", configBox).CornerRadius = UDim.new(0, 14)
 local cbs = Instance.new("UIStroke", configBox)
-cbs.Thickness = 2
-cbs.Color = Color3.fromRGB(42, 12, 70)
+cbs.Thickness = 2.5
+cbs.Color = Color3.fromRGB(22, 5, 36)
 
 local cfgLabel = Instance.new("TextLabel")
-cfgLabel.Size = UDim2.new(1, -100, 1, 0)
+cfgLabel.Size = UDim2.new(1, -115, 1, 0)
 cfgLabel.Position = UDim2.fromOffset(12, 0)
 cfgLabel.BackgroundTransparency = 1
 cfgLabel.Text = "Target Rounds"
-cfgLabel.TextColor3 = Color3.fromRGB(255, 235, 120)
-cfgLabel.TextSize = 13
+cfgLabel.TextColor3 = Color3.fromRGB(255, 235, 110)
+cfgLabel.TextSize = 13.5
 cfgLabel.Font = Enum.Font.FredokaOne
 cfgLabel.TextXAlignment = Enum.TextXAlignment.Left
-cfgLabel.ZIndex = 5
+cfgLabel.ZIndex = 6
 cfgLabel.Parent = configBox
+local cgls = Instance.new("UIStroke", cfgLabel)
+cgls.Thickness = 2.5
+cgls.Color = Color3.fromRGB(22, 5, 36)
 
 local roundCountLabel = Instance.new("TextLabel")
 roundCountLabel.Size = UDim2.fromOffset(30, 26)
