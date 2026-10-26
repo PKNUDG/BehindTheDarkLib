@@ -207,8 +207,10 @@ end
 function Library.BounceWiggleText(label: TextLabel)
     task.spawn(function()
         local origRot = label.Rotation
+        local origSize = label.TextSize
+
         local twExpand = TweenService:Create(label, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-            TextSize = 17,
+            TextSize = origSize + 4,
             Rotation = -10
         })
         twExpand:Play()
@@ -221,7 +223,7 @@ function Library.BounceWiggleText(label: TextLabel)
         twSway.Completed:Wait()
 
         local twReset = TweenService:Create(label, TweenInfo.new(0.18, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            TextSize = 13,
+            TextSize = origSize,
             Rotation = origRot
         })
         twReset:Play()
@@ -232,6 +234,17 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     local self = setmetatable({}, Library)
     local width = config.Size and config.Size.X.Offset or 660
     local height = config.Size and config.Size.Y.Offset or 440
+
+    -- ล้าง Blackout เก่าที่อาจค้างอยู่
+    pcall(function()
+        local oldB = CoreGui:FindFirstChild("BehindTheDark_Blackout")
+        if oldB then oldB:Destroy() end
+        local p = Players.LocalPlayer
+        if p and p:FindFirstChild("PlayerGui") then
+            local oldPB = p.PlayerGui:FindFirstChild("BehindTheDark_Blackout")
+            if oldPB then oldPB:Destroy() end
+        end
+    end)
 
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = config.Name or "BehindTheDarkHub"
@@ -414,6 +427,10 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     Library.AttachInteractiveEffects(closeBtn, closeBtnRim)
 
     closeBtn.Activated:Connect(function()
+        if self.LockConnection then
+            self.LockConnection:Disconnect()
+            self.LockConnection = nil
+        end
         if config.OnUnload then pcall(config.OnUnload) end
         blackoutGui:Destroy()
         screenGui:Destroy()
@@ -899,7 +916,6 @@ function Library:Create3DRenderToggle(side: string)
 
     local originalCamType = Enum.CameraType.Custom
     local originalCamCFrame = nil
-    local lockConnection: RBXScriptConnection? = nil
 
     btn.Activated:Connect(function()
         enabled = not enabled
@@ -915,8 +931,8 @@ function Library:Create3DRenderToggle(side: string)
             end)
             self.BlackoutFrame.Visible = true
 
-            if lockConnection then lockConnection:Disconnect() end
-            lockConnection = RunService.RenderStepped:Connect(function()
+            if self.LockConnection then self.LockConnection:Disconnect() end
+            self.LockConnection = RunService.RenderStepped:Connect(function()
                 if not enabled then
                     local c = workspace.CurrentCamera
                     if c then
@@ -933,9 +949,9 @@ function Library:Create3DRenderToggle(side: string)
             btn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
             lbl.Text = "[ 3D: OFF ]"
         else
-            if lockConnection then
-                lockConnection:Disconnect()
-                lockConnection = nil
+            if self.LockConnection then
+                self.LockConnection:Disconnect()
+                self.LockConnection = nil
             end
             pcall(function()
                 if cam then
