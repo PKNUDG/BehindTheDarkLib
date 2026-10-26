@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : LOBBY HUB (SEPARATED TRAYS LIKE IN-MATCH)
+-- CANDY TD : LOBBY HUB (FULL AUTO FIRST WIN & CHALLENGE)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -34,9 +34,6 @@ for _, gName in ipairs(oldGuis) do
     end)
 end
 
--- ========================================================
--- ANTI-AFK & RECONNECT
--- ========================================================
 local connError = GuiService.ErrorMessageChanged:Connect(function(errorMessage)
     if Controller.Running and errorMessage and errorMessage ~= "" then
         task.wait(2)
@@ -61,9 +58,6 @@ local connIdle = player.Idled:Connect(function()
     end
 end)
 
--- ========================================================
--- โหลดและใช้งาน BEHINDTHEDARKLIB
--- ========================================================
 local libUrl = "https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/BehindTheDarkLib.luau?v=" .. os.time()
 local libRaw = game:HttpGet(libUrl)
 local libChunk, libErr = loadstring(libRaw)
@@ -78,7 +72,7 @@ local states = {
     AutoSummon = (savedCfg.AutoSummon ~= nil) and savedCfg.AutoSummon or false,
     BannerType = savedCfg.BannerType or "Standard",
     RollAmount = savedCfg.RollAmount or 10,
-    AutoChallenge = (savedCfg.AutoChallenge ~= nil) and savedCfg.AutoChallenge or false,
+    AutoChallenge = (Library.Settings.AutoChallenge ~= nil) and Library.Settings.AutoChallenge or false,
     AutoDelete = {
         Rare = (savedCfg.AutoDelete and savedCfg.AutoDelete.Rare ~= nil) and savedCfg.AutoDelete.Rare or false,
         Epic = (savedCfg.AutoDelete and savedCfg.AutoDelete.Epic ~= nil) and savedCfg.AutoDelete.Epic or false,
@@ -87,17 +81,16 @@ local states = {
 }
 
 local function saveConfigState()
+    Library.Settings.AutoChallenge = states.AutoChallenge
     Library.Settings.Configs = {
         AutoSummon = states.AutoSummon,
         BannerType = states.BannerType,
         RollAmount = states.RollAmount,
-        AutoChallenge = states.AutoChallenge,
         AutoDelete = states.AutoDelete
     }
     Library.SaveSettings()
 end
 
--- Remote Action Helpers
 local function setServerAutoDelete(rarity: string, enable: boolean)
     local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
     local setRemote = hubRemotes and hubRemotes:FindFirstChild("SetAutoDelete")
@@ -139,23 +132,16 @@ local Window = Library:CreateWindow({
 })
 Controller.Gui = Window.Gui
 
--- ลบ Tray ฝั่งขวาเดิมออกทันที ไม่ให้เหลือซากกรอบซ้อน
 pcall(function()
     local rightRim = Window.RightColumn.Parent.Parent
-    if rightRim then
-        rightRim:Destroy()
-    end
+    if rightRim then rightRim:Destroy() end
 end)
 
--- ========================================================
--- ฝั่งซ้าย: AUTO SUMMON & AUTO DELETE SETTINGS
--- ========================================================
+-- ฝั่งซ้าย
 Window:CreateToggle("Left", "Auto Summon", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoSummon, function(v)
     states.AutoSummon = v
     saveConfigState()
-    if v then
-        syncAllAutoDelete()
-    end
+    if v then syncAllAutoDelete() end
 end)
 
 Window:CreateDropdown("Left", "Banner", 46, { "Standard", "Event" }, states.BannerType, 20, function(selected)
@@ -186,19 +172,26 @@ Window:CreateToggle("Left", "Delete Legendary", 236, { On = Color3.fromRGB(245, 
     setServerAutoDelete("Legendary", v)
 end)
 
--- ========================================================
--- ฝั่งขวา: 2 กล่องแยกอิสระ (CHALLENGE TRAY & SHOP TRAY)
--- ========================================================
-
--- 1. กล่องบน: Auto Challenge (ขนาดกะทัดรัดพอดี 1 ปุ่ม)
+-- ฝั่งขวา (2 กล่องแยก)
 local challengeSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 68))
 
-Window:CreateToggle(challengeSubTray, "Auto Challenge", 0, { On = Color3.fromRGB(255, 90, 150), Off = Color3.fromRGB(120, 120, 130) }, states.AutoChallenge, function(v)
+local challengeToggleUpdater = nil
+challengeToggleUpdater = Window:CreateToggle(challengeSubTray, "Auto Challenge", 0, { On = Color3.fromRGB(255, 90, 150), Off = Color3.fromRGB(120, 120, 130) }, states.AutoChallenge, function(v)
     states.AutoChallenge = v
     saveConfigState()
 end)
 
--- 2. กล่องล่าง: ซื้อไอเทมร้านค้า (แยกเป็นอีกกล่องอย่างชัดเจน)
+-- ตรวจสอบการเปลี่ยนค่าจาก Setting Modal
+task.spawn(function()
+    while Controller.Running do
+        task.wait(0.5)
+        if Library.Settings.AutoChallenge ~= states.AutoChallenge then
+            states.AutoChallenge = Library.Settings.AutoChallenge
+            if challengeToggleUpdater then challengeToggleUpdater(states.AutoChallenge) end
+        end
+    end
+end)
+
 local shopSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 76), UDim2.new(0.5, -20, 1, -88))
 
 local function createShopActionButton(parentTarget: Instance, text: string, yPos: number, rimColor: Color3, btnColor: Color3, callback: () -> ())
@@ -252,9 +245,7 @@ createShopActionButton(shopSubTray, "Buy Unit of Juice x10", 46, Color3.fromRGB(
     buyItemFromTeller("statroll", 10)
 end)
 
--- ========================================================
--- AUTO SUMMON LOOP
--- ========================================================
+-- Auto Summon Loop
 task.spawn(function()
     while Controller.Running do
         task.wait(0.5)
@@ -273,34 +264,101 @@ task.spawn(function()
 end)
 
 -- ========================================================
--- AUTO CHALLENGE LOOP
+-- AUTO CHALLENGE LOOP (สแกนหาเฉพาะด่าน FIRST WIN)
 -- ========================================================
-task.spawn(function()
-    while Controller.Running do
+local function findAndPlayFirstWinCar()
+    local candyTDGui = playerGui:FindFirstChild("CandyTD")
+    if not candyTDGui then return false end
+
+    local trainFrame = nil
+    for _, desc in ipairs(candyTDGui:GetDescendants()) do
+        if desc:IsA("TextLabel") and desc.Visible and desc.Text:upper():find("DUNGEON TRAIN") then
+            trainFrame = desc:FindFirstAncestorWhichIsA("Frame") or desc.Parent
+            break
+        end
+    end
+
+    if not trainFrame or not trainFrame.Visible then
+        local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
+        local funnel = hubRemotes and hubRemotes:FindFirstChild("Funnel")
+        if funnel and funnel:IsA("RemoteEvent") then
+            funnel:FireServer("open_train")
+        end
         task.wait(1.5)
-        if states.AutoChallenge then
-            pcall(function()
-                local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
-                if hubRemotes then
-                    local funnel = hubRemotes:FindFirstChild("Funnel")
-                    if funnel and funnel:IsA("RemoteEvent") then
-                        funnel:FireServer("open_train")
-                        task.wait(0.3)
-                    end
+    end
 
-                    local createMatch = hubRemotes:FindFirstChild("CreateMatch")
-                    if createMatch and createMatch:IsA("RemoteFunction") then
-                        createMatch:InvokeServer(2, "c996114_1", false)
-                        task.wait(0.3)
-                    end
+    local targetPlayButton = nil
+    for _, desc in ipairs(candyTDGui:GetDescendants()) do
+        if desc:IsA("TextLabel") and desc.Visible then
+            local text = desc.Text:upper():gsub("%s+", " ")
+            if text:find("FIRST WIN") then
+                local cardParent = desc:FindFirstAncestorWhichIsA("Frame")
+                while cardParent and not cardParent:FindFirstChildWhichIsA("TextButton", true) do
+                    cardParent = cardParent.Parent
+                end
 
-                    local startMatch = hubRemotes:FindFirstChild("StartMatch")
-                    if startMatch and startMatch:IsA("RemoteFunction") then
-                        startMatch:InvokeServer()
+                if cardParent then
+                    for _, btn in ipairs(cardParent:GetDescendants()) do
+                        if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible then
+                            local bText = (btn:IsA("TextButton") and btn.Text:upper()) or ""
+                            for _, l in ipairs(btn:GetDescendants()) do
+                                if l:IsA("TextLabel") and l.Visible then
+                                    bText = bText .. " " .. l.Text:upper()
+                                end
+                            end
+                            if bText:find("PLAY") then
+                                targetPlayButton = btn
+                                print("[AutoChallenge] เจอด่าน First Win! ปุ่ม:", btn:GetFullName())
+                                break
+                            end
+                        end
                     end
                 end
-            end)
-            task.wait(3)
+            end
+        end
+        if targetPlayButton then break end
+    end
+
+    if targetPlayButton then
+        pcall(function()
+            local firesig = (rawget(env, "firesignal") or firesignal) :: any
+            if firesig then
+                firesig(targetPlayButton.Activated)
+                firesig(targetPlayButton.MouseButton1Click)
+            else
+                VirtualInputManager:SendMouseButtonEvent(
+                    targetPlayButton.AbsolutePosition.X + (targetPlayButton.AbsoluteSize.X / 2),
+                    targetPlayButton.AbsolutePosition.Y + (targetPlayButton.AbsoluteSize.Y / 2) + 36,
+                    0, true, game, 1
+                )
+                task.wait(0.05)
+                VirtualInputManager:SendMouseButtonEvent(
+                    targetPlayButton.AbsolutePosition.X + (targetPlayButton.AbsoluteSize.X / 2),
+                    targetPlayButton.AbsolutePosition.Y + (targetPlayButton.AbsoluteSize.Y / 2) + 36,
+                    0, false, game, 1
+                )
+            end
+        end)
+
+        task.wait(1)
+        pcall(function()
+            local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
+            local startMatch = hubRemotes and hubRemotes:FindFirstChild("StartMatch")
+            if startMatch and startMatch:IsA("RemoteFunction") then
+                startMatch:InvokeServer()
+            end
+        end)
+        return true
+    end
+    return false
+end
+
+task.spawn(function()
+    while Controller.Running do
+        task.wait(2)
+        if states.AutoChallenge then
+            findAndPlayFirstWinCar()
+            task.wait(4)
         end
     end
 end)
