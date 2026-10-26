@@ -372,66 +372,131 @@ local function findMatchingPresetName(query: string?): string?
     return nil
 end
 
--- 1. ตรวจสอบจากการส่งค่าข้ามห้อง (Genv / Library.Settings)
-local candidateStage = _G.CandyTD_SelectedStage or Library.Settings.SelectedStage
-local matchedName = findMatchingPresetName(candidateStage)
+-- ฟังก์ชันอัปเดตสเตจและ UI อัตโนมัติเมื่อตรวจพบด่าน
+local stageDropdown: any = nil
+local autoPlaceToggleUpdater: any = nil
 
--- 2. หากยังไม่พบ ตรวจสอบจากข้อความในหน้าจอ In-Match (CandyTD UI)
-if not matchedName and candyTD then
-    for _, desc in ipairs(candyTD:GetDescendants()) do
-        if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" then
-            local found = findMatchingPresetName(desc.Text)
-            if found then
-                matchedName = found
-                print(string.format("[AutoStage] สแกนพบชื่อด่านจาก UI ('%s' -> '%s')", desc.Text, found))
-                break
+local function applyDetectedStage(targetStage: string, sourceDesc: string)
+    if not targetStage or not StagePresets[targetStage] then return end
+    if states.CurrentStage == targetStage and states.RecordStageName == targetStage then
+        return
+    end
+
+    print(string.format("[AutoStage] >> สลับไปยังด่าน: '%s' (ตรวจพบจาก: %s)", targetStage, sourceDesc))
+    states.CurrentStage = targetStage
+    states.RecordStageName = targetStage
+    Library.Settings.SelectedStage = targetStage
+    Library.Settings.Configs = Library.Settings.Configs or {}
+    Library.Settings.Configs.CurrentStage = targetStage
+
+    -- บันทึกแมปกับ PlaceId ไว้ด้วย
+    Library.Settings.PlaceIdStageMap = Library.Settings.PlaceIdStageMap or {}
+    Library.Settings.PlaceIdStageMap[currentPlaceId] = targetStage
+    Library.SaveSettings()
+
+    -- อัปเดต UI Dropdown
+    if stageDropdown and stageDropdown.Set then
+        stageDropdown.Set(targetStage)
+    end
+
+    -- หากมี Preset ยูนิตในด่านนี้อยู่แล้ว และยังไม่ได้เปิด Auto Place ให้เปิดอัตโนมัติ
+    local presetUnits = StagePresets[targetStage]
+    if presetUnits and #presetUnits > 0 then
+        if not states.AutoPlace then
+            states.AutoPlace = true
+            if autoPlaceToggleUpdater then
+                autoPlaceToggleUpdater(true)
             end
+            print(string.format("[AutoStage] พรีเซ็ตด่าน '%s' มีข้อมูลยูนิต %d ตัว -> เปิด Auto Place อัตโนมัติ", targetStage, #presetUnits))
         end
+    else
+        print(string.format("[AutoStage] ด่าน '%s' ยังเป็นพรีเซ็ตว่าง (พร้อมสำหรับการ Record)", targetStage))
     end
 end
 
--- 3. หากยังไม่พบ ตรวจสอบจาก Workspace / Map
-if not matchedName then
-    local mapFolder = workspace:FindFirstChild("Map") or workspace:FindFirstChild("Stage") or workspace:FindFirstChild("Arena")
-    if mapFolder then
-        local found = findMatchingPresetName(mapFolder.Name)
-        if found then
-            matchedName = found
-        else
-            for _, ch in ipairs(mapFolder:GetChildren()) do
-                local chFound = findMatchingPresetName(ch.Name)
-                if chFound then
-                    matchedName = chFound
-                    break
+-- ตรวจสอบรอบแรกทันที
+local initCandidate = _G.CandyTD_SelectedStage or Library.Settings.SelectedStage
+local initMatched = findMatchingPresetName(initCandidate)
+if initMatched then
+    states.CurrentStage = initMatched
+    states.RecordStageName = initMatched
+    local pUnits = StagePresets[initMatched]
+    if pUnits and #pUnits > 0 then
+        states.AutoPlace = true
+    end
+end
+
+-- ลูปสแกนตรวจจับด่านแบบต่อเนื่อง (Continuous Scanner)
+task.spawn(function()
+    local detected = false
+    while Controller.Running and not detected do
+        task.wait(0.75)
+
+        -- 1. ตรวจสอบค่าจาก Genv / Library.Settings
+        local fromLobby = _G.CandyTD_SelectedStage or Library.Settings.SelectedStage
+        local m1 = findMatchingPresetName(fromLobby)
+        if m1 then
+            applyDetectedStage(m1, "Lobby Handshake")
+            detected = true
+            break
+        end
+
+        -- 2. ตรวจสอบ ReplicatedStorage / MatchRemotes / CandyTD
+        local matchFolder = ReplicatedStorage:FindFirstChild("CandyTD") or ReplicatedStorage:FindFirstChild("Match")
+        if matchFolder then
+            for _, child in ipairs(matchFolder:GetDescendants()) do
+                if child:IsA("StringValue") and child.Value ~= "" then
+                    local m = findMatchingPresetName(child.Value)
+                    if m then
+                        applyDetectedStage(m, "ReplicatedStorage." .. child.Name)
+                        detected = true
+                        break
+                    end
                 end
             end
         end
-    end
-end
+        if detected then break end
 
--- 4. นำผลลัพธ์มาตั้งค่า CurrentStage & AutoPlace
-if matchedName then
-    states.CurrentStage = matchedName
-    states.RecordStageName = matchedName
-    local presetUnits = StagePresets[matchedName]
-    if presetUnits and #presetUnits > 0 then
-        states.AutoPlace = true
-        print(string.format("[AutoStage] ด่าน '%s' มีพรีเซ็ตยูนิต %d ตัว -> เปิดใช้งาน Auto Place อัตโนมัติ", matchedName, #presetUnits))
-    else
-        print(string.format("[AutoStage] ตรวจพบด่าน '%s' (พรีเซ็ตว่าง พร้อมสำหรับการ Record ยูนิตใหม่)", matchedName))
-    end
-elseif Library.Settings.PlaceIdStageMap and Library.Settings.PlaceIdStageMap[currentPlaceId] then
-    local mapped = Library.Settings.PlaceIdStageMap[currentPlaceId]
-    if StagePresets[mapped] then
-        states.CurrentStage = mapped
-        states.RecordStageName = mapped
-        local presetUnits = StagePresets[mapped]
-        if presetUnits and #presetUnits > 0 then
-            states.AutoPlace = true
+        -- 3. ตรวจสอบข้อความบน UI (PlayerGui ทั้งหมด รวมถึง CandyTD HUD)
+        for _, gui in ipairs(playerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and gui.Enabled then
+                for _, desc in ipairs(gui:GetDescendants()) do
+                    if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" and desc.TextSize >= 12 then
+                        local m = findMatchingPresetName(desc.Text)
+                        if m then
+                            applyDetectedStage(m, "UI (" .. desc.Name .. ": " .. desc.Text .. ")")
+                            detected = true
+                            break
+                        end
+                    end
+                end
+                if detected then break end
+            end
         end
-        print(string.format("[AutoStage] พบ PlaceId '%s' ตรงกับด่าน '%s'", currentPlaceId, mapped))
+        if detected then break end
+
+        -- 4. ตรวจสอบจาก Workspace Models / Map
+        local mapFolder = workspace:FindFirstChild("Map") or workspace:FindFirstChild("Stage") or workspace:FindFirstChild("Arena")
+        if mapFolder then
+            local m = findMatchingPresetName(mapFolder.Name)
+            if m then
+                applyDetectedStage(m, "Workspace.Map (" .. mapFolder.Name .. ")")
+                detected = true
+                break
+            else
+                for _, ch in ipairs(mapFolder:GetChildren()) do
+                    local chM = findMatchingPresetName(ch.Name)
+                    if chM then
+                        applyDetectedStage(chM, "Workspace.Map." .. ch.Name)
+                        detected = true
+                        break
+                    end
+                end
+            end
+        end
+        if detected then break end
     end
-end
+end)
 
 local refreshRecordUI: (() -> ())? = nil
 local lastRecordTick = 0
@@ -813,7 +878,6 @@ end)
 local bottomSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 162), UDim2.new(0.5, -20, 1, -174))
 
 -- สร้าง Toggle Auto Place
-local autoPlaceToggleUpdater = nil
 autoPlaceToggleUpdater = Window:CreateToggle(bottomSubTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
     states.AutoPlace = v
     saveConfigState()
@@ -823,7 +887,7 @@ if autoPlaceToggleUpdater then
     autoPlaceToggleUpdater(states.AutoPlace)
 end
 
-local stageDropdown = Window:CreateDropdown(bottomSubTray, "Stage", 46, getStageNames(), states.CurrentStage, 10, function(selected)
+stageDropdown = Window:CreateDropdown(bottomSubTray, "Stage", 46, getStageNames(), states.CurrentStage, 10, function(selected)
     states.CurrentStage = selected
     states.RecordStageName = selected
     Library.Settings.SelectedStage = selected
