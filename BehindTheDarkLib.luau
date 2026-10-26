@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (GOLD SHINE & 3D CARTOON)
+-- BEHIND THE DARK : CORE UI LIBRARY (GHOST DRAG & NEON GLOW)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -214,50 +214,28 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
     end)
 end
 
--- ระบบแกว่งสะบัดขยายต่อเนื่องของ Round 0/10
-local activeWiggles = {}
-function Library.StartIntenseWiggle(label: TextLabel)
+-- ระบบแกว่งทีละครั้ง: กดครั้งหนึ่งแกว่งซ้าย กดอีกครั้งแกว่งขวา
+local wiggleDirections = {}
+function Library.StepWiggle(label: TextLabel)
     if not Library.Settings.Animations then return end
-    if not activeWiggles[label] then
-        activeWiggles[label] = {
-            OriginalSize = label.TextSize,
-            CurrentBonus = 0,
-            Step = 0,
-            Running = true,
-            LastTrigger = tick()
-        }
-    else
-        activeWiggles[label].LastTrigger = tick()
-        activeWiggles[label].CurrentBonus = math.min(activeWiggles[label].CurrentBonus + 1.2, 9)
-        return
-    end
-
-    local data = activeWiggles[label]
-    data.CurrentBonus = 2.5
+    local origSize = label.TextSize
+    local dir = wiggleDirections[label] or -1
+    dir = -dir
+    wiggleDirections[label] = dir
 
     task.spawn(function()
-        while data.Running do
-            if tick() - data.LastTrigger > 0.45 then
-                break
-            end
-            data.Step = (data.Step == 1) and -1 or 1
-            local targetRot = data.Step * (12 + (data.CurrentBonus * 0.8))
-            local targetSize = data.OriginalSize + data.CurrentBonus
-
-            local tw = TweenService:Create(label, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
-                Rotation = targetRot,
-                TextSize = targetSize
-            })
-            tw:Play()
-            tw.Completed:Wait()
-        end
-
-        local twReset = TweenService:Create(label, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Rotation = 0,
-            TextSize = data.OriginalSize
+        local twTilt = TweenService:Create(label, TweenInfo.new(0.09, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Rotation = dir * 13,
+            TextSize = origSize + 3
         })
-        twReset:Play()
-        activeWiggles[label] = nil
+        twTilt:Play()
+        twTilt.Completed:Wait()
+
+        local twBack = TweenService:Create(label, TweenInfo.new(0.24, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Rotation = 0,
+            TextSize = origSize
+        })
+        twBack:Play()
     end)
 end
 
@@ -311,10 +289,12 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     blackout.Parent = blackoutGui
     self.BlackoutFrame = blackout
 
+    -- 1. กรอบหน้าต่างหลัก (ตั้ง AnchorPoint ตรงกลางเพื่อให้ Pop & Squish ทำงานที่จุดศูนย์กลาง)
     local outerBorder = Instance.new("Frame")
     outerBorder.Name = "MainOuterBorder"
+    outerBorder.AnchorPoint = Vector2.new(0.5, 0.5)
     outerBorder.Size = UDim2.fromOffset(width, height)
-    outerBorder.Position = UDim2.new(0.5, -width / 2, 0.5, -height / 2)
+    outerBorder.Position = UDim2.fromScale(0.5, 0.5)
     outerBorder.BackgroundColor3 = Color3.fromRGB(185, 140, 245)
     outerBorder.BorderSizePixel = 0
     outerBorder.Active = true
@@ -354,6 +334,49 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     applyCartoonSurface(card, 2, 23, true)
     self.MainCard = outerBorder
 
+    -- 2. โครงร่างเงาโปร่งแสงเวลาลากเมาส์ (Ghost Drag Outline + Looping Purple Gradient)
+    local dragGhost = Instance.new("Frame")
+    dragGhost.Name = "GhostDragFrame"
+    dragGhost.AnchorPoint = Vector2.new(0.5, 0.5)
+    dragGhost.Size = UDim2.fromOffset(width, height)
+    dragGhost.BackgroundColor3 = Color3.fromRGB(140, 75, 215)
+    dragGhost.BackgroundTransparency = 0.65
+    dragGhost.BorderSizePixel = 0
+    dragGhost.Visible = false
+    dragGhost.ZIndex = 9999
+    dragGhost.Parent = screenGui
+    Instance.new("UICorner", dragGhost).CornerRadius = UDim.new(0, 26)
+
+    local ghostStroke = Instance.new("UIStroke", dragGhost)
+    ghostStroke.Thickness = 3.5
+    ghostStroke.Color = Color3.fromRGB(225, 175, 255)
+
+    local ghostGrad = Instance.new("UIGradient")
+    ghostGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(225, 150, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(130, 50, 190)),
+        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(225, 150, 255))
+    })
+    ghostGrad.Rotation = 0
+    ghostGrad.Offset = Vector2.new(-1, 0)
+    ghostGrad.Parent = dragGhost
+
+    task.spawn(function()
+        while dragGhost and dragGhost.Parent do
+            if dragGhost.Visible and Library.Settings.Animations then
+                ghostGrad.Offset = Vector2.new(-1, 0)
+                local twGhost = TweenService:Create(ghostGrad, TweenInfo.new(2.5, Enum.EasingStyle.Linear), {
+                    Offset = Vector2.new(1, 0)
+                })
+                twGhost:Play()
+                twGhost.Completed:Wait()
+            else
+                task.wait(0.3)
+            end
+        end
+    end)
+
+    -- อนิเมชันเปิด/ปิดหน้าต่างตรงกลาง (Pop & Squish Disappear Center)
     local isToggling = false
     local function setWindowVisibilityAnimated(show: boolean)
         if isToggling then return end
@@ -381,22 +404,35 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         isToggling = false
     end
 
-    local dragging, dragStart, startPos = false, nil, nil
+    -- ระบบลาก UI: ลากเงาตามเมาส์ -> ปล่อยเมาส์แล้วย้ายตัวจริงมาวาง
+    local dragging = false
+    local dragOffset = Vector2.new()
+
     outerBorder.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
-            dragStart = input.Position
-            startPos = outerBorder.Position
+            dragOffset = Vector2.new(input.Position.X - outerBorder.AbsolutePosition.X - (width / 2), input.Position.Y - outerBorder.AbsolutePosition.Y - (height / 2))
+            dragGhost.Position = outerBorder.Position
+            dragGhost.Visible = true
+
             input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+                if input.UserInputState == Enum.UserInputState.End then
+                    if dragging then
+                        dragging = false
+                        dragGhost.Visible = false
+                        TweenService:Create(outerBorder, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                            Position = dragGhost.Position
+                        }):Play()
+                    end
+                end
             end)
         end
     end)
+
     outerBorder.InputChanged:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             if dragging then
-                local delta = input.Position - dragStart
-                outerBorder.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                dragGhost.Position = UDim2.fromOffset(input.Position.X - dragOffset.X, input.Position.Y - dragOffset.Y)
             end
         end
     end)
@@ -583,7 +619,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smTitle.Position = UDim2.fromOffset(10, 8)
     smTitle.BackgroundTransparency = 1
     smTitle.Text = "VISUAL SETTINGS"
-    smTitle.TextColor3 = Color3.fromRGB(242, 230, 255)
+    smTitle.TextColor3 = Color3.fromRGB(255, 225, 95)
     smTitle.TextSize = 15
     smTitle.Font = Enum.Font.FredokaOne
     smTitle.ZIndex = 71
@@ -610,7 +646,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         lbl.Position = UDim2.fromOffset(12, 0)
         lbl.BackgroundTransparency = 1
         lbl.Text = text
-        lbl.TextColor3 = Color3.fromRGB(242, 230, 255)
+        lbl.TextColor3 = Color3.fromRGB(255, 225, 95)
         lbl.TextSize = 12.5
         lbl.Font = Enum.Font.FredokaOne
         lbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -637,7 +673,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         local thumb = Instance.new("Frame")
         thumb.Size = UDim2.fromOffset(18, 18)
         thumb.Position = Library.Settings[settingKey] and UDim2.fromOffset(24, 2) or UDim2.fromOffset(2, 2)
-        thumb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        thumb.BackgroundColor3 = Library.Settings[settingKey] and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(255, 255, 255)
         thumb.BorderSizePixel = 0
         thumb.ZIndex = 73
         thumb.Parent = switchTrack
@@ -652,7 +688,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
                 BackgroundColor3 = active and Color3.fromRGB(110, 215, 65) or Color3.fromRGB(85, 75, 105)
             }):Play()
             TweenService:Create(thumb, toggleSlide, {
-                Position = active and UDim2.fromOffset(24, 2) or UDim2.fromOffset(2, 2)
+                Position = active and UDim2.fromOffset(24, 2) or UDim2.fromOffset(2, 2),
+                BackgroundColor3 = active and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(255, 255, 255)
             }):Play()
 
             if onToggle then onToggle(active) end
@@ -684,13 +721,12 @@ function Library:GetColumn(side: string): Frame
 end
 
 -- ========================================================
--- TOGGLE BUTTON (ปุ่ม 3D ขอบ 3 ชั้น + เงาหนา + ข้อความ ON ทองเรืองแสงลูป)
+-- TOGGLE BUTTON (ปุ่ม 3D + ON วงกลมเขียว + อักษรเขียวเรืองแสงวิ่งวนลูป)
 -- ========================================================
 function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: Color3, Off: Color3}, default: boolean, callback: (boolean) -> ())
     local parent = self:GetColumn(side)
     local state = default or false
 
-    -- 1. ชั้นเงาด้านล่างปุ่ม (3D Drop Shadow)
     local btnShadow = Instance.new("Frame")
     btnShadow.Name = "Button3DShadow"
     btnShadow.Size = UDim2.new(1, 0, 0, 44)
@@ -701,7 +737,6 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     btnShadow.Parent = parent
     Instance.new("UICorner", btnShadow).CornerRadius = UDim.new(0, 14)
 
-    -- 2. ขอบกลางสีสว่าง + ขอบนอกดำ (3D Rim Layer)
     local btnRim = Instance.new("Frame")
     btnRim.Name = "Button3DRim"
     btnRim.Size = UDim2.new(1, 0, 0, 41)
@@ -716,7 +751,6 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     outerBlack.Thickness = 3
     outerBlack.Color = Color3.fromRGB(22, 5, 36)
 
-    -- 3. ตัวปุ่มด้านใน (Inner Button Core)
     local onColor = Color3.fromRGB(182, 130, 248)
     local offColor = Color3.fromRGB(154, 102, 224)
 
@@ -769,12 +803,11 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     gloss.Parent = btn
     Instance.new("UICorner", gloss).CornerRadius = UDim.new(0, 9)
 
-    -- ข้อความฟังก์ชัน (ON: สีทองเรืองแสงซ้ายไปขวา / OFF: สีเทา)
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, -66, 1, 0)
     label.Position = UDim2.fromOffset(12, 0)
     label.BackgroundTransparency = 1
-    label.TextColor3 = state and Color3.fromRGB(255, 235, 110) or Color3.fromRGB(175, 175, 185)
+    label.TextColor3 = state and Color3.fromRGB(115, 255, 135) or Color3.fromRGB(175, 175, 185)
     label.TextSize = 14
     label.Font = Enum.Font.FredokaOne
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -785,26 +818,26 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     ts.Thickness = 3.2
     ts.Color = Color3.fromRGB(24, 5, 38)
 
-    -- Gradient สีทองเรืองแสงวิ่งวนลูป
-    local goldGrad = Instance.new("UIGradient")
-    goldGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(255, 215, 60)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 255, 210)),
-        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(255, 215, 60))
+    -- Gradient สีเขียวนีออนเรืองแสงวิ่งวนลูปจากซ้ายไปขวา
+    local neonGrad = Instance.new("UIGradient")
+    neonGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(115, 255, 135)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(235, 255, 235)),
+        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(115, 255, 135))
     })
-    goldGrad.Offset = Vector2.new(-1, 0)
-    goldGrad.Enabled = state
-    goldGrad.Parent = label
+    neonGrad.Offset = Vector2.new(-1, 0)
+    neonGrad.Enabled = state
+    neonGrad.Parent = label
 
     task.spawn(function()
         while label and label.Parent do
             if state and Library.Settings.Animations then
-                goldGrad.Offset = Vector2.new(-1, 0)
-                local twGold = TweenService:Create(goldGrad, TweenInfo.new(2.4, Enum.EasingStyle.Linear), {
+                neonGrad.Offset = Vector2.new(-1, 0)
+                local twNeon = TweenService:Create(neonGrad, TweenInfo.new(2.4, Enum.EasingStyle.Linear), {
                     Offset = Vector2.new(1, 0)
                 })
-                twGold:Play()
-                twGold.Completed:Wait()
+                twNeon:Play()
+                twNeon.Completed:Wait()
             else
                 task.wait(0.4)
             end
@@ -823,10 +856,11 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     stStroke.Thickness = 2.2
     stStroke.Color = Color3.fromRGB(22, 5, 36)
 
+    -- ตัววงกลม Thumb: ตอน ON เป็นสีเขียวมะนาวสด
     local thumb = Instance.new("Frame")
     thumb.Size = UDim2.fromOffset(18, 18)
     thumb.Position = state and UDim2.fromOffset(22, 2) or UDim2.fromOffset(2, 2)
-    thumb.BackgroundColor3 = state and Color3.fromRGB(255, 220, 80) or Color3.fromRGB(175, 175, 185)
+    thumb.BackgroundColor3 = state and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(175, 175, 185)
     thumb.BorderSizePixel = 0
     thumb.ZIndex = 10
     thumb.Parent = switchTrack
@@ -836,9 +870,9 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
 
     local function setVisual(val: boolean)
         state = val
-        goldGrad.Enabled = state
-        local labelColor = state and Color3.fromRGB(255, 235, 110) or Color3.fromRGB(175, 175, 185)
-        local thumbColor = state and Color3.fromRGB(255, 220, 80) or Color3.fromRGB(175, 175, 185)
+        neonGrad.Enabled = state
+        local labelColor = state and Color3.fromRGB(115, 255, 135) or Color3.fromRGB(175, 175, 185)
+        local thumbColor = state and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(175, 175, 185)
 
         TweenService:Create(label, toggleSlide, { TextColor3 = labelColor }):Play()
         TweenService:Create(thumb, toggleSlide, {
@@ -856,9 +890,6 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     return setVisual
 end
 
--- ========================================================
--- DROPDOWN (3D พร้อมเงาหนา)
--- ========================================================
 function Library:CreateDropdown(side: string, title: string, yPos: number, options: {any}, default: any, zIndexOffset: number, callback: (any) -> ())
     local parent = self:GetColumn(side)
     local selected = default
@@ -999,9 +1030,6 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
     end)
 end
 
--- ========================================================
--- 3D RENDERING TOGGLE BUTTON (3D พร้อมเงาหนา)
--- ========================================================
 function Library:Create3DRenderToggle(side: string)
     local parent = self:GetColumn(side or "Right")
     local enabled = true
