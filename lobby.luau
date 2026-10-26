@@ -347,12 +347,12 @@ local function triggerButton(btn: GuiButton)
 end
 
 local function findTrainFrame()
-    local area = playerGui:FindFirstChild("HubWindows")
-    if area then
-        local challengesArea = area:FindFirstChild("Area_challenges", true)
-        if challengesArea and challengesArea:IsA("GuiObject") and challengesArea.Visible then
-            return challengesArea, area
-        end
+    local hw = playerGui:FindFirstChild("HubWindows")
+    if hw then
+        -- หา Area_challenges หรือ Window ที่กำลังแสดงบนหน้าจอ
+        local ch = hw:FindFirstChild("Area_challenges", true)
+        if ch then return ch, hw end
+        return hw, hw
     end
 
     local searchContainers = { playerGui, CoreGui }
@@ -395,24 +395,26 @@ local function findAndPlayFirstWinCar()
         return false
     end
 
-    print("[AutoChallenge] ตรวจพบหน้าต่างหลักใน:", trainFrame:GetFullName())
+    -- สแกนจาก container สูงขึ้นมาหนึ่งชั้นเพื่อให้ครอบคลุม
+    local scanRoot = trainFrame:FindFirstAncestor("HubWindows") or trainFrame.Parent or trainFrame
+    print("[AutoChallenge] ขอบเขตการสแกน:", scanRoot:GetFullName())
 
     -- 3. สแกนหาตู้รถไฟที่มีป้าย FIRST WIN
     local targetPlayButton = nil
     local playButtons = {}
     local firstWinBadges = {}
 
-    -- สแกนองค์ประกอบทั้งหมดในหน้าต่าง Area_challenges
-    for _, desc in ipairs(trainFrame:GetDescendants()) do
+    -- สแกนทุก Descendant ภายใน scanRoot
+    for _, desc in ipairs(scanRoot:GetDescendants()) do
         if desc:IsA("TextLabel") then
             local txt = desc.Text:upper():gsub("%s+", " ")
             if txt:find("FIRST") and txt:find("WIN") then
                 table.insert(firstWinBadges, desc)
-                print("[AutoChallenge] >> เจอป้าย FIRST WIN:", desc:GetFullName())
+                print("[AutoChallenge] >> เจอป้าย FIRST WIN:", desc:GetFullName(), "ข้อความ:", desc.Text)
             end
         elseif desc:IsA("ImageLabel") or desc:IsA("Frame") then
             local n = desc.Name:upper()
-            if n:find("FIRST") or n:find("FIRSTWIN") then
+            if n:find("FIRST") and n:find("WIN") then
                 table.insert(firstWinBadges, desc)
                 print("[AutoChallenge] >> เจอป้าย First Win (จากชื่อ Object):", desc:GetFullName())
             end
@@ -425,11 +427,17 @@ local function findAndPlayFirstWinCar()
                     bText = bText .. " " .. t.Text:upper()
                 end
             end
-            if bText:find("PLAY") then
+            local bName = desc.Name:upper()
+            if bText:find("PLAY") or bName:find("PLAY") then
                 table.insert(playButtons, { Button = desc, PosX = desc.AbsolutePosition.X })
                 print("[AutoChallenge] >> เจอปุ่ม PLAY:", desc:GetFullName(), "ตำแหน่ง X:", desc.AbsolutePosition.X)
             end
         end
+    end
+
+    -- หากยังไม่พบปุ่ม PLAY หรือ FIRST WIN เลย ให้ Print ตัวอย่าง 10 รายการใน scanRoot ออกมาวิเคราะห์
+    if #playButtons == 0 or #firstWinBadges == 0 then
+        print(string.format("[AutoChallenge-Debug] สแกนเสร็จ: เจอปุ่ม PLAY %d ปุ่ม, เจอป้าย FIRST WIN %d ป้าย", #playButtons, #firstWinBadges))
     end
 
     -- เรียงลำดับปุ่ม PLAY ตามตำแหน่งแนวนอน (ซ้ายไปขวา: Car 1 -> Car 2 -> Car 3)
