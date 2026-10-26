@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (GHOST DRAG & NEON LIME)
+-- BEHIND THE DARK : CORE UI LIBRARY (FULL ENHANCED THEME)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -7,6 +7,7 @@ local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
+local SoundService = game:GetService("SoundService")
 
 local Library = {}
 Library.__index = Library
@@ -17,8 +18,27 @@ Library.Settings = {
     Animations = true,
     MovingPattern = true,
     ClickRipple = true,
-    AnimeGlint = true
+    AnimeGlint = true,
+    SoundEffects = true,
+    WindowPos = nil
 }
+
+-- เสียงการ์ตูนเอฟเฟกต์
+local SOUND_CLICK = "rbxassetid://6895079853"
+local SOUND_TOGGLE = "rbxassetid://9069609268"
+
+function Library.PlaySound(soundId: string)
+    if not Library.Settings.SoundEffects then return end
+    task.spawn(function()
+        local s = Instance.new("Sound")
+        s.SoundId = soundId
+        s.Volume = 0.55
+        s.Parent = SoundService
+        s:Play()
+        s.Ended:Wait()
+        s:Destroy()
+    end)
+end
 
 local function loadSavedSettings()
     local rf = (type(readfile) == "function" and readfile) or nil
@@ -197,6 +217,7 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
 
     btn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            Library.PlaySound(SOUND_CLICK)
             spawnClickRipple(btn, input.Position)
             if Library.Settings.Animations then
                 TweenService:Create(uiScale, pressSquish, { Scale = 0.94 }):Play()
@@ -214,7 +235,6 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
     end)
 end
 
--- ระบบแกว่งสลับฝั่งทีละครั้ง (แก้บั๊กตัวอักษรหดเล็กลงถาวร)
 local wiggleData = {}
 function Library.StepWiggle(label: TextLabel)
     if not Library.Settings.Animations then return end
@@ -297,12 +317,22 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     blackout.Parent = blackoutGui
     self.BlackoutFrame = blackout
 
-    -- 1. กรอบหน้าต่างหลัก (AnchorPoint ตรงกลาง)
+    -- ตำแหน่งเริ่มต้น (ดึงจากตำแหน่งที่บันทึกไว้ใน JSON หรือกึ่งกลางจอ)
+    local defaultPos = UDim2.fromScale(0.5, 0.5)
+    if Library.Settings.WindowPos and type(Library.Settings.WindowPos) == "table" then
+        defaultPos = UDim2.new(
+            Library.Settings.WindowPos.XScale or 0.5,
+            Library.Settings.WindowPos.XOffset or 0,
+            Library.Settings.WindowPos.YScale or 0.5,
+            Library.Settings.WindowPos.YOffset or 0
+        )
+    end
+
     local outerBorder = Instance.new("Frame")
     outerBorder.Name = "MainOuterBorder"
     outerBorder.AnchorPoint = Vector2.new(0.5, 0.5)
     outerBorder.Size = UDim2.fromOffset(width, height)
-    outerBorder.Position = UDim2.fromScale(0.5, 0.5)
+    outerBorder.Position = defaultPos
     outerBorder.BackgroundColor3 = Color3.fromRGB(185, 140, 245)
     outerBorder.BorderSizePixel = 0
     outerBorder.Active = true
@@ -342,7 +372,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     applyCartoonSurface(card, 2, 23, true)
     self.MainCard = outerBorder
 
-    -- 2. โครงเงาโปร่งแสงเวลาลากเมาส์ (Ghost Drag Outline + Looping Purple Gradient)
     local dragGhost = Instance.new("Frame")
     dragGhost.Name = "GhostDragFrame"
     dragGhost.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -384,7 +413,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         end
     end)
 
-    -- อนิเมชันเปิด/ปิดหน้าต่างตรงกลาง (Pop & Squish Center)
     local isToggling = false
     local function setWindowVisibilityAnimated(show: boolean)
         if isToggling then return end
@@ -392,6 +420,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
 
         if show then
             outerBorder.Visible = true
+            Library.PlaySound(SOUND_TOGGLE)
             if Library.Settings.Animations then
                 windowScale.Scale = 0.05
                 local twOpen = TweenService:Create(windowScale, windowPopOpen, { Scale = 1 })
@@ -401,6 +430,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
                 windowScale.Scale = 1
             end
         else
+            Library.PlaySound(SOUND_TOGGLE)
             if Library.Settings.Animations then
                 local twClose = TweenService:Create(windowScale, windowSquishClose, { Scale = 0.05 })
                 twClose:Play()
@@ -412,7 +442,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         isToggling = false
     end
 
-    -- ระบบ Ghost Drag: ตรวจจับทั่วทั้งหน้าจอผ่าน UserInputService
     local isDragging = false
     local dragStartMouse = Vector3.new()
     local dragStartPos = UDim2.new()
@@ -438,9 +467,19 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         if isDragging and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
             isDragging = false
             dragGhost.Visible = false
+            local finalPos = dragGhost.Position
             TweenService:Create(outerBorder, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-                Position = dragGhost.Position
+                Position = finalPos
             }):Play()
+
+            -- จดจำตำแหน่งล่าสุดลงไฟล์ JSON
+            Library.Settings.WindowPos = {
+                XScale = finalPos.X.Scale,
+                XOffset = finalPos.X.Offset,
+                YScale = finalPos.Y.Scale,
+                YOffset = finalPos.Y.Offset
+            }
+            saveCurrentSettings()
         end
     end)
 
@@ -609,8 +648,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
 
     local settingsModal = Instance.new("Frame")
     settingsModal.Name = "SettingsModal"
-    settingsModal.Size = UDim2.fromOffset(270, 248)
-    settingsModal.Position = UDim2.new(0.5, -135, 0.5, -124)
+    settingsModal.Size = UDim2.fromOffset(270, 290)
+    settingsModal.Position = UDim2.new(0.5, -135, 0.5, -145)
     settingsModal.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
     settingsModal.BorderSizePixel = 0
     settingsModal.ZIndex = 70
@@ -625,7 +664,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smTitle.Size = UDim2.new(1, -20, 0, 32)
     smTitle.Position = UDim2.fromOffset(10, 8)
     smTitle.BackgroundTransparency = 1
-    smTitle.Text = "VISUAL SETTINGS"
+    smTitle.Text = "VISUAL & SOUND"
     smTitle.TextColor3 = Color3.fromRGB(255, 225, 95)
     smTitle.TextSize = 15
     smTitle.Font = Enum.Font.FredokaOne
@@ -689,6 +728,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         switchTrack.Activated:Connect(function()
             Library.Settings[settingKey] = not Library.Settings[settingKey]
             local active = Library.Settings[settingKey]
+            Library.PlaySound(SOUND_TOGGLE)
             saveCurrentSettings()
 
             TweenService:Create(switchTrack, toggleSlide, {
@@ -707,9 +747,11 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     createSettingRow("Looping Pattern", 88, "MovingPattern")
     createSettingRow("Click Ripple", 131, "ClickRipple")
     createSettingRow("Anime Glint", 174, "AnimeGlint")
+    createSettingRow("Sound Effects", 217, "SoundEffects")
 
     settingsBtn.Activated:Connect(function()
         settingsModal.Visible = not settingsModal.Visible
+        Library.PlaySound(SOUND_CLICK)
     end)
 
     UserInputService.InputBegan:Connect(function(input, gpe)
@@ -810,7 +852,6 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     gloss.Parent = btn
     Instance.new("UICorner", gloss).CornerRadius = UDim.new(0, 9)
 
-    -- ข้อความฟังก์ชัน: ON สีมะนาวสดใส / OFF สีเทา
     local LIME_COLOR = Color3.fromRGB(180, 255, 75)
     local OFF_COLOR = Color3.fromRGB(175, 175, 185)
 
@@ -829,7 +870,6 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     ts.Thickness = 3.2
     ts.Color = Color3.fromRGB(24, 5, 38)
 
-    -- Gradient สีมะนาวสดเรืองแสงวิ่งวนลูปจากซ้ายไปขวา
     local limeGrad = Instance.new("UIGradient")
     limeGrad.Color = ColorSequence.new({
         ColorSequenceKeypoint.new(0.0, Color3.fromRGB(175, 255, 65)),
@@ -867,7 +907,6 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
     stStroke.Thickness = 2.2
     stStroke.Color = Color3.fromRGB(22, 5, 36)
 
-    -- ตัววงกลม Thumb: ตอน ON เป็นสีเขียวมะนาวสด
     local thumb = Instance.new("Frame")
     thumb.Size = UDim2.fromOffset(18, 18)
     thumb.Position = state and UDim2.fromOffset(22, 2) or UDim2.fromOffset(2, 2)
@@ -894,6 +933,7 @@ function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: 
 
     btn.Activated:Connect(function()
         state = not state
+        Library.PlaySound(SOUND_TOGGLE)
         setVisual(state)
         callback(state)
     end)
@@ -1028,6 +1068,7 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
 
             optBtn.Activated:Connect(function()
                 selected = opt
+                Library.PlaySound(SOUND_CLICK)
                 selectLabel.Text = string.format("%s: %s", title, tostring(selected))
                 scroll.Visible = false
                 callback(selected)
@@ -1037,6 +1078,7 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
 
     selectBtn.Activated:Connect(function()
         scroll.Visible = not scroll.Visible
+        Library.PlaySound(SOUND_CLICK)
         if scroll.Visible then populate() end
     end)
 end
@@ -1099,6 +1141,7 @@ function Library:Create3DRenderToggle(side: string)
 
     btn.Activated:Connect(function()
         enabled = not enabled
+        Library.PlaySound(SOUND_TOGGLE)
         local cam = workspace.CurrentCamera
 
         if not enabled then
