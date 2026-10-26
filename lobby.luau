@@ -212,7 +212,8 @@ local function createShopActionButton(parentTarget: Instance, text: string, yPos
     rim.ZIndex = 6
     rim.Parent = shadow
     Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 14)
-    local rs = Instance.new("UIStroke", rim)
+    local rs = Instance.new("UIStroke")
+    rs.Parent = rim
     rs.Thickness = 2.5
     rs.Color = Color3.fromRGB(22, 5, 36)
 
@@ -229,7 +230,8 @@ local function createShopActionButton(parentTarget: Instance, text: string, yPos
     btn.ZIndex = 7
     btn.Parent = rim
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 11)
-    local bts = Instance.new("UIStroke", btn)
+    local bts = Instance.new("UIStroke")
+    bts.Parent = btn
     bts.Thickness = 2.5
     bts.Color = Color3.fromRGB(22, 5, 36)
 

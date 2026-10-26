@@ -273,7 +273,7 @@ function Library.StepWiggle(label: TextLabel)
     end)
 end
 
-function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?, OnUnload: (() -> ())?})
+function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?, OnUnload: (() -> ())?})
     local self = setmetatable({}, Library)
     local width = config.Size and config.Size.X.Offset or 660
     local height = config.Size and config.Size.Y.Offset or 440
@@ -346,7 +346,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     outerBorder.Parent = screenGui
     Instance.new("UICorner", outerBorder).CornerRadius = UDim.new(0, 26)
 
-    local mainBlackStroke = Instance.new("UIStroke", outerBorder)
+    local mainBlackStroke = Instance.new("UIStroke")
+    mainBlackStroke.Parent = outerBorder
     mainBlackStroke.Thickness = 4.5
     mainBlackStroke.Color = Color3.fromRGB(24, 6, 38)
 
@@ -381,7 +382,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     self.CardInner = card
 
     local isToggling = false
-    function self:ToggleVisibility()
+    function self.ToggleVisibility(_)
         if isToggling then return end
         isToggling = true
         Library.PlaySound(SOUND_TOGGLE)
@@ -456,7 +457,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     titleRim.ZIndex = 4
     titleRim.Parent = card
     Instance.new("UICorner", titleRim).CornerRadius = UDim.new(0, 15)
-    local tpStroke = Instance.new("UIStroke", titleRim)
+    local tpStroke = Instance.new("UIStroke")
+    tpStroke.Parent = titleRim
     tpStroke.Thickness = 3
     tpStroke.Color = Color3.fromRGB(22, 5, 36)
 
@@ -492,7 +494,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     })
     rainbowGrad.Parent = titleLabel
 
-    local titleStroke = Instance.new("UIStroke", titleLabel)
+    local titleStroke = Instance.new("UIStroke")
+    titleStroke.Parent = titleLabel
     titleStroke.Thickness = 3.5
     titleStroke.Color = Color3.fromRGB(22, 5, 36)
 
@@ -520,7 +523,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     perfBadge.ZIndex = 6
     perfBadge.Parent = titlePlate
     Instance.new("UICorner", perfBadge).CornerRadius = UDim.new(0, 8)
-    local pbStroke = Instance.new("UIStroke", perfBadge)
+    local pbStroke = Instance.new("UIStroke")
+    pbStroke.Parent = perfBadge
     pbStroke.Thickness = 2
     pbStroke.Color = Color3.fromRGB(22, 5, 36)
 
@@ -568,7 +572,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     closeBtnRim.ZIndex = 6
     closeBtnRim.Parent = titlePlate
     Instance.new("UICorner", closeBtnRim).CornerRadius = UDim.new(0, 10)
-    local cbStroke = Instance.new("UIStroke", closeBtnRim)
+    local cbStroke = Instance.new("UIStroke")
+    cbStroke.Parent = closeBtnRim
     cbStroke.Thickness = 2.5
     cbStroke.Color = Color3.fromRGB(22, 5, 36)
 
@@ -603,7 +608,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     setBtnRim.ZIndex = 6
     setBtnRim.Parent = titlePlate
     Instance.new("UICorner", setBtnRim).CornerRadius = UDim.new(0, 10)
-    local sbStroke = Instance.new("UIStroke", setBtnRim)
+    local sbStroke = Instance.new("UIStroke")
+    sbStroke.Parent = setBtnRim
     sbStroke.Thickness = 2.5
     sbStroke.Color = Color3.fromRGB(22, 5, 36)
 
@@ -628,7 +634,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     btn3DRim.ZIndex = 6
     btn3DRim.Parent = titlePlate
     Instance.new("UICorner", btn3DRim).CornerRadius = UDim.new(0, 10)
-    local b3ds = Instance.new("UIStroke", btn3DRim)
+    local b3ds = Instance.new("UIStroke")
+    b3ds.Parent = btn3DRim
     b3ds.Thickness = 2.5
     b3ds.Color = Color3.fromRGB(22, 5, 36)
 
@@ -645,7 +652,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     btn3D.ZIndex = 7
     btn3D.Parent = btn3DRim
     Instance.new("UICorner", btn3D).CornerRadius = UDim.new(0, 8)
-    local b3dts = Instance.new("UIStroke", btn3D)
+    local b3dts = Instance.new("UIStroke")
+    b3dts.Parent = btn3D
     b3dts.Thickness = 2
     b3dts.Color = Color3.fromRGB(22, 5, 36)
     Library.AttachInteractiveEffects(btn3D, btn3DRim)
@@ -723,7 +731,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         trayRim.Parent = mainView
         Instance.new("UICorner", trayRim).CornerRadius = UDim.new(0, 20)
         
-        local trayOuterBlack = Instance.new("UIStroke", trayRim)
+        local trayOuterBlack = Instance.new("UIStroke")
+        trayOuterBlack.Parent = trayRim
         trayOuterBlack.Thickness = 3.5
         trayOuterBlack.Color = Color3.fromRGB(22, 5, 36)
 
@@ -750,7 +759,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     self.LeftColumn = createColumnTray(UDim2.fromOffset(14, 0), UDim2.new(0.5, -20, 1, -12))
     self.RightColumn = createColumnTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 1, -12))
 
-    function self:CreateSubTray(pos: UDim2, size: UDim2)
+    function self.CreateSubTray(_, pos: UDim2, size: UDim2)
         return createColumnTray(pos, size)
     end
 
@@ -781,7 +790,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smOuter.Parent = card
     Instance.new("UICorner", smOuter).CornerRadius = UDim.new(0, 22)
     
-    local smOuterStroke = Instance.new("UIStroke", smOuter)
+    local smOuterStroke = Instance.new("UIStroke")
+    smOuterStroke.Parent = smOuter
     smOuterStroke.Thickness = 4
     smOuterStroke.Color = Color3.fromRGB(24, 6, 38)
 
@@ -804,7 +814,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smTitleRim.ZIndex = 72
     smTitleRim.Parent = smInner
     Instance.new("UICorner", smTitleRim).CornerRadius = UDim.new(0, 12)
-    local smtrStroke = Instance.new("UIStroke", smTitleRim)
+    local smtrStroke = Instance.new("UIStroke")
+    smtrStroke.Parent = smTitleRim
     smtrStroke.Thickness = 2.5
     smtrStroke.Color = Color3.fromRGB(22, 5, 36)
 
@@ -828,7 +839,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smTitle.TextXAlignment = Enum.TextXAlignment.Left
     smTitle.ZIndex = 74
     smTitle.Parent = smTitlePlate
-    local smts = Instance.new("UIStroke", smTitle)
+    local smts = Instance.new("UIStroke")
+    smts.Parent = smTitle
     smts.Thickness = 2.8
     smts.Color = Color3.fromRGB(22, 5, 36)
 
@@ -842,7 +854,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smCloseBtn.ZIndex = 75
     smCloseBtn.Parent = smTitlePlate
     Instance.new("UICorner", smCloseBtn).CornerRadius = UDim.new(0, 6)
-    local smcbs = Instance.new("UIStroke", smCloseBtn)
+    local smcbs = Instance.new("UIStroke")
+    smcbs.Parent = smCloseBtn
     smcbs.Thickness = 2
     smcbs.Color = Color3.fromRGB(22, 5, 36)
     Library.AttachInteractiveEffects(smCloseBtn)
@@ -857,7 +870,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     settingsScroll.Parent = smInner
     Library.ApplyCartoonScrollbar(settingsScroll)
 
-    local sLayout = Instance.new("UIListLayout", settingsScroll)
+    local sLayout = Instance.new("UIListLayout")
+    sLayout.Parent = settingsScroll
     sLayout.Padding = UDim.new(0, 6)
 
     local function createSettingRow(text: string, settingKey: string, onToggle: ((boolean) -> ())?)
@@ -877,7 +891,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         rowRim.ZIndex = 74
         rowRim.Parent = rowShadow
         Instance.new("UICorner", rowRim).CornerRadius = UDim.new(0, 12)
-        local rs = Instance.new("UIStroke", rowRim)
+        local rs = Instance.new("UIStroke")
+        rs.Parent = rowRim
         rs.Thickness = 2.2
         rs.Color = Color3.fromRGB(22, 5, 36)
 
@@ -901,7 +916,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.ZIndex = 76
         lbl.Parent = row
-        local ls = Instance.new("UIStroke", lbl)
+        local ls = Instance.new("UIStroke")
+        ls.Parent = lbl
         ls.Thickness = 2.2
         ls.Color = Color3.fromRGB(22, 5, 36)
 
@@ -915,7 +931,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         switchTrack.ZIndex = 76
         switchTrack.Parent = row
         Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
-        local sts = Instance.new("UIStroke", switchTrack)
+        local sts = Instance.new("UIStroke")
+        sts.Parent = switchTrack
         sts.Thickness = 2
         sts.Color = Color3.fromRGB(22, 5, 36)
 
@@ -982,7 +999,8 @@ function Library:CreatePage(name: string)
     pageView.Parent = self.CardInner
     Instance.new("UICorner", pageView).CornerRadius = UDim.new(0, 18)
 
-    local stroke = Instance.new("UIStroke", pageView)
+    local stroke = Instance.new("UIStroke")
+    stroke.Parent = pageView
     stroke.Thickness = 3.5
     stroke.Color = Color3.fromRGB(22, 5, 36)
 
@@ -1041,7 +1059,8 @@ function Library:CreateToggle(target: any, text: string, yPos: number, _: {On: C
     btnRim.Parent = btnShadow
     Instance.new("UICorner", btnRim).CornerRadius = UDim.new(0, 14)
 
-    local outerBlack = Instance.new("UIStroke", btnRim)
+    local outerBlack = Instance.new("UIStroke")
+    outerBlack.Parent = btnRim
     outerBlack.Thickness = 3
     outerBlack.Color = Color3.fromRGB(22, 5, 36)
 
@@ -1111,7 +1130,8 @@ function Library:CreateToggle(target: any, text: string, yPos: number, _: {On: C
     label.ZIndex = 9
     label.Text = text
     label.Parent = btn
-    local ts = Instance.new("UIStroke", label)
+    local ts = Instance.new("UIStroke")
+    ts.Parent = label
     ts.Thickness = 3.2
     ts.Color = Color3.fromRGB(24, 5, 38)
 
@@ -1148,7 +1168,8 @@ function Library:CreateToggle(target: any, text: string, yPos: number, _: {On: C
     switchTrack.ZIndex = 9
     switchTrack.Parent = btn
     Instance.new("UICorner", switchTrack).CornerRadius = UDim.new(1, 0)
-    local stStroke = Instance.new("UIStroke", switchTrack)
+    local stStroke = Instance.new("UIStroke")
+    stStroke.Parent = switchTrack
     stStroke.Thickness = 2.2
     stStroke.Color = Color3.fromRGB(22, 5, 36)
 
@@ -1211,7 +1232,8 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     dropRim.ZIndex = zBase + 1
     dropRim.Parent = dropShadow
     Instance.new("UICorner", dropRim).CornerRadius = UDim.new(0, 14)
-    local cs = Instance.new("UIStroke", dropRim)
+    local cs = Instance.new("UIStroke")
+    cs.Parent = dropRim
     cs.Thickness = 3
     cs.Color = Color3.fromRGB(22, 5, 36)
 
@@ -1240,7 +1262,8 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     selectLabel.TextXAlignment = Enum.TextXAlignment.Left
     selectLabel.ZIndex = zBase + 3
     selectLabel.Parent = selectBtn
-    local sls = Instance.new("UIStroke", selectLabel)
+    local sls = Instance.new("UIStroke")
+    sls.Parent = selectLabel
     sls.Thickness = 3
     sls.Color = Color3.fromRGB(22, 5, 36)
 
@@ -1256,12 +1279,14 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     scroll.ZIndex = zBase + 20
     scroll.Parent = dropRim
     Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 12)
-    local ss = Instance.new("UIStroke", scroll)
+    local ss = Instance.new("UIStroke")
+    ss.Parent = scroll
     ss.Thickness = 3
     ss.Color = Color3.fromRGB(22, 5, 36)
     Library.ApplyCartoonScrollbar(scroll)
 
-    local list = Instance.new("UIListLayout", scroll)
+    local list = Instance.new("UIListLayout")
+    list.Parent = scroll
     list.Padding = UDim.new(0, 4)
 
     local function populate()
@@ -1290,7 +1315,8 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
             optLbl.TextXAlignment = Enum.TextXAlignment.Left
             optLbl.ZIndex = zBase + 22
             optLbl.Parent = optBtn
-            local ols = Instance.new("UIStroke", optLbl)
+            local ols = Instance.new("UIStroke")
+            ols.Parent = optLbl
             ols.Thickness = 2.5
             ols.Color = Color3.fromRGB(22, 5, 36)
 

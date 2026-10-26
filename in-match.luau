@@ -279,7 +279,7 @@ local function saveConfigState()
 end
 
 local currentPlaceId = tostring(game.PlaceId)
-while (not currentPlaceId or currentPlaceId == "0") do
+while not currentPlaceId or currentPlaceId == "0" do
     task.wait(0.2)
     currentPlaceId = tostring(game.PlaceId)
 end
@@ -498,7 +498,7 @@ visualUpdaters["AGAIN"] = Window:CreateToggle("Left", "Auto Again", 46, { On = C
 visualUpdaters["HOME"] = Window:CreateToggle("Left", "Auto Home", 92, { On = Color3.fromRGB(60, 180, 245), Off = Color3.fromRGB(120, 120, 130) }, states.EndChoice == "HOME", function() setEndChoice("HOME") end)
 updateEndChoiceVisuals()
 
-local againLimitUpdater = Window:CreateToggle("Left", "Again Count Limit", 144, { On = Color3.fromRGB(255, 140, 40), Off = Color3.fromRGB(120, 120, 130) }, states.AgainBeforeHomeActive, function(v)
+Window:CreateToggle("Left", "Again Count Limit", 144, { On = Color3.fromRGB(255, 140, 40), Off = Color3.fromRGB(120, 120, 130) }, states.AgainBeforeHomeActive, function(v)
     states.AgainBeforeHomeActive = v
     saveConfigState()
 end)
@@ -521,7 +521,8 @@ configBox.BorderSizePixel = 0
 configBox.ZIndex = 5
 configBox.Parent = configBoxShadow
 Instance.new("UICorner", configBox).CornerRadius = UDim.new(0, 14)
-local cbs = Instance.new("UIStroke", configBox)
+local cbs = Instance.new("UIStroke")
+cbs.Parent = configBox
 cbs.Thickness = 2.5
 cbs.Color = Color3.fromRGB(22, 5, 36)
 
@@ -536,7 +537,8 @@ cfgLabel.Font = Enum.Font.FredokaOne
 cfgLabel.TextXAlignment = Enum.TextXAlignment.Left
 cfgLabel.ZIndex = 6
 cfgLabel.Parent = configBox
-local cgls = Instance.new("UIStroke", cfgLabel)
+local cgls = Instance.new("UIStroke")
+cgls.Parent = cfgLabel
 cgls.Thickness = 2.5
 cgls.Color = Color3.fromRGB(22, 5, 36)
 
@@ -548,7 +550,8 @@ roundCountBadge.BorderSizePixel = 0
 roundCountBadge.ZIndex = 6
 roundCountBadge.Parent = configBox
 Instance.new("UICorner", roundCountBadge).CornerRadius = UDim.new(0, 8)
-local rcbs = Instance.new("UIStroke", roundCountBadge)
+local rcbs = Instance.new("UIStroke")
+rcbs.Parent = roundCountBadge
 rcbs.Thickness = 2
 rcbs.Color = Color3.fromRGB(22, 5, 36)
 
@@ -579,7 +582,8 @@ roundStatusBox.BorderSizePixel = 0
 roundStatusBox.ZIndex = 5
 roundStatusBox.Parent = roundStatusShadow
 Instance.new("UICorner", roundStatusBox).CornerRadius = UDim.new(0, 16)
-local rsbs = Instance.new("UIStroke", roundStatusBox)
+local rsbs = Instance.new("UIStroke")
+rsbs.Parent = roundStatusBox
 rsbs.Thickness = 3
 rsbs.Color = Color3.fromRGB(22, 5, 36)
 
@@ -592,7 +596,8 @@ roundStatus.TextSize = 17
 roundStatus.Font = Enum.Font.FredokaOne
 roundStatus.ZIndex = 6
 roundStatus.Parent = roundStatusBox
-local rsts = Instance.new("UIStroke", roundStatus)
+local rsts = Instance.new("UIStroke")
+rsts.Parent = roundStatus
 rsts.Thickness = 3
 rsts.Color = Color3.fromRGB(22, 5, 36)
 
@@ -614,7 +619,8 @@ local function create3DActionButton(xPos: number, rimColor: Color3, btnColor: Co
     rim.ZIndex = 7
     rim.Parent = shadow
     Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 8)
-    local rs = Instance.new("UIStroke", rim)
+    local rs = Instance.new("UIStroke")
+    rs.Parent = rim
     rs.Thickness = 2
     rs.Color = Color3.fromRGB(22, 5, 36)
 
@@ -629,7 +635,8 @@ local function create3DActionButton(xPos: number, rimColor: Color3, btnColor: Co
     btn.Parent = rim
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 
-    local bts = Instance.new("UIStroke", btn)
+    local bts = Instance.new("UIStroke")
+    bts.Parent = btn
     bts.Thickness = 2
     bts.Color = Color3.fromRGB(22, 5, 36)
 
@@ -717,7 +724,8 @@ local function createBottomActionButton(text: string, yPos: number, rimColor: Co
     rim.ZIndex = 9
     rim.Parent = shadow
     Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 14)
-    local rs = Instance.new("UIStroke", rim)
+    local rs = Instance.new("UIStroke")
+    rs.Parent = rim
     rs.Thickness = 2.5
     rs.Color = Color3.fromRGB(22, 5, 36)
 
@@ -734,7 +742,8 @@ local function createBottomActionButton(text: string, yPos: number, rimColor: Co
     btn.ZIndex = 10
     btn.Parent = rim
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 11)
-    local bts = Instance.new("UIStroke", btn)
+    local bts = Instance.new("UIStroke")
+    bts.Parent = btn
     bts.Thickness = 2.5
     bts.Color = Color3.fromRGB(22, 5, 36)
 
@@ -776,7 +785,8 @@ backBtn.AutoButtonColor = false
 backBtn.ZIndex = 7
 backBtn.Parent = backBtnShadow
 Instance.new("UICorner", backBtn).CornerRadius = UDim.new(0, 9)
-local bbs = Instance.new("UIStroke", backBtn)
+local bbs = Instance.new("UIStroke")
+bbs.Parent = backBtn
 bbs.Thickness = 2
 bbs.Color = Color3.fromRGB(22, 5, 36)
 Library.AttachInteractiveEffects(backBtn, backBtnShadow)
@@ -793,7 +803,8 @@ mapInfoBadge.BorderSizePixel = 0
 mapInfoBadge.ZIndex = 6
 mapInfoBadge.Parent = recHeader
 Instance.new("UICorner", mapInfoBadge).CornerRadius = UDim.new(0, 10)
-local mibs = Instance.new("UIStroke", mapInfoBadge)
+local mibs = Instance.new("UIStroke")
+mibs.Parent = mapInfoBadge
 mibs.Thickness = 2
 mibs.Color = Color3.fromRGB(22, 5, 36)
 
@@ -831,7 +842,8 @@ stageInput.ClearTextOnFocus = false
 stageInput.ZIndex = 7
 stageInput.Parent = inputShadow
 Instance.new("UICorner", stageInput).CornerRadius = UDim.new(0, 9)
-local sis = Instance.new("UIStroke", stageInput)
+local sis = Instance.new("UIStroke")
+sis.Parent = stageInput
 sis.Thickness = 2
 sis.Color = Color3.fromRGB(22, 5, 36)
 
@@ -857,7 +869,8 @@ recToggleBtn.AutoButtonColor = false
 recToggleBtn.ZIndex = 7
 recToggleBtn.Parent = recToggleShadow
 Instance.new("UICorner", recToggleBtn).CornerRadius = UDim.new(0, 9)
-local rts2 = Instance.new("UIStroke", recToggleBtn)
+local rts2 = Instance.new("UIStroke")
+rts2.Parent = recToggleBtn
 rts2.Thickness = 2
 rts2.Color = Color3.fromRGB(22, 5, 36)
 Library.AttachInteractiveEffects(recToggleBtn, recToggleShadow)
@@ -880,14 +893,17 @@ unitScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 unitScroll.ZIndex = 7
 unitScroll.Parent = listShadow
 Instance.new("UICorner", unitScroll).CornerRadius = UDim.new(0, 11)
-local uss = Instance.new("UIStroke", unitScroll)
+local uss = Instance.new("UIStroke")
+uss.Parent = unitScroll
 uss.Thickness = 2
 uss.Color = Color3.fromRGB(22, 5, 36)
 Library.ApplyCartoonScrollbar(unitScroll)
 
-local uListLayout = Instance.new("UIListLayout", unitScroll)
+local uListLayout = Instance.new("UIListLayout")
+uListLayout.Parent = unitScroll
 uListLayout.Padding = UDim.new(0, 4)
-local uListPad = Instance.new("UIPadding", unitScroll)
+local uListPad = Instance.new("UIPadding")
+uListPad.Parent = unitScroll
 uListPad.PaddingTop = UDim.new(0, 6)
 uListPad.PaddingLeft = UDim.new(0, 6)
 uListPad.PaddingRight = UDim.new(0, 6)
@@ -933,7 +949,8 @@ refreshRecordUI = function()
             card.ZIndex = 8
             card.Parent = unitScroll
             Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
-            local cs = Instance.new("UIStroke", card)
+            local cs = Instance.new("UIStroke")
+            cs.Parent = card
             cs.Thickness = 1.5
             cs.Color = Color3.fromRGB(22, 5, 36)
 
@@ -1051,7 +1068,8 @@ undoBtn.AutoButtonColor = false
 undoBtn.ZIndex = 7
 undoBtn.Parent = undoShadow
 Instance.new("UICorner", undoBtn).CornerRadius = UDim.new(0, 9)
-local ubs = Instance.new("UIStroke", undoBtn)
+local ubs = Instance.new("UIStroke")
+ubs.Parent = undoBtn
 ubs.Thickness = 2
 ubs.Color = Color3.fromRGB(22, 5, 36)
 Library.AttachInteractiveEffects(undoBtn, undoShadow)
@@ -1088,7 +1106,8 @@ clearBtn.AutoButtonColor = false
 clearBtn.ZIndex = 7
 clearBtn.Parent = clearShadow
 Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 9)
-local cs = Instance.new("UIStroke", clearBtn)
+local cs = Instance.new("UIStroke")
+cs.Parent = clearBtn
 cs.Thickness = 2
 cs.Color = Color3.fromRGB(22, 5, 36)
 Library.AttachInteractiveEffects(clearBtn, clearShadow)
@@ -1133,7 +1152,7 @@ local function runAutoPlaceSequence()
     end
 
     print(string.format("[AutoPlace] เริ่มวางยูนิต %d ตัวในด่าน: %s", #currentQueue, states.CurrentStage))
-    for idx, item in ipairs(currentQueue) do
+    for _, item in ipairs(currentQueue) do
         local ok, result = pcall(function()
             return actRemote:InvokeServer("place", item.unit, item.x, item.z)
         end)
