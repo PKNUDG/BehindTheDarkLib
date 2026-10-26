@@ -265,10 +265,10 @@ local states = {
     AgainBeforeHomeActive = (savedCfg.AgainBeforeHomeActive ~= nil) and savedCfg.AgainBeforeHomeActive or false,
     AutoSkipWave = (savedCfg.AutoSkipWave ~= nil) and savedCfg.AutoSkipWave or true,
     BoostFPS = (savedCfg.BoostFPS ~= nil) and savedCfg.BoostFPS or false,
-    AutoPlace = false,
+    AutoPlace = (savedCfg.AutoPlace ~= nil) and savedCfg.AutoPlace or false,
     RecordMode = false,
-    CurrentStage = "Inf Bug Milk",
-    RecordStageName = "Inf Bug Milk",
+    CurrentStage = savedCfg.CurrentStage or Library.Settings.SelectedStage or "Inf Bug Milk",
+    RecordStageName = savedCfg.CurrentStage or Library.Settings.SelectedStage or "Inf Bug Milk",
     TargetRounds = savedCfg.TargetRounds or 10,
     CurrentRounds = 0
 }
@@ -281,8 +281,10 @@ local function saveConfigState()
         AutoSkipWave = states.AutoSkipWave,
         BoostFPS = states.BoostFPS,
         AutoPlace = states.AutoPlace,
-        TargetRounds = states.TargetRounds
+        TargetRounds = states.TargetRounds,
+        CurrentStage = states.CurrentStage
     }
+    Library.Settings.SelectedStage = states.CurrentStage
     Library.SaveSettings()
 end
 
@@ -299,8 +301,6 @@ pcall(function()
         currentMapName = info.Name
     end
 end)
-
-local matchedPlaceStage = false
 
 local function findMatchingPresetName(query: string?): string?
     if not query or query == "" then return nil end
@@ -413,7 +413,6 @@ end
 if matchedName then
     states.CurrentStage = matchedName
     states.RecordStageName = matchedName
-    matchedPlaceStage = true
     local presetUnits = StagePresets[matchedName]
     if presetUnits and #presetUnits > 0 then
         states.AutoPlace = true
@@ -426,7 +425,6 @@ elseif Library.Settings.PlaceIdStageMap and Library.Settings.PlaceIdStageMap[cur
     if StagePresets[mapped] then
         states.CurrentStage = mapped
         states.RecordStageName = mapped
-        matchedPlaceStage = true
         local presetUnits = StagePresets[mapped]
         if presetUnits and #presetUnits > 0 then
             states.AutoPlace = true
@@ -821,8 +819,8 @@ autoPlaceToggleUpdater = Window:CreateToggle(bottomSubTray, "Auto Place", 0, { O
     saveConfigState()
 end)
 
-if matchedPlaceStage and autoPlaceToggleUpdater then
-    autoPlaceToggleUpdater(true)
+if autoPlaceToggleUpdater then
+    autoPlaceToggleUpdater(states.AutoPlace)
 end
 
 local stageDropdown = Window:CreateDropdown(bottomSubTray, "Stage", 46, getStageNames(), states.CurrentStage, 10, function(selected)
