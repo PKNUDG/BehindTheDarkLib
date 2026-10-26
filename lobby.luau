@@ -395,60 +395,60 @@ local function findAndPlayFirstWinCar()
         return false
     end
 
-    -- สแกนจาก container สูงขึ้นมาหนึ่งชั้นเพื่อให้ครอบคลุม
-    local scanRoot = trainFrame:FindFirstAncestor("HubWindows") or trainFrame.Parent or trainFrame
-    print("[AutoChallenge] ขอบเขตการสแกน:", scanRoot:GetFullName())
+    -- ล็อกเป้าหมายเฉพาะหน้าต่าง Challenges
+    local challengesWindow = playerGui:FindFirstChild("HubWindows")
+        and playerGui.HubWindows:FindFirstChild("Challenges")
+        and playerGui.HubWindows.Challenges:FindFirstChild("Pop", true)
 
-    -- 3. สแกนหาตู้รถไฟที่มีป้าย FIRST WIN
+    local scanRoot = challengesWindow or trainFrame:FindFirstAncestor("Challenges") or trainFrame
+
+    print("[AutoChallenge] เจาะจงหน้าต่างรถไฟ:", scanRoot:GetFullName())
+
     local targetPlayButton = nil
     local playButtons = {}
     local firstWinBadges = {}
 
-    print("[AutoChallenge-Scan] กำลังตรวจสอบองค์ประกอบทั้งหมดใน: " .. scanRoot.Name)
-    local elementCount = 0
-
-    -- สแกนทุก Descendant ภายใน scanRoot
+    -- สแกนเฉพาะตู้รถไฟในหน้าต่าง Challenges
     for _, desc in ipairs(scanRoot:GetDescendants()) do
-        elementCount = elementCount + 1
         if desc:IsA("TextLabel") then
             local txt = desc.Text:upper():gsub("%s+", " ")
-            if txt:find("FIRST") or txt:find("WIN") then
+            if txt:find("FIRST") and txt:find("WIN") then
                 table.insert(firstWinBadges, desc)
-                print("[AutoChallenge] >> เจอป้าย (TextLabel):", desc.Name, "Text:", desc.Text, "Path:", desc:GetFullName())
+                print("[AutoChallenge] >> เจอป้าย FIRST WIN:", desc:GetFullName())
             end
-        elseif desc:IsA("ImageLabel") or desc:IsA("Frame") then
-            local n = desc.Name:upper()
-            if n:find("FIRST") or n:find("WIN") or n:find("BADGE") or n:find("STAR") then
+        elseif desc:IsA("Frame") or desc:IsA("ImageLabel") then
+            if desc.Name == "FirstWin" then
                 table.insert(firstWinBadges, desc)
-                print("[AutoChallenge] >> เจอป้าย (Object):", desc.Name, "Path:", desc:GetFullName())
+                print("[AutoChallenge] >> เจอป้าย FirstWin (Frame):", desc:GetFullName())
             end
         end
 
-        if desc:IsA("TextButton") or desc:IsA("ImageButton") then
-            local bText = (desc:IsA("TextButton") and desc.Text:upper()) or ""
-            for _, t in ipairs(desc:GetDescendants()) do
-                if t:IsA("TextLabel") then
-                    bText = bText .. " " .. t.Text:upper()
-                end
-            end
-            local bName = desc.Name:upper()
-            if bText:find("PLAY") or bName:find("PLAY") then
-                table.insert(playButtons, { Button = desc, PosX = desc.AbsolutePosition.X })
-                print("[AutoChallenge] >> เจอปุ่ม PLAY:", desc.Name, "Path:", desc:GetFullName(), "PosX:", desc.AbsolutePosition.X)
-            end
+        if (desc:IsA("TextButton") or desc:IsA("ImageButton")) and desc.Name == "Play" then
+            table.insert(playButtons, { Button = desc, PosX = desc.AbsolutePosition.X })
+            print("[AutoChallenge] >> เจอปุ่ม PLAY:", desc:GetFullName(), "PosX:", desc.AbsolutePosition.X)
         end
     end
 
-    print(string.format("[AutoChallenge-Debug] ตรวจสอบวัตถุทั้งหมด %d รายการ | เจอปุ่ม PLAY %d ปุ่ม | เจอป้าย FIRST WIN %d ป้าย", elementCount, #playButtons, #firstWinBadges))
+    print(string.format("[AutoChallenge] ผลการสแกน Challenges: เจอปุ่ม PLAY %d ปุ่ม | เจอป้าย FIRST WIN %d ป้าย", #playButtons, #firstWinBadges))
 
-    -- เรียงลำดับปุ่ม PLAY ตามตำแหน่งแนวนอน (ซ้ายไปขวา: Car 1 -> Car 2 -> Car 3)
+    -- เรียงลำดับปุ่ม PLAY (Car1 -> Car2 -> Car3)
     table.sort(playButtons, function(a, b) return a.PosX < b.PosX end)
 
-    -- จับคู่ป้าย FIRST WIN กับปุ่ม PLAY ที่อยู่ในการ์ดเดียวกัน
     if #firstWinBadges > 0 then
+        -- มีตู้ที่ยังได้ของ First Win
         for _, badge in ipairs(firstWinBadges) do
+            local parentCar = badge:FindFirstAncestor("Car1") or badge:FindFirstAncestor("Car2") or badge:FindFirstAncestor("Car3")
+            if parentCar then
+                local playBtn = parentCar:FindFirstChild("Play", true)
+                if playBtn and (playBtn:IsA("TextButton") or playBtn:IsA("ImageButton")) then
+                    targetPlayButton = playBtn
+                    print("[AutoChallenge] จับคู่ผ่านชื่อตู้ (" .. parentCar.Name .. ") สำเร็จ! ปุ่ม:", playBtn:GetFullName())
+                    break
+                end
+            end
+
+            -- Fallback พิกัด X
             local badgeX = badge.AbsolutePosition.X
-            -- หาปุ่ม PLAY ที่พิกัด X ใกล้เคียงกับป้าย FIRST WIN ที่สุด
             local bestBtn = nil
             local minDiff = 99999
             for _, pData in ipairs(playButtons) do
@@ -458,32 +458,15 @@ local function findAndPlayFirstWinCar()
                     bestBtn = pData.Button
                 end
             end
-
             if bestBtn then
                 targetPlayButton = bestBtn
-                print("[AutoChallenge] จับคู่สำเร็จ! เจอปุ่ม PLAY ประจำตู้ First Win:", bestBtn:GetFullName())
+                print("[AutoChallenge] จับคู่ผ่านพิกัด X สำเร็จ! ปุ่ม:", bestBtn:GetFullName())
                 break
             end
         end
-    end
-
-    -- หากสแกนทั้งหน้าต่างแล้วไม่มีป้าย First Win ใดๆ เลย
-    if #firstWinBadges == 0 then
+    else
         local countdownText = ""
-        for _, l in ipairs(trainFrame:GetDescendants()) do
-            if l:IsA("TextLabel") and l.Text:upper():find("NEW CARS IN") then
-                countdownText = l.Text
-                break
-            end
-        end
-        print("[AutoChallenge] รับของ First Win ครบหมดทุกตู้แล้ว! " .. countdownText)
-        return false
-    end
-
-    -- หากสแกนแล้วไม่พบ FIRST WIN เลย
-    if not hasAnyFirstWin then
-        local countdownText = ""
-        for _, l in ipairs(trainFrame:GetDescendants()) do
+        for _, l in ipairs(scanRoot:GetDescendants()) do
             if l:IsA("TextLabel") and l.Text:upper():find("NEW CARS IN") then
                 countdownText = l.Text
                 break
