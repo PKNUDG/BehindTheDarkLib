@@ -275,7 +275,7 @@ local states = {
 local refreshRecordUI: (() -> ())? = nil
 local lastRecordTick = 0
 
--- ฟังก์ชันบันทึกข้อมูลยูนิต
+-- ฟังก์ชันประมวลผลยูนิตที่วางลงสนาม
 local function handleRecordInput(actionName, unitArg, p1, p2)
     if not states.RecordMode then return end
     local act = tostring(actionName):lower()
@@ -340,25 +340,31 @@ local function handleRecordInput(actionName, unitArg, p1, p2)
     end
 end
 
--- Hook Remote แบบไม่ Yield และไม่ขัดขวางการทำงานของตัวเกม
-local function hookPlacementRecorder()
+-- อัปเดต Handler ให้ _G เพื่อไม่ให้หลุดแม้ Re-execute
+_G.CandyTD_ActiveRecordHandler = function(action, ...)
+    handleRecordInput(action, ...)
+end
+
+-- Hook Remote แบบไม่ Yield เพื่อความเสถียร 100%
+local function installPlacementHook()
     if _G.CandyTD_PlacementHookInstalled then return end
     _G.CandyTD_PlacementHookInstalled = true
 
     local hookMeta = (type(hookmetamethod) == "function" and hookmetamethod) or nil
-    local checkCaller = (type(checkcaller) == "function" and checkcaller) or function() return false end
     local newCClosure = (type(newcclosure) == "function" and newcclosure) or function(f) return f end
 
     if hookMeta then
         local oldNamecall
         oldNamecall = hookMeta(game, "__namecall", newCClosure(function(self, ...)
             local method = getnamecallmethod()
-            if states.RecordMode and not checkCaller() and (method == "InvokeServer" or method == "FireServer") then
+            if (method == "InvokeServer" or method == "FireServer") then
                 local remoteName = tostring(self.Name)
                 if remoteName == "Act" or remoteName == "Request" then
                     local args = { ... }
                     task.spawn(function()
-                        handleRecordInput(args[1], args[2], args[3], args[4])
+                        if _G.CandyTD_ActiveRecordHandler then
+                            _G.CandyTD_ActiveRecordHandler(args[1], args[2], args[3], args[4])
+                        end
                     end)
                 end
             end
@@ -366,7 +372,7 @@ local function hookPlacementRecorder()
         end))
     end
 end
-pcall(hookPlacementRecorder)
+pcall(installPlacementHook)
 
 -- ========================================================
 -- โหลดและใช้งาน BEHINDTHEDARKLIB
@@ -817,6 +823,7 @@ recToggleBtn.Activated:Connect(function()
         recToggleBtn.BackgroundColor3 = Color3.fromRGB(154, 102, 224)
         recToggleBtn.Text = "● START RECORD"
         savePresetsToFile()
+        states.CurrentStage = clean
         stageDropdown.SetOptions(getStageNames())
     end
     refreshRecordUI()
@@ -906,7 +913,7 @@ local function createNavButton(text: string, yPos: number, rimColor: Color3, btn
     btn.Activated:Connect(callback)
 end
 
--- 1. ปุ่มเปิดหน้า Record View (สลับหน้า)
+-- 1. ปุ่มเปิดหน้า Record View (สลับหน้าเต็ม)
 createNavButton("Setup Record & Presets ⚙", 236, Color3.fromRGB(255, 145, 160), Color3.fromRGB(235, 65, 85), function()
     stageInput.Text = states.CurrentStage
     states.RecordStageName = states.CurrentStage
