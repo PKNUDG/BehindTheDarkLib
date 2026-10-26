@@ -271,11 +271,10 @@ againLimitUpdater = Window:CreateToggle("Left", "Again Count Limit", 144, { On =
 end)
 
 -- ========================================================
--- TARGET ROUNDS & 3D BUTTONS + INTENSE WIGGLE ANIMATION
+-- TARGET ROUNDS & 3D BUTTONS (ไม่มีตัวอักษรบนปุ่มบวกลบ)
 -- ========================================================
 local leftCol = Window:GetColumn("Left")
 
--- 1. กรอบ Target Rounds (3D สไตล์การ์ตูน)
 local configBoxShadow = Instance.new("Frame")
 configBoxShadow.Size = UDim2.new(1, 0, 0, 44)
 configBoxShadow.Position = UDim2.fromOffset(0, 190)
@@ -302,7 +301,7 @@ cfgLabel.Size = UDim2.new(1, -115, 1, 0)
 cfgLabel.Position = UDim2.fromOffset(12, 0)
 cfgLabel.BackgroundTransparency = 1
 cfgLabel.Text = "Target Rounds"
-cfgLabel.TextColor3 = Color3.fromRGB(255, 235, 110)
+cfgLabel.TextColor3 = Color3.fromRGB(255, 225, 95)
 cfgLabel.TextSize = 13.5
 cfgLabel.Font = Enum.Font.FredokaOne
 cfgLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -312,7 +311,6 @@ local cgls = Instance.new("UIStroke", cfgLabel)
 cgls.Thickness = 2.5
 cgls.Color = Color3.fromRGB(22, 5, 36)
 
--- กล่องแสดงตัวเลขเป้าหมาย (สไตล์การ์ตูนตามภาพ)
 local roundCountBadge = Instance.new("Frame")
 roundCountBadge.Size = UDim2.fromOffset(30, 28)
 roundCountBadge.Position = UDim2.new(1, -66, 0.5, -14)
@@ -335,7 +333,6 @@ roundCountLabel.Text = tostring(states.TargetRounds)
 roundCountLabel.ZIndex = 7
 roundCountLabel.Parent = roundCountBadge
 
--- 2. กรอบแสดง Round 0/10 (3D)
 local roundStatusShadow = Instance.new("Frame")
 roundStatusShadow.Size = UDim2.new(1, 0, 0, 54)
 roundStatusShadow.Position = UDim2.fromOffset(0, 244)
@@ -361,7 +358,7 @@ local roundStatus = Instance.new("TextLabel")
 roundStatus.Size = UDim2.fromScale(1, 1)
 roundStatus.BackgroundTransparency = 1
 roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
-roundStatus.TextColor3 = Color3.fromRGB(255, 235, 110)
+roundStatus.TextColor3 = Color3.fromRGB(255, 225, 95)
 roundStatus.TextSize = 17
 roundStatus.Font = Enum.Font.FredokaOne
 roundStatus.ZIndex = 6
@@ -370,8 +367,8 @@ local rsts = Instance.new("UIStroke", roundStatus)
 rsts.Thickness = 3
 rsts.Color = Color3.fromRGB(22, 5, 36)
 
--- ฟังก์ชันสร้างปุ่ม 3D ขอบ 3 ชั้นสำหรับบวกลบ
-local function create3DActionButton(text: string, xPos: number, rimColor: Color3, btnColor: Color3)
+-- ฟังก์ชันสร้างปุ่ม 3D ไร้ตัวอักษร
+local function create3DActionButton(xPos: number, rimColor: Color3, btnColor: Color3)
     local shadow = Instance.new("Frame")
     shadow.Size = UDim2.fromOffset(26, 28)
     shadow.Position = UDim2.new(1, xPos, 0.5, -14)
@@ -397,10 +394,7 @@ local function create3DActionButton(text: string, xPos: number, rimColor: Color3
     btn.Size = UDim2.new(1, -4, 1, -4)
     btn.Position = UDim2.fromOffset(2, 2)
     btn.BackgroundColor3 = btnColor
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 16
-    btn.Font = Enum.Font.FredokaOne
+    btn.Text = ""
     btn.BorderSizePixel = 0
     btn.AutoButtonColor = false
     btn.ZIndex = 8
@@ -415,24 +409,24 @@ local function create3DActionButton(text: string, xPos: number, rimColor: Color3
     return btn
 end
 
--- ปุ่มลบ (-) สีแดง 3D
-local btnMinus = create3DActionButton("-", -98, Color3.fromRGB(255, 140, 150), Color3.fromRGB(235, 65, 75))
+-- ปุ่มลดสีแดง (ไร้ตัวอักษร - กดครั้งหนึ่งแกว่งซ้าย อีกครั้งแกว่งขวา)
+local btnMinus = create3DActionButton(-98, Color3.fromRGB(255, 140, 150), Color3.fromRGB(235, 65, 75))
 btnMinus.Activated:Connect(function()
     if states.TargetRounds > 1 then
         states.TargetRounds = states.TargetRounds - 1
         roundCountLabel.Text = tostring(states.TargetRounds)
         roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
-        Library.StartIntenseWiggle(roundStatus)
+        Library.StepWiggle(roundStatus)
     end
 end)
 
--- ปุ่มบวก (+) สีเขียว 3D
-local btnPlus = create3DActionButton("+", -32, Color3.fromRGB(190, 255, 145), Color3.fromRGB(115, 225, 70))
+-- ปุ่มบวกสีเขียว (ไร้ตัวอักษร - กดครั้งหนึ่งแกว่งซ้าย อีกครั้งแกว่งขวา)
+local btnPlus = create3DActionButton(-32, Color3.fromRGB(190, 255, 145), Color3.fromRGB(115, 225, 70))
 btnPlus.Activated:Connect(function()
     states.TargetRounds = states.TargetRounds + 1
     roundCountLabel.Text = tostring(states.TargetRounds)
     roundStatus.Text = string.format("Round %d/%d", states.CurrentRounds, states.TargetRounds)
-    Library.StartIntenseWiggle(roundStatus)
+    Library.StepWiggle(roundStatus)
 end)
 
 -- ควบคุมฝั่งขวา
