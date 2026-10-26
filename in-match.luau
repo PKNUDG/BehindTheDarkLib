@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : IN-MATCH CONTROLLER (POWERED BY BEHINDTHEDARKLIB)
+-- CANDY TD : IN-MATCH CONTROLLER (FULL PRESET & RECORDER)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -11,6 +11,7 @@ local GuiService = game:GetService("GuiService")
 local TeleportService = game:GetService("TeleportService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -181,9 +182,11 @@ local function requestMatchAction(action: string, ...)
 end
 
 -- ========================================================
--- PRESETS & STATES
+-- PRESET & FILE SYSTEM (CANDYTD_PRESETS.JSON)
 -- ========================================================
-local StagePresets = {
+local PRESET_FILE = "CandyTD_Presets.json"
+
+local DefaultStagePresets = {
     ["Raid Halloween"] = {
         { unit = "AlienJake", x = -23.374317169189453, z = -29.752378463745117 },
         { unit = "AlienJake", x = -21.034372329711914, z = -30.95560073852539 },
@@ -207,6 +210,39 @@ local StagePresets = {
     }
 }
 
+local StagePresets = {}
+
+local function savePresetsToFile()
+    local wf = (type(writefile) == "function" and writefile) or nil
+    if wf then
+        pcall(function()
+            local encoded = HttpService:JSONEncode(StagePresets)
+            wf(PRESET_FILE, encoded)
+        end)
+    end
+end
+
+local function loadPresetsFromFile()
+    local rf = (type(readfile) == "function" and readfile) or nil
+    local loaded = false
+    if rf then
+        local ok, data = pcall(rf, PRESET_FILE)
+        if ok and data and data ~= "" then
+            local decodedOk, parsed = pcall(HttpService.JSONDecode, HttpService, data)
+            if decodedOk and type(parsed) == "table" then
+                StagePresets = parsed
+                loaded = true
+            end
+        end
+    end
+    if not loaded then
+        StagePresets = DefaultStagePresets
+        savePresetsToFile()
+    end
+end
+
+loadPresetsFromFile()
+
 local states = {
     EndChoice = "AGAIN",
     AutoUpgrade = true,
@@ -214,10 +250,47 @@ local states = {
     AutoSkipWave = true,
     BoostFPS = false,
     AutoPlace = false,
+    RecordMode = false,
     CurrentStage = "Inf Bug Milk",
     TargetRounds = 10,
     CurrentRounds = 0
 }
+
+-- ========================================================
+-- IN-GAME RECORDER HOOK
+-- ========================================================
+local function hookPlacementRecorder()
+    local hookMeta = (type(hookmetamethod) == "function" and hookmetamethod) or nil
+    if hookMeta then
+        local oldNamecall
+        oldNamecall = hookMeta(game, "__namecall", function(self, ...)
+            local method = getnamecallmethod()
+            local args = { ... }
+            if states.RecordMode and method == "InvokeServer" and tostring(self.Name) == "Act" then
+                if args[1] == "place" and args[2] and args[3] and args[4] then
+                    StagePresets[states.CurrentStage] = StagePresets[states.CurrentStage] or {}
+                    local currentQueue = StagePresets[states.CurrentStage]
+                    table.insert(currentQueue, {
+                        unit = tostring(args[2]),
+                        x = tonumber(args[3]),
+                        z = tonumber(args[4])
+                    })
+                    savePresetsToFile()
+                    print(string.format("[Recorder] บันทึกลำดับที่ %d: %s (X: %.2f, Z: %.2f)", #currentQueue, tostring(args[2]), tonumber(args[3]), tonumber(args[4])))
+                elseif args[1] == "target" and args[3] then
+                    local currentQueue = StagePresets[states.CurrentStage]
+                    if currentQueue and #currentQueue > 0 then
+                        currentQueue[#currentQueue].setTarget = tostring(args[3])
+                        savePresetsToFile()
+                        print(string.format("[Recorder] บันทึก Target ลำดับที่ %d: %s", #currentQueue, tostring(args[3])))
+                    end
+                end
+            end
+            return oldNamecall(self, ...)
+        end)
+    end
+end
+pcall(hookPlacementRecorder)
 
 -- ========================================================
 -- โหลดและใช้งาน BEHINDTHEDARKLIB
@@ -425,7 +498,11 @@ btnPlus.Activated:Connect(function()
     Library.StepWiggle(roundStatus)
 end)
 
--- ควบคุมฝั่งขวา
+-- ========================================================
+-- ควบคุมฝั่งขวา (CONTROLS & PRESET MANAGEMENT)
+-- ========================================================
+local rightCol = Window:GetColumn("Right")
+
 Window:CreateToggle("Right", "Auto Upgrade All", 0, { On = Color3.fromRGB(90, 195, 60), Off = Color3.fromRGB(120, 120, 130) }, true, function(v)
     states.AutoUpgrade = v
 end)
@@ -447,6 +524,69 @@ Window:CreateDropdown("Right", "Stage", 190, { "Inf Bug Milk", "Raid Halloween" 
     states.CurrentStage = selected
 end)
 
+-- 1. ปุ่มสลับ Record Mode (ดักจับการวางยูนิตจริง)
+Window:CreateToggle("Right", "Record Mode", 236, { On = Color3.fromRGB(255, 65, 85), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
+    states.RecordMode = v
+    if v then
+        StagePresets[states.CurrentStage] = {}
+        savePresetsToFile()
+        print(string.format("[Recorder] เริ่มบันทึกพรีเซ็ตด่าน '%s' (เคลียร์รายการเดิมแล้ว)", states.CurrentStage))
+    else
+        savePresetsToFile()
+        print(string.format("[Recorder] ปิดโหมดบันทึก บันทึกยูนิตทั้งหมด %d ตัวลง '%s' สำเร็จ", #(StagePresets[states.CurrentStage] or {}), PRESET_FILE))
+    end
+end)
+
+-- 2. ปุ่ม 3D สั่ง Reload Presets จากไฟล์ JSON
+local function createPresetUtilityButton(text: string, yPos: number, rimColor: Color3, btnColor: Color3, callback: () -> ())
+    local shadow = Instance.new("Frame")
+    shadow.Size = UDim2.new(1, -128, 0, 36)
+    shadow.Position = UDim2.fromOffset(0, yPos)
+    shadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+    shadow.BorderSizePixel = 0
+    shadow.ZIndex = 14
+    shadow.Parent = rightCol
+    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 12)
+
+    local rim = Instance.new("Frame")
+    rim.Size = UDim2.new(1, 0, 0, 33)
+    rim.Position = UDim2.fromOffset(0, 0)
+    rim.BackgroundColor3 = rimColor
+    rim.BorderSizePixel = 0
+    rim.ZIndex = 15
+    rim.Parent = shadow
+    Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 12)
+    local rs = Instance.new("UIStroke", rim)
+    rs.Thickness = 2.5
+    rs.Color = Color3.fromRGB(22, 5, 36)
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -6, 1, -5)
+    btn.Position = UDim2.fromOffset(3, 2)
+    btn.BackgroundColor3 = btnColor
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 13
+    btn.Font = Enum.Font.FredokaOne
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
+    btn.ZIndex = 16
+    btn.Parent = rim
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 9)
+    local bts = Instance.new("UIStroke", btn)
+    bts.Thickness = 2.5
+    bts.Color = Color3.fromRGB(22, 5, 36)
+
+    Library.AttachInteractiveEffects(btn, shadow)
+    btn.Activated:Connect(callback)
+end
+
+createPresetUtilityButton("Reload Presets", 282, Color3.fromRGB(255, 220, 110), Color3.fromRGB(240, 160, 45), function()
+    loadPresetsFromFile()
+    Library.PlaySound("rbxassetid://6895079853")
+    print(string.format("[PresetManager] โหลดค่าพรีเซ็ตจาก %s สำเร็จ!", PRESET_FILE))
+end)
+
 Window:Create3DRenderToggle("Right")
 
 -- ========================================================
@@ -459,10 +599,13 @@ local function runAutoPlaceSequence()
     if not (actRemote and actRemote:IsA("RemoteFunction")) then return end
 
     local currentQueue = StagePresets[states.CurrentStage]
-    if not currentQueue or #currentQueue == 0 then return end
+    if not currentQueue or #currentQueue == 0 then
+        print(string.format("[AutoPlace] ไม่พบรายการยูนิตในด่าน '%s' กรุณาเปิด Record Mode หรือแก้ไขใน %s", states.CurrentStage, PRESET_FILE))
+        return
+    end
 
-    print("[AutoPlace] เริ่มวางยูนิตในด่าน: " .. states.CurrentStage)
-    for _, item in ipairs(currentQueue) do
+    print(string.format("[AutoPlace] เริ่มวางยูนิต %d ตัวในด่าน: %s", #currentQueue, states.CurrentStage))
+    for idx, item in ipairs(currentQueue) do
         local ok, result = pcall(function()
             return actRemote:InvokeServer("place", item.unit, item.x, item.z)
         end)
