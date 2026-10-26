@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : IN-MATCH CONTROLLER (FIXED RECORD & MAP INFO)
+-- CANDY TD : IN-MATCH CONTROLLER (ORDER FIXED & AUTO PLACE)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -241,7 +241,6 @@ local function getStageNames(): {string}
     return names
 end
 
--- โหลด BEHINDTHEDARKLIB
 local libUrl = "https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/BehindTheDarkLib.luau?v=" .. os.time()
 local libRaw = game:HttpGet(libUrl)
 local libChunk, libErr = loadstring(libRaw)
@@ -258,7 +257,7 @@ local states = {
     AgainBeforeHomeActive = (savedCfg.AgainBeforeHomeActive ~= nil) and savedCfg.AgainBeforeHomeActive or false,
     AutoSkipWave = (savedCfg.AutoSkipWave ~= nil) and savedCfg.AutoSkipWave or true,
     BoostFPS = (savedCfg.BoostFPS ~= nil) and savedCfg.BoostFPS or false,
-    AutoPlace = (savedCfg.AutoPlace ~= nil) and savedCfg.AutoPlace or false,
+    AutoPlace = false,
     RecordMode = false,
     CurrentStage = "Inf Bug Milk",
     RecordStageName = "Inf Bug Milk",
@@ -279,9 +278,6 @@ local function saveConfigState()
     Library.SaveSettings()
 end
 
--- ========================================================
--- ตรวจจับ PLACE ID & MAP NAME และเปิด AUTO PLACE อัตโนมัติ
--- ========================================================
 local currentPlaceId = tostring(game.PlaceId)
 while (not currentPlaceId or currentPlaceId == "0") do
     task.wait(0.2)
@@ -311,20 +307,9 @@ elseif Library.Settings.SelectedStage and StagePresets[Library.Settings.Selected
     states.RecordStageName = Library.Settings.SelectedStage
 end
 
--- เมื่อสร้าง Toggle Auto Place ให้ส่งค่า states.AutoPlace ปัจจุบัน และซิงก์อัปเดตปุ่มทันที
-local autoPlaceToggleUpdater = nil
-autoPlaceToggleUpdater = Window:CreateToggle(bottomSubTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
-    states.AutoPlace = v
-    saveConfigState()
-end)
+local refreshRecordUI: (() -> ())? = nil
+local lastRecordTick = 0
 
-if matchedPlaceStage and autoPlaceToggleUpdater then
-    autoPlaceToggleUpdater(true)
-end
-
--- ========================================================
--- แก้ไขระบบ RECORD (รองรับ Remote & Direct Call)
--- ========================================================
 local function handleRecordInput(...)
     if not states.RecordMode then return end
     local rawArgs = { ... }
@@ -358,7 +343,6 @@ local function handleRecordInput(...)
     end
 
     if not isPlace and not isTarget then
-        -- ตรวจสอบโครงสร้างคำสั่งแบบ arg[1] = "place", arg[2] = unit, arg[3] = X, arg[4] = Z
         if type(rawArgs[1]) == "string" and rawArgs[1]:lower() == "place" then
             isPlace = true
             unitName = tostring(rawArgs[2])
@@ -441,7 +425,6 @@ end
 
 _G.CandyTD_ActiveRecordHandler = handleRecordInput
 
--- ติดตั้ง Hook
 local function installPlacementHook()
     if matchNet and type(matchNet.request) == "function" then
         local oldReq = matchNet.request
@@ -496,7 +479,7 @@ if Window.RightColumn and Window.RightColumn.Parent and Window.RightColumn.Paren
     Window.RightColumn.Parent.Parent.Visible = false
 end
 
--- ซ้าย
+-- ฝั่งซ้าย
 local visualUpdaters = {}
 local function updateEndChoiceVisuals()
     if visualUpdaters["NEXT"] then visualUpdaters["NEXT"](states.EndChoice == "NEXT") end
@@ -674,7 +657,9 @@ btnPlus.Activated:Connect(function()
     saveConfigState()
 end)
 
--- ขวา 2 กล่องแยก
+-- ========================================================
+-- ฝั่งขวา: สร้าง SUBTRAY ก่อนเพื่อไม่ให้เกิด NIL ERROR
+-- ========================================================
 local topSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 154))
 Window:CreateToggle(topSubTray, "Auto Upgrade All", 0, { On = Color3.fromRGB(90, 195, 60), Off = Color3.fromRGB(120, 120, 130) }, states.AutoUpgrade, function(v)
     states.AutoUpgrade = v
@@ -693,11 +678,18 @@ Window:CreateToggle(topSubTray, "Boost FPS", 92, { On = Color3.fromRGB(50, 205, 
 end)
 
 local bottomSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 162), UDim2.new(0.5, -20, 1, -174))
+
+-- สร้าง Toggle Auto Place โดยตรงบน bottomSubTray
 local autoPlaceToggleUpdater = nil
 autoPlaceToggleUpdater = Window:CreateToggle(bottomSubTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
     states.AutoPlace = v
     saveConfigState()
 end)
+
+-- ถ้าตรวจพบ PlaceId ตรงกับพรีเซ็ต ให้เปิดสวิตช์ Auto Place บน UI ทันที
+if matchedPlaceStage and autoPlaceToggleUpdater then
+    autoPlaceToggleUpdater(true)
+end
 
 local stageDropdown = Window:CreateDropdown(bottomSubTray, "Stage", 46, getStageNames(), states.CurrentStage, 10, function(selected)
     states.CurrentStage = selected
@@ -776,7 +768,7 @@ local backBtn = Instance.new("TextButton")
 backBtn.Size = UDim2.new(1, 0, 1, -3)
 backBtn.Position = UDim2.fromOffset(0, 0)
 backBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
-backBtn.Text = "⬅ BACK"
+backBtn.Text = "BACK"
 backBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 backBtn.TextSize = 13
 backBtn.Font = Enum.Font.FredokaOne
@@ -858,7 +850,7 @@ local recToggleBtn = Instance.new("TextButton")
 recToggleBtn.Size = UDim2.new(1, 0, 1, -3)
 recToggleBtn.Position = UDim2.fromOffset(0, 0)
 recToggleBtn.BackgroundColor3 = Color3.fromRGB(154, 102, 224)
-recToggleBtn.Text = "● START RECORD"
+recToggleBtn.Text = "START RECORD"
 recToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 recToggleBtn.TextSize = 12.5
 recToggleBtn.Font = Enum.Font.FredokaOne
@@ -963,7 +955,7 @@ refreshRecordUI = function()
             btnUp.Size = UDim2.fromOffset(26, 24)
             btnUp.Position = UDim2.new(1, -58, 0.5, -12)
             btnUp.BackgroundColor3 = (i > 1) and Color3.fromRGB(80, 180, 245) or Color3.fromRGB(60, 45, 80)
-            btnUp.Text = "▲"
+            btnUp.Text = "UP"
             btnUp.TextColor3 = Color3.fromRGB(255, 255, 255)
             btnUp.TextSize = 11
             btnUp.Font = Enum.Font.FredokaOne
@@ -981,7 +973,7 @@ refreshRecordUI = function()
             btnDown.Size = UDim2.fromOffset(26, 24)
             btnDown.Position = UDim2.new(1, -28, 0.5, -12)
             btnDown.BackgroundColor3 = (i < #q) and Color3.fromRGB(240, 150, 40) or Color3.fromRGB(60, 45, 80)
-            btnDown.Text = "▼"
+            btnDown.Text = "DN"
             btnDown.TextColor3 = Color3.fromRGB(255, 255, 255)
             btnDown.TextSize = 11
             btnDown.Font = Enum.Font.FredokaOne
@@ -1017,10 +1009,10 @@ recToggleBtn.Activated:Connect(function()
     if states.RecordMode then
         if states.AutoPlace and autoPlaceToggleUpdater then autoPlaceToggleUpdater(false) end
         recToggleBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
-        recToggleBtn.Text = "● RECORDING... (STOP)"
+        recToggleBtn.Text = "RECORDING (STOP)"
     else
         recToggleBtn.BackgroundColor3 = Color3.fromRGB(154, 102, 224)
-        recToggleBtn.Text = "● START RECORD"
+        recToggleBtn.Text = "START RECORD"
         savePresetsToFile()
         states.CurrentStage = clean
         Library.Settings.SelectedStage = clean
@@ -1052,7 +1044,7 @@ local undoBtn = Instance.new("TextButton")
 undoBtn.Size = UDim2.new(1, 0, 1, -3)
 undoBtn.Position = UDim2.fromOffset(0, 0)
 undoBtn.BackgroundColor3 = Color3.fromRGB(215, 115, 45)
-undoBtn.Text = "⟲ UNDO LAST"
+undoBtn.Text = "UNDO LAST"
 undoBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 undoBtn.TextSize = 12
 undoBtn.Font = Enum.Font.FredokaOne
@@ -1120,7 +1112,7 @@ createBottomActionButton("Setup Record & Presets", 92, Color3.fromRGB(255, 145, 
     RecordPage.Show()
 end)
 
-createBottomActionButton("Reload Presets ↺", 136, Color3.fromRGB(255, 220, 110), Color3.fromRGB(240, 160, 45), function()
+createBottomActionButton("Reload Presets", 136, Color3.fromRGB(255, 220, 110), Color3.fromRGB(240, 160, 45), function()
     loadPresetsFromFile()
     stageDropdown.SetOptions(getStageNames())
     Library.PlaySound("rbxassetid://6895079853")
