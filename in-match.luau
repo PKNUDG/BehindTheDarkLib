@@ -273,70 +273,97 @@ local states = {
 }
 
 local refreshRecordUI: (() -> ())? = nil
+local lastRecordTick = 0
 
--- ฟังก์ชันดักจับยูนิตที่วาง
+-- ฟังก์ชันบันทึกข้อมูลยูนิต
 local function handleRecordInput(actionName, unitArg, p1, p2)
+    if not states.RecordMode then return end
+    local act = tostring(actionName):lower()
+    if act ~= "place" and act ~= "target" then return end
+
     local targetStage = (states.RecordStageName and states.RecordStageName ~= "") and states.RecordStageName or states.CurrentStage
     StagePresets[targetStage] = StagePresets[targetStage] or {}
     local currentQueue = StagePresets[targetStage]
 
-    if tostring(actionName):lower() == "place" then
-        local uName = tostring(unitArg or "UnknownUnit")
+    if act == "place" then
+        local uName = "UnknownUnit"
         local posX, posZ = 0, 0
 
-        if typeof(p1) == "Vector3" then
-            posX, posZ = p1.X, p1.Z
-        elseif typeof(p1) == "CFrame" then
-            posX, posZ = p1.Position.X, p1.Position.Z
-        elseif type(p1) == "number" and type(p2) == "number" then
-            posX, posZ = p1, p2
+        if type(unitArg) == "table" then
+            uName = tostring(unitArg.unit or unitArg.name or unitArg.Name or "UnknownUnit")
+            posX = tonumber(unitArg.x or unitArg.X) or 0
+            posZ = tonumber(unitArg.z or unitArg.Z) or 0
+        else
+            uName = tostring(unitArg or "UnknownUnit")
+            if typeof(p1) == "Vector3" then
+                posX, posZ = p1.X, p1.Z
+            elseif typeof(p1) == "CFrame" then
+                posX, posZ = p1.Position.X, p1.Position.Z
+            elseif type(p1) == "table" then
+                posX = tonumber(p1.x or p1.X) or 0
+                posZ = tonumber(p1.z or p1.Z) or 0
+            elseif type(p1) == "number" and type(p2) == "number" then
+                posX, posZ = p1, p2
+            end
         end
+
+        if tick() - lastRecordTick < 0.15 then
+            local last = currentQueue[#currentQueue]
+            if last and last.unit == uName and math.abs((last.x or 0) - posX) < 0.05 and math.abs((last.z or 0) - posZ) < 0.05 then
+                return
+            end
+        end
+        lastRecordTick = tick()
 
         table.insert(currentQueue, {
             unit = uName,
             x = posX,
             z = posZ
         })
-        savePresetsToFile()
-        print(string.format("[Recorder] บันทึก: #%d %s (X: %.1f, Z: %.1f) ในด่าน '%s'", #currentQueue, uName, posX, posZ, targetStage))
-        if refreshRecordUI then refreshRecordUI() end
-    elseif tostring(actionName):lower() == "target" then
+
+        task.spawn(function()
+            savePresetsToFile()
+            if refreshRecordUI then refreshRecordUI() end
+        end)
+        print(string.format("[Recorder] บันทึกสำเร็จ: #%d %s (X: %.1f, Z: %.1f) ในด่าน '%s'", #currentQueue, uName, posX, posZ, targetStage))
+
+    elseif act == "target" then
         local targetMode = tostring(p1 or p2 or "strongest")
         if #currentQueue > 0 then
             currentQueue[#currentQueue].setTarget = targetMode
-            savePresetsToFile()
-            print(string.format("[Recorder] ตั้งเป้า: #%d %s -> %s", #currentQueue, currentQueue[#currentQueue].unit, targetMode))
-            if refreshRecordUI then refreshRecordUI() end
+            task.spawn(function()
+                savePresetsToFile()
+                if refreshRecordUI then refreshRecordUI() end
+            end)
+            print(string.format("[Recorder] บันทึก Target สำเร็จ: #%d %s -> %s", #currentQueue, currentQueue[#currentQueue].unit, targetMode))
         end
     end
 end
 
--- Hook ผ่าน Metatable และ Module
+-- Hook Remote แบบไม่ Yield และไม่ขัดขวางการทำงานของตัวเกม
 local function hookPlacementRecorder()
-    if matchNet and type(matchNet.request) == "function" then
-        local oldReq = matchNet.request
-        matchNet.request = function(action, ...)
-            if states.RecordMode then
-                handleRecordInput(action, ...)
-            end
-            return oldReq(action, ...)
-        end
-    end
+    if _G.CandyTD_PlacementHookInstalled then return end
+    _G.CandyTD_PlacementHookInstalled = true
 
     local hookMeta = (type(hookmetamethod) == "function" and hookmetamethod) or nil
+    local checkCaller = (type(checkcaller) == "function" and checkcaller) or function() return false end
+    local newCClosure = (type(newcclosure) == "function" and newcclosure) or function(f) return f end
+
     if hookMeta then
         local oldNamecall
-        oldNamecall = hookMeta(game, "__namecall", function(self, ...)
+        oldNamecall = hookMeta(game, "__namecall", newCClosure(function(self, ...)
             local method = getnamecallmethod()
-            local args = { ... }
-            if states.RecordMode and (method == "InvokeServer" or method == "FireServer") and (tostring(self.Name) == "Act" or tostring(self.Name) == "Request") then
-                handleRecordInput(args[1], args[2], args[3], args[4])
-            end
-            if setnamecallmethod then
-                setnamecallmethod(method)
+            if states.RecordMode and not checkCaller() and (method == "InvokeServer" or method == "FireServer") then
+                local remoteName = tostring(self.Name)
+                if remoteName == "Act" or remoteName == "Request" then
+                    local args = { ... }
+                    task.spawn(function()
+                        handleRecordInput(args[1], args[2], args[3], args[4])
+                    end)
+                end
             end
             return oldNamecall(self, ...)
-        end)
+        end))
     end
 end
 pcall(hookPlacementRecorder)
@@ -561,7 +588,8 @@ Window:CreateToggle("Right", "Boost FPS", 92, { On = Color3.fromRGB(50, 205, 150
     applyUltraBoostFPS(v)
 end)
 
-Window:CreateToggle("Right", "Auto Place", 144, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
+local autoPlaceToggle = nil
+autoPlaceToggle = Window:CreateToggle("Right", "Auto Place", 144, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, false, function(v)
     states.AutoPlace = v
 end)
 
@@ -780,6 +808,9 @@ recToggleBtn.Activated:Connect(function()
 
     Library.PlaySound(SOUND_TOGGLE)
     if states.RecordMode then
+        if states.AutoPlace and autoPlaceToggle then
+            autoPlaceToggle(false)
+        end
         recToggleBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
         recToggleBtn.Text = "● RECORDING... (STOP)"
     else
