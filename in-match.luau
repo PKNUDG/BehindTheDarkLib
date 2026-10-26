@@ -658,7 +658,7 @@ btnPlus.Activated:Connect(function()
 end)
 
 -- ========================================================
--- ฝั่งขวา: สร้าง SUBTRAY ก่อนเพื่อไม่ให้เกิด NIL ERROR
+-- ฝั่งขวา: สร้าง SUBTRAY ก่อน
 -- ========================================================
 local topSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 154))
 Window:CreateToggle(topSubTray, "Auto Upgrade All", 0, { On = Color3.fromRGB(90, 195, 60), Off = Color3.fromRGB(120, 120, 130) }, states.AutoUpgrade, function(v)
@@ -679,14 +679,13 @@ end)
 
 local bottomSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 162), UDim2.new(0.5, -20, 1, -174))
 
--- สร้าง Toggle Auto Place โดยตรงบน bottomSubTray
+-- สร้าง Toggle Auto Place
 local autoPlaceToggleUpdater = nil
 autoPlaceToggleUpdater = Window:CreateToggle(bottomSubTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
     states.AutoPlace = v
     saveConfigState()
 end)
 
--- ถ้าตรวจพบ PlaceId ตรงกับพรีเซ็ต ให้เปิดสวิตช์ Auto Place บน UI ทันที
 if matchedPlaceStage and autoPlaceToggleUpdater then
     autoPlaceToggleUpdater(true)
 end
@@ -744,7 +743,7 @@ local function createBottomActionButton(text: string, yPos: number, rimColor: Co
 end
 
 -- ========================================================
--- RECORD PAGE (พร้อมแสดง PLACEID และ MAP NAME)
+-- RECORD PAGE
 -- ========================================================
 local RecordPage = Window:CreatePage("RecordView")
 
@@ -786,7 +785,6 @@ backBtn.Activated:Connect(function()
     RecordPage.Hide()
 end)
 
--- ป้ายแสดง PlaceId และชื่อแมพปัจจุบัน
 local mapInfoBadge = Instance.new("Frame")
 mapInfoBadge.Size = UDim2.new(1, -105, 1, 0)
 mapInfoBadge.Position = UDim2.fromOffset(105, 0)
