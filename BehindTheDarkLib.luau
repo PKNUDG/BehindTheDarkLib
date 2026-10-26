@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (SUB-PAGE SUPPORT)
+-- BEHIND THE DARK : CORE UI LIBRARY (SUB-PAGE & MODAL POPUP)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -286,6 +286,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     screenGui.ResetOnSpawn = false
     screenGui.IgnoreGuiInset = true
     screenGui.DisplayOrder = 999999
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
     local success = pcall(function() screenGui.Parent = CoreGui end)
     if not success then
@@ -652,6 +653,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     settingsModal.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
     settingsModal.BorderSizePixel = 0
     settingsModal.ZIndex = 70
+    settingsModal.Active = true
     settingsModal.Visible = false
     settingsModal.Parent = card
     Instance.new("UICorner", settingsModal).CornerRadius = UDim.new(0, 18)
@@ -769,35 +771,52 @@ function Library:GetColumn(side: string): Frame
 end
 
 -- ========================================================
--- ฟังก์ชันสร้างหน้าต่างใหม่ (SUB-PAGE MODAL)
+-- ฟังก์ชันสร้างหน้าต่างใหม่ (SUB-PAGE MODAL + BACKDROP)
 -- ========================================================
 function Library:CreateSubPage(config: {Title: string, Size: UDim2?})
     local width = config.Size and config.Size.X.Offset or 520
     local height = config.Size and config.Size.Y.Offset or 360
 
+    -- แผ่นม่านโปร่งแสงบังด้านหลัง (Backdrop)
+    local backdrop = Instance.new("TextButton")
+    backdrop.Name = "SubPageBackdrop_" .. config.Title
+    backdrop.Size = UDim2.fromScale(1, 1)
+    backdrop.BackgroundColor3 = Color3.fromRGB(15, 5, 25)
+    backdrop.BackgroundTransparency = 0.45
+    backdrop.Text = ""
+    backdrop.AutoButtonColor = false
+    backdrop.BorderSizePixel = 0
+    backdrop.ZIndex = 80
+    backdrop.Visible = false
+    backdrop.Parent = self.CardInner
+
     local pageFrame = Instance.new("Frame")
-    pageFrame.Name = "SubPage_" .. config.Title
+    pageFrame.Name = "SubPageFrame"
     pageFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     pageFrame.Size = UDim2.fromOffset(width, height)
     pageFrame.Position = UDim2.fromScale(0.5, 0.5)
-    pageFrame.BackgroundColor3 = Color3.fromRGB(45, 14, 72)
+    pageFrame.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
     pageFrame.BorderSizePixel = 0
-    pageFrame.ZIndex = 50
-    pageFrame.Visible = false
-    pageFrame.Parent = self.CardInner
+    pageFrame.ZIndex = 82
+    pageFrame.Active = true
+    pageFrame.Parent = backdrop
     Instance.new("UICorner", pageFrame).CornerRadius = UDim.new(0, 20)
 
     local stroke = Instance.new("UIStroke", pageFrame)
     stroke.Thickness = 4
     stroke.Color = Color3.fromRGB(22, 5, 36)
 
-    -- Title Bar ของ Sub-Page
+    local subScale = Instance.new("UIScale")
+    subScale.Scale = 1
+    subScale.Parent = pageFrame
+
+    -- Header Title Bar
     local header = Instance.new("Frame")
-    header.Size = UDim2.new(1, -20, 0, 40)
+    header.Size = UDim2.new(1, -20, 0, 42)
     header.Position = UDim2.fromOffset(10, 10)
     header.BackgroundColor3 = Color3.fromRGB(75, 28, 115)
     header.BorderSizePixel = 0
-    header.ZIndex = 51
+    header.ZIndex = 83
     header.Parent = pageFrame
     Instance.new("UICorner", header).CornerRadius = UDim.new(0, 12)
     local hs = Instance.new("UIStroke", header)
@@ -813,13 +832,12 @@ function Library:CreateSubPage(config: {Title: string, Size: UDim2?})
     titleLbl.TextSize = 15
     titleLbl.Font = Enum.Font.FredokaOne
     titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-    titleLbl.ZIndex = 52
+    titleLbl.ZIndex = 84
     titleLbl.Parent = header
     local ts = Instance.new("UIStroke", titleLbl)
     ts.Thickness = 2.5
     ts.Color = Color3.fromRGB(22, 5, 36)
 
-    -- ปุ่มปิดหน้า Sub-Page
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.fromOffset(28, 28)
     closeBtn.Position = UDim2.new(1, -34, 0.5, -14)
@@ -829,34 +847,47 @@ function Library:CreateSubPage(config: {Title: string, Size: UDim2?})
     closeBtn.TextSize = 14
     closeBtn.Font = Enum.Font.FredokaOne
     closeBtn.BorderSizePixel = 0
-    closeBtn.ZIndex = 52
+    closeBtn.ZIndex = 84
     closeBtn.Parent = header
     Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
     Library.AttachInteractiveEffects(closeBtn)
 
-    closeBtn.Activated:Connect(function()
-        pageFrame.Visible = false
-        Library.PlaySound(SOUND_CLICK)
-    end)
+    local function closePage()
+        if Library.Settings.Animations then
+            local tw = TweenService:Create(subScale, windowSquishClose, { Scale = 0.05 })
+            tw:Play()
+            tw.Completed:Wait()
+        end
+        backdrop.Visible = false
+        subScale.Scale = 1
+        Library.PlaySound(SOUND_TOGGLE)
+    end
+
+    local function openPage()
+        backdrop.Visible = true
+        Library.PlaySound(SOUND_TOGGLE)
+        if Library.Settings.Animations then
+            subScale.Scale = 0.05
+            TweenService:Create(subScale, windowPopOpen, { Scale = 1 }):Play()
+        else
+            subScale.Scale = 1
+        end
+    end
+
+    closeBtn.Activated:Connect(closePage)
 
     local content = Instance.new("Frame")
     content.Size = UDim2.new(1, -20, 1, -66)
-    content.Position = UDim2.fromOffset(10, 56)
+    content.Position = UDim2.fromOffset(10, 58)
     content.BackgroundTransparency = 1
-    content.ZIndex = 51
+    content.ZIndex = 83
     content.Parent = pageFrame
 
     return {
         Frame = pageFrame,
         Content = content,
-        Open = function()
-            pageFrame.Visible = true
-            Library.PlaySound(SOUND_TOGGLE)
-        end,
-        Close = function()
-            pageFrame.Visible = false
-            Library.PlaySound(SOUND_TOGGLE)
-        end
+        Open = openPage,
+        Close = closePage
     }
 end
 
