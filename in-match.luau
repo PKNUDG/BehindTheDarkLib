@@ -887,48 +887,7 @@ stageDropdown = Window:CreateDropdown(bottomSubTray, "Stage", 46, getStageNames(
 end)
 
 local function createBottomActionButton(text: string, yPos: number, rimColor: Color3, btnColor: Color3, callback: () -> ())
-    local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(1, 0, 0, 42)
-    shadow.Position = UDim2.fromOffset(0, yPos)
-    shadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
-    shadow.BorderSizePixel = 0
-    shadow.ZIndex = 8
-    shadow.Parent = bottomSubTray
-    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 14)
-
-    local rim = Instance.new("Frame")
-    rim.Size = UDim2.new(1, 0, 0, 39)
-    rim.Position = UDim2.fromOffset(0, 0)
-    rim.BackgroundColor3 = rimColor
-    rim.BorderSizePixel = 0
-    rim.ZIndex = 9
-    rim.Parent = shadow
-    Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 14)
-    local rs = Instance.new("UIStroke")
-    rs.Parent = rim
-    rs.Thickness = 2.5
-    rs.Color = Color3.fromRGB(22, 5, 36)
-
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -6, 1, -5)
-    btn.Position = UDim2.fromOffset(3, 2)
-    btn.BackgroundColor3 = btnColor
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 13.5
-    btn.Font = Enum.Font.FredokaOne
-    btn.BorderSizePixel = 0
-    btn.AutoButtonColor = false
-    btn.ZIndex = 10
-    btn.Parent = rim
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 11)
-    local bts = Instance.new("UIStroke")
-    bts.Parent = btn
-    bts.Thickness = 2.5
-    bts.Color = Color3.fromRGB(22, 5, 36)
-
-    Library.AttachInteractiveEffects(btn, shadow)
-    btn.Activated:Connect(callback)
+    Window:CreateActionButton(bottomSubTray, text, yPos, rimColor, btnColor, callback)
 end
 
 -- ========================================================
@@ -1096,7 +1055,6 @@ local function swapUnits(stageName: string, idx1: number, idx2: number)
         q[idx1] = q[idx2]
         q[idx2] = temp
         savePresetsToFile()
-        Library.PlaySound("rbxassetid://6895079853")
         if refreshRecordUI then refreshRecordUI() end
     end
 end
@@ -1200,7 +1158,6 @@ recToggleBtn.Activated:Connect(function()
     states.RecordStageName = clean
     stageInput.Text = clean
 
-    Library.PlaySound("rbxassetid://9069609268")
     if states.RecordMode then
         if states.AutoPlace and autoPlaceToggleUpdater then autoPlaceToggleUpdater(false) end
         recToggleBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
@@ -1260,7 +1217,6 @@ undoBtn.Activated:Connect(function()
     if clean ~= "" and StagePresets[clean] and #StagePresets[clean] > 0 then
         table.remove(StagePresets[clean], #StagePresets[clean])
         savePresetsToFile()
-        Library.PlaySound("rbxassetid://6895079853")
         refreshRecordUI()
     end
 end)
@@ -1299,7 +1255,6 @@ clearBtn.Activated:Connect(function()
     if clean ~= "" then
         StagePresets[clean] = {}
         savePresetsToFile()
-        Library.PlaySound("rbxassetid://6895079853")
         refreshRecordUI()
     end
 end)
@@ -1338,7 +1293,6 @@ delPresetBtn.Activated:Connect(function()
     if clean ~= "" and StagePresets[clean] ~= nil then
         StagePresets[clean] = nil
         savePresetsToFile()
-        Library.PlaySound("rbxassetid://6895079853")
         print(string.format("[PresetManager] ลบพรีเซ็ตด่าน '%s' ออกจากระบบเรียบร้อย", clean))
 
         local names = getStageNames()
@@ -1367,7 +1321,6 @@ end)
 createBottomActionButton("Reload Presets", 136, Color3.fromRGB(255, 220, 110), Color3.fromRGB(240, 160, 45), function()
     loadPresetsFromFile()
     stageDropdown.SetOptions(getStageNames())
-    Library.PlaySound("rbxassetid://6895079853")
     print("[PresetManager] โหลดค่าพรีเซ็ตสำเร็จ!")
 end)
 

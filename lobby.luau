@@ -194,56 +194,11 @@ end)
 
 local shopSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 76), UDim2.new(0.5, -20, 1, -88))
 
-local function createShopActionButton(parentTarget: Instance, text: string, yPos: number, rimColor: Color3, btnColor: Color3, callback: () -> ())
-    local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(1, 0, 0, 44)
-    shadow.Position = UDim2.fromOffset(0, yPos)
-    shadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
-    shadow.BorderSizePixel = 0
-    shadow.ZIndex = 5
-    shadow.Parent = parentTarget
-    Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 14)
-
-    local rim = Instance.new("Frame")
-    rim.Size = UDim2.new(1, 0, 0, 41)
-    rim.Position = UDim2.fromOffset(0, 0)
-    rim.BackgroundColor3 = rimColor
-    rim.BorderSizePixel = 0
-    rim.ZIndex = 6
-    rim.Parent = shadow
-    Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 14)
-    local rs = Instance.new("UIStroke")
-    rs.Parent = rim
-    rs.Thickness = 2.5
-    rs.Color = Color3.fromRGB(22, 5, 36)
-
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -6, 1, -5)
-    btn.Position = UDim2.fromOffset(3, 2)
-    btn.BackgroundColor3 = btnColor
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 13.5
-    btn.Font = Enum.Font.FredokaOne
-    btn.BorderSizePixel = 0
-    btn.AutoButtonColor = false
-    btn.ZIndex = 7
-    btn.Parent = rim
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 11)
-    local bts = Instance.new("UIStroke")
-    bts.Parent = btn
-    bts.Thickness = 2.5
-    bts.Color = Color3.fromRGB(22, 5, 36)
-
-    Library.AttachInteractiveEffects(btn, shadow)
-    btn.Activated:Connect(callback)
-end
-
-createShopActionButton(shopSubTray, "Buy Trait Crystal x10", 0, Color3.fromRGB(140, 240, 180), Color3.fromRGB(60, 210, 140), function()
+Window:CreateActionButton(shopSubTray, "Buy Trait Crystal x10", 0, Color3.fromRGB(140, 240, 180), Color3.fromRGB(60, 210, 140), function()
     buyItemFromTeller("crystal", 10)
 end)
 
-createShopActionButton(shopSubTray, "Buy Unit of Juice x10", 46, Color3.fromRGB(255, 185, 110), Color3.fromRGB(255, 140, 40), function()
+Window:CreateActionButton(shopSubTray, "Buy Unit of Juice x10", 46, Color3.fromRGB(255, 185, 110), Color3.fromRGB(255, 140, 40), function()
     buyItemFromTeller("statroll", 10)
 end)
 
