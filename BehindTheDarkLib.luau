@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (FULL ENHANCED THEME)
+-- BEHIND THE DARK : CORE UI LIBRARY (SUB-PAGE SUPPORT)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -23,7 +23,6 @@ Library.Settings = {
     WindowPos = nil
 }
 
--- เสียงการ์ตูนเอฟเฟกต์
 local SOUND_CLICK = "rbxassetid://6895079853"
 local SOUND_TOGGLE = "rbxassetid://9069609268"
 
@@ -317,7 +316,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     blackout.Parent = blackoutGui
     self.BlackoutFrame = blackout
 
-    -- ตำแหน่งเริ่มต้น (ดึงจากตำแหน่งที่บันทึกไว้ใน JSON หรือกึ่งกลางจอ)
     local defaultPos = UDim2.fromScale(0.5, 0.5)
     if Library.Settings.WindowPos and type(Library.Settings.WindowPos) == "table" then
         defaultPos = UDim2.new(
@@ -357,6 +355,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     card.BorderSizePixel = 0
     card.ClipsDescendants = true
     card.ZIndex = 2
+    card.Active = false
     card.Parent = outerBorder
     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 23)
 
@@ -371,6 +370,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
 
     applyCartoonSurface(card, 2, 23, true)
     self.MainCard = outerBorder
+    self.CardInner = card
 
     local dragGhost = Instance.new("Frame")
     dragGhost.Name = "GhostDragFrame"
@@ -472,7 +472,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
                 Position = finalPos
             }):Play()
 
-            -- จดจำตำแหน่งล่าสุดลงไฟล์ JSON
             Library.Settings.WindowPos = {
                 XScale = finalPos.X.Scale,
                 XOffset = finalPos.X.Offset,
@@ -770,8 +769,97 @@ function Library:GetColumn(side: string): Frame
 end
 
 -- ========================================================
--- TOGGLE BUTTON (ปุ่ม 3D + ON วงกลมเขียว + อักษรเขียวมะนาวสดเรืองแสงลูป)
+-- ฟังก์ชันสร้างหน้าต่างใหม่ (SUB-PAGE MODAL)
 -- ========================================================
+function Library:CreateSubPage(config: {Title: string, Size: UDim2?})
+    local width = config.Size and config.Size.X.Offset or 520
+    local height = config.Size and config.Size.Y.Offset or 360
+
+    local pageFrame = Instance.new("Frame")
+    pageFrame.Name = "SubPage_" .. config.Title
+    pageFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    pageFrame.Size = UDim2.fromOffset(width, height)
+    pageFrame.Position = UDim2.fromScale(0.5, 0.5)
+    pageFrame.BackgroundColor3 = Color3.fromRGB(45, 14, 72)
+    pageFrame.BorderSizePixel = 0
+    pageFrame.ZIndex = 50
+    pageFrame.Visible = false
+    pageFrame.Parent = self.CardInner
+    Instance.new("UICorner", pageFrame).CornerRadius = UDim.new(0, 20)
+
+    local stroke = Instance.new("UIStroke", pageFrame)
+    stroke.Thickness = 4
+    stroke.Color = Color3.fromRGB(22, 5, 36)
+
+    -- Title Bar ของ Sub-Page
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, -20, 0, 40)
+    header.Position = UDim2.fromOffset(10, 10)
+    header.BackgroundColor3 = Color3.fromRGB(75, 28, 115)
+    header.BorderSizePixel = 0
+    header.ZIndex = 51
+    header.Parent = pageFrame
+    Instance.new("UICorner", header).CornerRadius = UDim.new(0, 12)
+    local hs = Instance.new("UIStroke", header)
+    hs.Thickness = 2.5
+    hs.Color = Color3.fromRGB(22, 5, 36)
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1, -44, 1, 0)
+    titleLbl.Position = UDim2.fromOffset(12, 0)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = config.Title
+    titleLbl.TextColor3 = Color3.fromRGB(255, 225, 95)
+    titleLbl.TextSize = 15
+    titleLbl.Font = Enum.Font.FredokaOne
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.ZIndex = 52
+    titleLbl.Parent = header
+    local ts = Instance.new("UIStroke", titleLbl)
+    ts.Thickness = 2.5
+    ts.Color = Color3.fromRGB(22, 5, 36)
+
+    -- ปุ่มปิดหน้า Sub-Page
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.fromOffset(28, 28)
+    closeBtn.Position = UDim2.new(1, -34, 0.5, -14)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.TextSize = 14
+    closeBtn.Font = Enum.Font.FredokaOne
+    closeBtn.BorderSizePixel = 0
+    closeBtn.ZIndex = 52
+    closeBtn.Parent = header
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
+    Library.AttachInteractiveEffects(closeBtn)
+
+    closeBtn.Activated:Connect(function()
+        pageFrame.Visible = false
+        Library.PlaySound(SOUND_CLICK)
+    end)
+
+    local content = Instance.new("Frame")
+    content.Size = UDim2.new(1, -20, 1, -66)
+    content.Position = UDim2.fromOffset(10, 56)
+    content.BackgroundTransparency = 1
+    content.ZIndex = 51
+    content.Parent = pageFrame
+
+    return {
+        Frame = pageFrame,
+        Content = content,
+        Open = function()
+            pageFrame.Visible = true
+            Library.PlaySound(SOUND_TOGGLE)
+        end,
+        Close = function()
+            pageFrame.Visible = false
+            Library.PlaySound(SOUND_TOGGLE)
+        end
+    }
+end
+
 function Library:CreateToggle(side: string, text: string, yPos: number, _: {On: Color3, Off: Color3}, default: boolean, callback: (boolean) -> ())
     local parent = self:GetColumn(side)
     local state = default or false
@@ -1081,6 +1169,18 @@ function Library:CreateDropdown(side: string, title: string, yPos: number, optio
         Library.PlaySound(SOUND_CLICK)
         if scroll.Visible then populate() end
     end)
+
+    return {
+        SetOptions = function(newOptions: {any})
+            options = newOptions
+            if not table.find(options, selected) and #options > 0 then
+                selected = options[1]
+                selectLabel.Text = string.format("%s: %s", title, tostring(selected))
+                callback(selected)
+            end
+            if scroll.Visible then populate() end
+        end
+    }
 end
 
 function Library:Create3DRenderToggle(side: string)
