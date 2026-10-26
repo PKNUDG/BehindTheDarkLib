@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : IN-MATCH CONTROLLER (RECORD SUB-PAGE & CUSTOM STAGE)
+-- CANDY TD : IN-MATCH CONTROLLER (SUB-PAGE & CUSTOM STAGE)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -238,6 +238,12 @@ local function loadPresetsFromFile()
     if not loaded then
         StagePresets = DefaultStagePresets
         savePresetsToFile()
+    else
+        for k, v in pairs(DefaultStagePresets) do
+            if StagePresets[k] == nil then
+                StagePresets[k] = v
+            end
+        end
     end
 end
 
@@ -269,7 +275,7 @@ local states = {
 local onUnitRecorded: (() -> ())? = nil
 
 -- ========================================================
--- IN-GAME RECORDER HOOK
+-- IN-GAME RECORDER HOOK (ปลอดภัย ไม่ทำเกมหลุด)
 -- ========================================================
 local function hookPlacementRecorder()
     local hookMeta = (type(hookmetamethod) == "function" and hookmetamethod) or nil
@@ -278,7 +284,7 @@ local function hookPlacementRecorder()
         oldNamecall = hookMeta(game, "__namecall", function(self, ...)
             local method = getnamecallmethod()
             local args = { ... }
-            if states.RecordMode and method == "InvokeServer" and tostring(self.Name) == "Act" then
+            if states.RecordMode and (method == "InvokeServer" or method == "FireServer") and (tostring(self.Name) == "Act" or tostring(self.Name) == "Request") then
                 local targetStage = (states.RecordStageName and states.RecordStageName ~= "") and states.RecordStageName or states.CurrentStage
                 if args[1] == "place" and args[2] and args[3] and args[4] then
                     StagePresets[targetStage] = StagePresets[targetStage] or {}
@@ -289,16 +295,19 @@ local function hookPlacementRecorder()
                         z = tonumber(args[4])
                     })
                     savePresetsToFile()
-                    print(string.format("[Recorder] บันทึกในด่าน '%s' ลำดับที่ %d: %s (X: %.2f, Z: %.2f)", targetStage, #currentQueue, tostring(args[2]), tonumber(args[3]), tonumber(args[4])))
+                    print(string.format("[Recorder] บันทึกลำดับที่ %d: %s (X: %.2f, Z: %.2f) ในด่าน '%s'", #currentQueue, tostring(args[2]), tonumber(args[3]), tonumber(args[4]), targetStage))
                     if onUnitRecorded then onUnitRecorded() end
                 elseif args[1] == "target" and args[3] then
                     local currentQueue = StagePresets[targetStage]
                     if currentQueue and #currentQueue > 0 then
                         currentQueue[#currentQueue].setTarget = tostring(args[3])
                         savePresetsToFile()
-                        print(string.format("[Recorder] บันทึก Target ในด่าน '%s' ลำดับที่ %d: %s", targetStage, #currentQueue, tostring(args[3])))
+                        print(string.format("[Recorder] บันทึก Target ลำดับที่ %d: %s ในด่าน '%s'", #currentQueue, tostring(args[3]), targetStage))
                     end
                 end
+            end
+            if setnamecallmethod then
+                setnamecallmethod(method)
             end
             return oldNamecall(self, ...)
         end)
@@ -534,23 +543,24 @@ end)
 
 local stageDropdown = Window:CreateDropdown("Right", "Stage", 190, getStageNames(), states.CurrentStage, 10, function(selected)
     states.CurrentStage = selected
+    states.RecordStageName = selected
 end)
 
 -- ========================================================
--- หน้าต่างใหม่สำหรับ RECORD MODE (SUB-PAGE)
+-- หน้าต่างใหม่ RECORD MODE (SUB-PAGE MODAL)
 -- ========================================================
 local RecordPage = Window:CreateSubPage({
     Title = "RECORD & PRESET SETUP",
-    Size = UDim2.fromOffset(500, 310)
+    Size = UDim2.fromOffset(480, 310)
 })
 
--- 1. ช่องกรอกชื่อด่าน (TextBox เพิ่มชื่อด่านเอง ไม่ทับด่านเก่า)
+-- 1. ช่องกรอกชื่อด่าน (TextBox ไม่ทับด่านเดิม)
 local nameBoxShadow = Instance.new("Frame")
 nameBoxShadow.Size = UDim2.new(1, 0, 0, 42)
 nameBoxShadow.Position = UDim2.fromOffset(0, 0)
 nameBoxShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
 nameBoxShadow.BorderSizePixel = 0
-nameBoxShadow.ZIndex = 52
+nameBoxShadow.ZIndex = 84
 nameBoxShadow.Parent = RecordPage.Content
 Instance.new("UICorner", nameBoxShadow).CornerRadius = UDim.new(0, 12)
 
@@ -559,7 +569,7 @@ nameBoxRim.Size = UDim2.new(1, 0, 0, 39)
 nameBoxRim.Position = UDim2.fromOffset(0, 0)
 nameBoxRim.BackgroundColor3 = Color3.fromRGB(115, 95, 175)
 nameBoxRim.BorderSizePixel = 0
-nameBoxRim.ZIndex = 53
+nameBoxRim.ZIndex = 85
 nameBoxRim.Parent = nameBoxShadow
 Instance.new("UICorner", nameBoxRim).CornerRadius = UDim.new(0, 12)
 local nbs = Instance.new("UIStroke", nameBoxRim)
@@ -567,32 +577,20 @@ nbs.Thickness = 2.5
 nbs.Color = Color3.fromRGB(22, 5, 36)
 
 local stageInput = Instance.new("TextBox")
-stageInput.Size = UDim2.new(1, -6, 1, -5)
-stageInput.Position = UDim2.fromOffset(3, 2)
+stageInput.Size = UDim2.new(1, -8, 1, -6)
+stageInput.Position = UDim2.fromOffset(4, 3)
 stageInput.BackgroundColor3 = Color3.fromRGB(36, 12, 58)
 stageInput.BorderSizePixel = 0
 stageInput.Text = states.RecordStageName
-stageInput.PlaceholderText = "Type stage name here..."
+stageInput.PlaceholderText = "Type new stage name here..."
 stageInput.PlaceholderColor3 = Color3.fromRGB(160, 145, 185)
 stageInput.TextColor3 = Color3.fromRGB(255, 235, 110)
 stageInput.TextSize = 13.5
 stageInput.Font = Enum.Font.FredokaOne
 stageInput.ClearTextOnFocus = false
-stageInput.ZIndex = 54
+stageInput.ZIndex = 86
 stageInput.Parent = nameBoxRim
 Instance.new("UICorner", stageInput).CornerRadius = UDim.new(0, 10)
-
-stageInput.FocusLost:Connect(function()
-    local txt = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
-    if txt ~= "" then
-        states.RecordStageName = txt
-        if not StagePresets[txt] then
-            StagePresets[txt] = {}
-            savePresetsToFile()
-            stageDropdown.SetOptions(getStageNames())
-        end
-    end
-end)
 
 -- 2. แถบแสดงสถานะยูนิตที่บันทึก
 local recordStatusLabel = Instance.new("TextLabel")
@@ -600,11 +598,11 @@ recordStatusLabel.Size = UDim2.new(1, 0, 0, 34)
 recordStatusLabel.Position = UDim2.fromOffset(0, 52)
 recordStatusLabel.BackgroundColor3 = Color3.fromRGB(30, 8, 48)
 recordStatusLabel.BorderSizePixel = 0
-recordStatusLabel.Text = string.format("Units recorded in '%s': %d", states.RecordStageName, #(StagePresets[states.RecordStageName] or {}))
+recordStatusLabel.Text = string.format("Target: '%s' | Recorded: %d units", states.RecordStageName, #(StagePresets[states.RecordStageName] or {}))
 recordStatusLabel.TextColor3 = Color3.fromRGB(242, 230, 255)
 recordStatusLabel.TextSize = 13
 recordStatusLabel.Font = Enum.Font.FredokaOne
-recordStatusLabel.ZIndex = 52
+recordStatusLabel.ZIndex = 84
 recordStatusLabel.Parent = RecordPage.Content
 Instance.new("UICorner", recordStatusLabel).CornerRadius = UDim.new(0, 10)
 local rsls = Instance.new("UIStroke", recordStatusLabel)
@@ -612,9 +610,15 @@ rsls.Thickness = 2
 rsls.Color = Color3.fromRGB(22, 5, 36)
 
 onUnitRecorded = function()
-    local count = #(StagePresets[states.RecordStageName] or {})
-    recordStatusLabel.Text = string.format("Units recorded in '%s': %d", states.RecordStageName, count)
+    local tName = (stageInput.Text ~= "") and stageInput.Text or states.RecordStageName
+    local count = #(StagePresets[tName] or {})
+    recordStatusLabel.Text = string.format("Target: '%s' | Recorded: %d units", tName, count)
 end
+
+stageInput:GetPropertyChangedSignal("Text"):Connect(function()
+    states.RecordStageName = stageInput.Text
+    onUnitRecorded()
+end)
 
 -- 3. ปุ่มสลับ Record ON/OFF ในหน้า Sub-Page
 local recordBtnShadow = Instance.new("Frame")
@@ -622,7 +626,7 @@ recordBtnShadow.Size = UDim2.new(1, 0, 0, 44)
 recordBtnShadow.Position = UDim2.fromOffset(0, 96)
 recordBtnShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
 recordBtnShadow.BorderSizePixel = 0
-recordBtnShadow.ZIndex = 52
+recordBtnShadow.ZIndex = 84
 recordBtnShadow.Parent = RecordPage.Content
 Instance.new("UICorner", recordBtnShadow).CornerRadius = UDim.new(0, 14)
 
@@ -631,7 +635,7 @@ recordBtnRim.Size = UDim2.new(1, 0, 0, 41)
 recordBtnRim.Position = UDim2.fromOffset(0, 0)
 recordBtnRim.BackgroundColor3 = Color3.fromRGB(195, 150, 250)
 recordBtnRim.BorderSizePixel = 0
-recordBtnRim.ZIndex = 53
+recordBtnRim.ZIndex = 85
 recordBtnRim.Parent = recordBtnShadow
 Instance.new("UICorner", recordBtnRim).CornerRadius = UDim.new(0, 14)
 local rbs = Instance.new("UIStroke", recordBtnRim)
@@ -648,7 +652,7 @@ recordBtn.Text = "START RECORDING (OFF)"
 recordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 recordBtn.TextSize = 14
 recordBtn.Font = Enum.Font.FredokaOne
-recordBtn.ZIndex = 54
+recordBtn.ZIndex = 86
 recordBtn.Parent = recordBtnRim
 Instance.new("UICorner", recordBtn).CornerRadius = UDim.new(0, 11)
 local rts = Instance.new("UIStroke", recordBtn)
@@ -658,10 +662,14 @@ Library.AttachInteractiveEffects(recordBtn, recordBtnShadow)
 
 recordBtn.Activated:Connect(function()
     states.RecordMode = not states.RecordMode
+    local cleanName = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
+    if cleanName == "" then cleanName = "Custom Stage" end
+    states.RecordStageName = cleanName
+    stageInput.Text = cleanName
+
     Library.PlaySound("rbxassetid://9069609268")
     if states.RecordMode then
-        local tStage = states.RecordStageName
-        StagePresets[tStage] = StagePresets[tStage] or {}
+        StagePresets[cleanName] = StagePresets[cleanName] or {}
         recordBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
         recordBtn.Text = "RECORDING NOW... (CLICK TO STOP)"
         recordBtnRim.BackgroundColor3 = Color3.fromRGB(255, 140, 150)
@@ -681,7 +689,7 @@ clearBtnShadow.Size = UDim2.new(1, 0, 0, 40)
 clearBtnShadow.Position = UDim2.fromOffset(0, 150)
 clearBtnShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
 clearBtnShadow.BorderSizePixel = 0
-clearBtnShadow.ZIndex = 52
+clearBtnShadow.ZIndex = 84
 clearBtnShadow.Parent = RecordPage.Content
 Instance.new("UICorner", clearBtnShadow).CornerRadius = UDim.new(0, 12)
 
@@ -694,7 +702,7 @@ clearBtn.Text = "CLEAR CURRENT STAGE DATA"
 clearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 clearBtn.TextSize = 13
 clearBtn.Font = Enum.Font.FredokaOne
-clearBtn.ZIndex = 54
+clearBtn.ZIndex = 86
 clearBtn.Parent = clearBtnShadow
 Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 10)
 local cs = Instance.new("UIStroke", clearBtn)
@@ -703,10 +711,13 @@ cs.Color = Color3.fromRGB(22, 5, 36)
 Library.AttachInteractiveEffects(clearBtn, clearBtnShadow)
 
 clearBtn.Activated:Connect(function()
-    StagePresets[states.RecordStageName] = {}
-    savePresetsToFile()
-    Library.PlaySound("rbxassetid://6895079853")
-    onUnitRecorded()
+    local cleanName = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
+    if cleanName ~= "" then
+        StagePresets[cleanName] = {}
+        savePresetsToFile()
+        Library.PlaySound("rbxassetid://6895079853")
+        onUnitRecorded()
+    end
 end)
 
 -- ========================================================
@@ -757,6 +768,8 @@ end
 
 -- 1. ปุ่มเปิดหน้า Record Mode Setup
 createNavButton("Setup Record & Presets ⚙", 236, Color3.fromRGB(255, 145, 160), Color3.fromRGB(235, 65, 85), function()
+    stageInput.Text = states.CurrentStage
+    states.RecordStageName = states.CurrentStage
     onUnitRecorded()
     RecordPage.Open()
 end)
