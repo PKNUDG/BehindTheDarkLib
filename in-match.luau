@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : IN-MATCH CONTROLLER (AUTO PERSIST & PURE SUB-TRAYS)
+-- CANDY TD : IN-MATCH CONTROLLER (FIXED RECORD & MAP INFO)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -12,6 +12,7 @@ local TeleportService = game:GetService("TeleportService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -240,9 +241,7 @@ local function getStageNames(): {string}
     return names
 end
 
--- ========================================================
--- โหลดและใช้งาน BEHINDTHEDARKLIB
--- ========================================================
+-- โหลด BEHINDTHEDARKLIB
 local libUrl = "https://raw.githubusercontent.com/PKNUDG/BehindTheDarkLib/main/BehindTheDarkLib.luau?v=" .. os.time()
 local libRaw = game:HttpGet(libUrl)
 local libChunk, libErr = loadstring(libRaw)
@@ -280,28 +279,193 @@ local function saveConfigState()
     Library.SaveSettings()
 end
 
--- ระบบตรวจจับ PlaceId และเปิด Auto Place เองอัตโนมัติ
+-- ========================================================
+-- ตรวจจับ PLACE ID & MAP NAME
+-- ========================================================
 local currentPlaceId = tostring(game.PlaceId)
 while (not currentPlaceId or currentPlaceId == "0") do
     task.wait(0.2)
     currentPlaceId = tostring(game.PlaceId)
 end
 
-local placeIdMatched = false
+local currentMapName = "Custom Match"
+pcall(function()
+    local info = MarketplaceService:GetProductInfo(game.PlaceId)
+    if info and info.Name then
+        currentMapName = info.Name
+    end
+end)
+
 if Library.Settings.PlaceIdStageMap and Library.Settings.PlaceIdStageMap[currentPlaceId] then
     local mapped = Library.Settings.PlaceIdStageMap[currentPlaceId]
     if StagePresets[mapped] then
         states.CurrentStage = mapped
         states.RecordStageName = mapped
         states.AutoPlace = true
-        placeIdMatched = true
-        print(string.format("[AutoStage] แมปตรงกับ PlaceId: %s -> ด่าน %s (เปิด Auto Place ให้ทันที)", currentPlaceId, mapped))
+        print(string.format("[AutoStage] แมปตรงกับ PlaceId: %s -> ด่าน %s (เปิด Auto Place อัตโนมัติ)", currentPlaceId, mapped))
     end
 elseif Library.Settings.SelectedStage and StagePresets[Library.Settings.SelectedStage] then
     states.CurrentStage = Library.Settings.SelectedStage
     states.RecordStageName = Library.Settings.SelectedStage
 end
 
+local refreshRecordUI: (() -> ())? = nil
+local lastRecordTick = 0
+
+-- ========================================================
+-- แก้ไขระบบ RECORD (รองรับ Remote & Direct Call)
+-- ========================================================
+local function handleRecordInput(...)
+    if not states.RecordMode then return end
+    local rawArgs = { ... }
+    if #rawArgs == 0 then return end
+
+    local isPlace = false
+    local isTarget = false
+    local unitName = nil
+    local posX, posZ = nil, nil
+    local targetMode = nil
+
+    for _, arg in ipairs(rawArgs) do
+        local str = tostring(arg):lower()
+        if str == "place" then
+            isPlace = true
+        elseif str == "target" then
+            isTarget = true
+        elseif typeof(arg) == "Vector3" then
+            posX, posZ = arg.X, arg.Z
+        elseif typeof(arg) == "CFrame" then
+            posX, posZ = arg.Position.X, arg.Position.Z
+        elseif type(arg) == "table" then
+            if arg.unit or arg.name or arg.Name or arg.Unit then
+                unitName = tostring(arg.unit or arg.name or arg.Name or arg.Unit)
+            end
+            if arg.x or arg.X then posX = tonumber(arg.x or arg.X) end
+            if arg.z or arg.Z then posZ = tonumber(arg.z or arg.Z) end
+            if tostring(arg.action or arg.Action):lower() == "place" then isPlace = true end
+            if tostring(arg.action or arg.Action):lower() == "target" then isTarget = true end
+        end
+    end
+
+    if not isPlace and not isTarget then
+        -- ตรวจสอบโครงสร้างคำสั่งแบบ arg[1] = "place", arg[2] = unit, arg[3] = X, arg[4] = Z
+        if type(rawArgs[1]) == "string" and rawArgs[1]:lower() == "place" then
+            isPlace = true
+            unitName = tostring(rawArgs[2])
+            posX = tonumber(rawArgs[3])
+            posZ = tonumber(rawArgs[4])
+        elseif type(rawArgs[1]) == "string" and rawArgs[1]:lower() == "target" then
+            isTarget = true
+            targetMode = tostring(rawArgs[3] or rawArgs[2])
+        end
+    end
+
+    if isPlace then
+        if not unitName then
+            for _, arg in ipairs(rawArgs) do
+                if type(arg) == "string" and arg:lower() ~= "place" and not tonumber(arg) then
+                    unitName = arg
+                    break
+                end
+            end
+        end
+
+        if not posX or not posZ then
+            local nums = {}
+            for _, arg in ipairs(rawArgs) do
+                if type(arg) == "number" then
+                    table.insert(nums, arg)
+                end
+            end
+            if #nums >= 2 then
+                posX, posZ = nums[1], nums[2]
+            end
+        end
+
+        if unitName and posX and posZ then
+            local targetStage = (states.RecordStageName and states.RecordStageName ~= "") and states.RecordStageName or states.CurrentStage
+            StagePresets[targetStage] = StagePresets[targetStage] or {}
+            local currentQueue = StagePresets[targetStage]
+
+            if tick() - lastRecordTick < 0.15 then
+                local last = currentQueue[#currentQueue]
+                if last and last.unit == unitName and math.abs((last.x or 0) - posX) < 0.05 and math.abs((last.z or 0) - posZ) < 0.05 then
+                    return
+                end
+            end
+            lastRecordTick = tick()
+
+            table.insert(currentQueue, {
+                unit = unitName,
+                x = posX,
+                z = posZ
+            })
+
+            task.spawn(function()
+                savePresetsToFile()
+                if refreshRecordUI then refreshRecordUI() end
+            end)
+            print(string.format("[Recorder] บันทึกสำเร็จ: #%d %s (X: %.1f, Z: %.1f) ในด่าน '%s'", #currentQueue, unitName, posX, posZ, targetStage))
+        end
+
+    elseif isTarget then
+        for _, arg in ipairs(rawArgs) do
+            if type(arg) == "string" and arg:lower() ~= "target" then
+                targetMode = arg
+            end
+        end
+        if targetMode then
+            local targetStage = (states.RecordStageName and states.RecordStageName ~= "") and states.RecordStageName or states.CurrentStage
+            local currentQueue = StagePresets[targetStage]
+            if currentQueue and #currentQueue > 0 then
+                currentQueue[#currentQueue].setTarget = targetMode
+                task.spawn(function()
+                    savePresetsToFile()
+                    if refreshRecordUI then refreshRecordUI() end
+                end)
+                print(string.format("[Recorder] บันทึก Target สำเร็จ: #%d %s -> %s", #currentQueue, currentQueue[#currentQueue].unit, targetMode))
+            end
+        end
+    end
+end
+
+_G.CandyTD_ActiveRecordHandler = handleRecordInput
+
+-- ติดตั้ง Hook
+local function installPlacementHook()
+    if matchNet and type(matchNet.request) == "function" then
+        local oldReq = matchNet.request
+        matchNet.request = function(...)
+            local args = { ... }
+            task.spawn(function()
+                if _G.CandyTD_ActiveRecordHandler then
+                    _G.CandyTD_ActiveRecordHandler(unpack(args))
+                end
+            end)
+            return oldReq(...)
+        end
+    end
+
+    local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
+    local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
+    if actRemote and typeof(hookfunction) == "function" then
+        local oldInvoke
+        oldInvoke = hookfunction(actRemote.InvokeServer, function(self, ...)
+            local args = { ... }
+            task.spawn(function()
+                if _G.CandyTD_ActiveRecordHandler then
+                    _G.CandyTD_ActiveRecordHandler(unpack(args))
+                end
+            end)
+            return oldInvoke(self, ...)
+        end)
+    end
+end
+pcall(installPlacementHook)
+
+-- ========================================================
+-- WINDOW & UI LAYOUT
+-- ========================================================
 local Window = Library:CreateWindow({
     Title = "BEHIND THE DARK",
     Name = "CandyTD_BehindTheDarkHub",
@@ -318,16 +482,12 @@ local Window = Library:CreateWindow({
 })
 Controller.Gui = Window.Gui
 
--- ซ่อนกรอบเดิมฝั่งขวา เพื่อให้เหลือเฉพาะ 2 กล่องแยกที่สร้างใหม่
 if Window.RightColumn and Window.RightColumn.Parent and Window.RightColumn.Parent.Parent then
     Window.RightColumn.Parent.Parent.Visible = false
 end
 
--- ========================================================
--- ฝั่งซ้าย (LEFT COLUMN)
--- ========================================================
+-- ซ้าย
 local visualUpdaters = {}
-
 local function updateEndChoiceVisuals()
     if visualUpdaters["NEXT"] then visualUpdaters["NEXT"](states.EndChoice == "NEXT") end
     if visualUpdaters["AGAIN"] then visualUpdaters["AGAIN"](states.EndChoice == "AGAIN") end
@@ -351,7 +511,6 @@ local againLimitUpdater = Window:CreateToggle("Left", "Again Count Limit", 144, 
 end)
 
 local leftCol = Window:GetColumn("Left")
-
 local configBoxShadow = Instance.new("Frame")
 configBoxShadow.Size = UDim2.new(1, 0, 0, 44)
 configBoxShadow.Position = UDim2.fromOffset(0, 190)
@@ -505,12 +664,8 @@ btnPlus.Activated:Connect(function()
     saveConfigState()
 end)
 
--- ========================================================
--- ฝั่งขวา: 2 กล่องแยกอิสระ ไม่มีกรอบซ้อน (SEPARATED TRAYS)
--- ========================================================
--- 1. กล่องบน: Auto Upgrade, Auto Skip Wave, Boost FPS
+-- ขวา 2 กล่องแยก
 local topSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 154))
-
 Window:CreateToggle(topSubTray, "Auto Upgrade All", 0, { On = Color3.fromRGB(90, 195, 60), Off = Color3.fromRGB(120, 120, 130) }, states.AutoUpgrade, function(v)
     states.AutoUpgrade = v
     saveConfigState()
@@ -527,9 +682,7 @@ Window:CreateToggle(topSubTray, "Boost FPS", 92, { On = Color3.fromRGB(50, 205, 
     applyUltraBoostFPS(v)
 end)
 
--- 2. กล่องล่าง: เริ่มตั้งแต่ Auto Place ลงไป
 local bottomSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 162), UDim2.new(0.5, -20, 1, -174))
-
 local autoPlaceToggleUpdater = nil
 autoPlaceToggleUpdater = Window:CreateToggle(bottomSubTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
     states.AutoPlace = v
@@ -589,7 +742,7 @@ local function createBottomActionButton(text: string, yPos: number, rimColor: Co
 end
 
 -- ========================================================
--- ระบบแยกหน้า (SEPARATE RECORD PAGE)
+-- RECORD PAGE (พร้อมแสดง PLACEID และ MAP NAME)
 -- ========================================================
 local RecordPage = Window:CreatePage("RecordView")
 
@@ -601,7 +754,7 @@ recHeader.ZIndex = 6
 recHeader.Parent = RecordPage.Container
 
 local backBtnShadow = Instance.new("Frame")
-backBtnShadow.Size = UDim2.fromOffset(105, 34)
+backBtnShadow.Size = UDim2.fromOffset(95, 34)
 backBtnShadow.Position = UDim2.fromOffset(0, 0)
 backBtnShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
 backBtnShadow.BorderSizePixel = 0
@@ -631,20 +784,28 @@ backBtn.Activated:Connect(function()
     RecordPage.Hide()
 end)
 
-local recTitle = Instance.new("TextLabel")
-recTitle.Size = UDim2.new(1, -120, 1, 0)
-recTitle.Position = UDim2.fromOffset(115, 0)
-recTitle.BackgroundTransparency = 1
-recTitle.Text = "STAGE RECORDER & CUSTOM PRESETS"
-recTitle.TextColor3 = Color3.fromRGB(255, 225, 95)
-recTitle.TextSize = 14
-recTitle.Font = Enum.Font.FredokaOne
-recTitle.TextXAlignment = Enum.TextXAlignment.Left
-recTitle.ZIndex = 6
-recTitle.Parent = recHeader
-local rts = Instance.new("UIStroke", recTitle)
-rts.Thickness = 2.5
-rts.Color = Color3.fromRGB(22, 5, 36)
+-- ป้ายแสดง PlaceId และชื่อแมพปัจจุบัน
+local mapInfoBadge = Instance.new("Frame")
+mapInfoBadge.Size = UDim2.new(1, -105, 1, 0)
+mapInfoBadge.Position = UDim2.fromOffset(105, 0)
+mapInfoBadge.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
+mapInfoBadge.BorderSizePixel = 0
+mapInfoBadge.ZIndex = 6
+mapInfoBadge.Parent = recHeader
+Instance.new("UICorner", mapInfoBadge).CornerRadius = UDim.new(0, 10)
+local mibs = Instance.new("UIStroke", mapInfoBadge)
+mibs.Thickness = 2
+mibs.Color = Color3.fromRGB(22, 5, 36)
+
+local mapInfoLabel = Instance.new("TextLabel")
+mapInfoLabel.Size = UDim2.fromScale(1, 1)
+mapInfoLabel.BackgroundTransparency = 1
+mapInfoLabel.Text = string.format("Map: %s  |  PlaceId: %s", currentMapName, currentPlaceId)
+mapInfoLabel.TextColor3 = Color3.fromRGB(255, 225, 95)
+mapInfoLabel.TextSize = 11.5
+mapInfoLabel.Font = Enum.Font.FredokaOne
+mapInfoLabel.ZIndex = 7
+mapInfoLabel.Parent = mapInfoBadge
 
 local inputShadow = Instance.new("Frame")
 inputShadow.Size = UDim2.new(0.58, -6, 0, 38)
