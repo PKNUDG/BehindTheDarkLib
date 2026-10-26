@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (SUB-COLUMN SUPPORT)
+-- BEHIND THE DARK : CORE UI LIBRARY (PERSISTENT & SUB-CONTAINER)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -21,7 +21,9 @@ Library.Settings = {
     AnimeGlint = true,
     SoundEffects = true,
     WindowPos = nil,
-    SelectedStage = nil
+    SelectedStage = nil,
+    PlaceIdStageMap = {},
+    Configs = {}
 }
 
 local SOUND_CLICK = "rbxassetid://6895079853"
@@ -58,9 +60,7 @@ local function loadSavedSettings()
             local decodedOk, parsed = pcall(HttpService.JSONDecode, HttpService, data)
             if decodedOk and type(parsed) == "table" then
                 for k, v in pairs(parsed) do
-                    if Library.Settings[k] ~= nil then
-                        Library.Settings[k] = v
-                    end
+                    Library.Settings[k] = v
                 end
             end
         end
@@ -397,60 +397,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     ghostStroke.Thickness = 3.5
     ghostStroke.Color = Color3.fromRGB(225, 175, 255)
 
-    local ghostGrad = Instance.new("UIGradient")
-    ghostGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(225, 150, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(130, 50, 190)),
-        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(225, 150, 255))
-    })
-    ghostGrad.Rotation = 0
-    ghostGrad.Offset = Vector2.new(-1, 0)
-    ghostGrad.Parent = dragGhost
-
-    task.spawn(function()
-        while dragGhost and dragGhost.Parent do
-            if dragGhost.Visible and Library.Settings.Animations then
-                ghostGrad.Offset = Vector2.new(-1, 0)
-                local twGhost = TweenService:Create(ghostGrad, TweenInfo.new(2.5, Enum.EasingStyle.Linear), {
-                    Offset = Vector2.new(1, 0)
-                })
-                twGhost:Play()
-                twGhost.Completed:Wait()
-            else
-                task.wait(0.3)
-            end
-        end
-    end)
-
-    local isToggling = false
-    local function setWindowVisibilityAnimated(show: boolean)
-        if isToggling then return end
-        isToggling = true
-
-        if show then
-            outerBorder.Visible = true
-            Library.PlaySound(SOUND_TOGGLE)
-            if Library.Settings.Animations then
-                windowScale.Scale = 0.05
-                local twOpen = TweenService:Create(windowScale, windowPopOpen, { Scale = 1 })
-                twOpen:Play()
-                twOpen.Completed:Wait()
-            else
-                windowScale.Scale = 1
-            end
-        else
-            Library.PlaySound(SOUND_TOGGLE)
-            if Library.Settings.Animations then
-                local twClose = TweenService:Create(windowScale, windowSquishClose, { Scale = 0.05 })
-                twClose:Play()
-                twClose.Completed:Wait()
-            end
-            outerBorder.Visible = false
-            windowScale.Scale = 1
-        end
-        isToggling = false
-    end
-
     local isDragging = false
     local dragStartMouse = Vector3.new()
     local dragStartPos = UDim2.new()
@@ -599,7 +545,6 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
             self.LockConnection = nil
         end
         if config.OnUnload then pcall(config.OnUnload) end
-        setWindowVisibilityAnimated(false)
         blackoutGui:Destroy()
         screenGui:Destroy()
     end)
@@ -757,10 +702,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
 
     self.LeftColumn = createColumnTray(UDim2.fromOffset(14, 0), UDim2.new(0.5, -20, 1, -12))
     self.RightColumn = createColumnTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 1, -12))
-    self.CenterColumn = self.LeftColumn
 
-    -- ฟังก์ชันสำหรับสร้างกรอบ Tray ย่อยแบบแยกอิสระ (ไม่ซ้อนกรอบเดิม)
-    function self:CreateSubColumn(pos: UDim2, size: UDim2)
+    function self:CreateSubTray(pos: UDim2, size: UDim2)
         return createColumnTray(pos, size)
     end
 
@@ -1302,6 +1245,10 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     end)
 
     return {
+        Set = function(newVal: any)
+            selected = newVal
+            selectLabel.Text = string.format("%s: %s", title, tostring(selected))
+        end,
         SetOptions = function(newOptions: {any})
             options = newOptions
             if not table.find(options, selected) and #options > 0 then
