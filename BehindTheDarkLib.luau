@@ -1,5 +1,5 @@
 -- ========================================================
--- BEHIND THE DARK : CORE UI LIBRARY (CPU | GPU | PING MONITOR)
+-- BEHIND THE DARK : CORE UI LIBRARY (SETTINGS WITH AUTO CHALLENGE)
 -- ========================================================
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -21,6 +21,7 @@ Library.Settings = {
     ClickRipple = true,
     AnimeGlint = true,
     SoundEffects = true,
+    AutoChallenge = false,
     WindowPos = nil,
     SelectedStage = nil,
     PlaceIdStageMap = {},
@@ -72,8 +73,6 @@ loadSavedSettings()
 
 local springBounce = TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local pressSquish = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local glintTween = TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local rippleTween = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local toggleSlide = TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local windowPopOpen = TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local windowSquishClose = TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
@@ -140,38 +139,7 @@ local function applyCartoonSurface(target: GuiObject, zIndex: number, cornerRad:
     end
 end
 
-local function spawnClickRipple(btn: GuiButton, inputPos: Vector3)
-    if not (Library.Settings.Animations and Library.Settings.ClickRipple) then return end
-    local relX = inputPos.X - btn.AbsolutePosition.X
-    local relY = inputPos.Y - btn.AbsolutePosition.Y
-
-    local ripple = Instance.new("Frame")
-    ripple.Name = "ClickRipple"
-    ripple.AnchorPoint = Vector2.new(0.5, 0.5)
-    ripple.Position = UDim2.fromOffset(relX, relY)
-    ripple.Size = UDim2.fromOffset(0, 0)
-    ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    ripple.BackgroundTransparency = 0.45
-    ripple.BorderSizePixel = 0
-    ripple.ZIndex = btn.ZIndex + 4
-    ripple.Parent = btn
-    Instance.new("UICorner", ripple).CornerRadius = UDim.new(1, 0)
-
-    local targetSize = math.max(btn.AbsoluteSize.X, btn.AbsoluteSize.Y) * 2.1
-    local tw = TweenService:Create(ripple, rippleTween, {
-        Size = UDim2.fromOffset(targetSize, targetSize),
-        BackgroundTransparency = 1
-    })
-    tw:Play()
-    tw.Completed:Connect(function()
-        ripple:Destroy()
-    end)
-end
-
 function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
-    local isHovered = false
-    btn.ClipsDescendants = true
-
     local targetObj: Instance = (typeof(scaleTarget) == "Instance") and scaleTarget or btn
     local uiScale = targetObj:FindFirstChildOfClass("UIScale")
     if not uiScale then
@@ -180,55 +148,28 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
         uiScale.Parent = targetObj
     end
 
-    local glint = Instance.new("Frame")
-    glint.Name = "AnimeGlint"
-    glint.Size = UDim2.new(0.26, 0, 2.6, 0)
-    glint.Position = UDim2.new(-0.7, 0, -0.8, 0)
-    glint.Rotation = 22
-    glint.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    glint.BackgroundTransparency = 0.52
-    glint.BorderSizePixel = 0
-    glint.ZIndex = btn.ZIndex + 3
-    glint.Parent = btn
-    Instance.new("UICorner", glint).CornerRadius = UDim.new(1, 0)
-
     btn.MouseEnter:Connect(function()
-        isHovered = true
         if Library.Settings.Animations then
             TweenService:Create(uiScale, springBounce, { Scale = 1.025 }):Play()
-            if Library.Settings.AnimeGlint then
-                glint.Position = UDim2.new(-0.7, 0, -0.8, 0)
-                glint.BackgroundTransparency = 0.50
-                TweenService:Create(glint, glintTween, {
-                    Position = UDim2.new(1.5, 0, -0.8, 0),
-                    BackgroundTransparency = 0.85
-                }):Play()
-            end
         end
     end)
-
     btn.MouseLeave:Connect(function()
-        isHovered = false
         if Library.Settings.Animations then
             TweenService:Create(uiScale, springBounce, { Scale = 1 }):Play()
         end
     end)
-
     btn.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             Library.PlaySound(SOUND_CLICK)
-            spawnClickRipple(btn, input.Position)
             if Library.Settings.Animations then
                 TweenService:Create(uiScale, pressSquish, { Scale = 0.94 }):Play()
             end
         end
     end)
-
     btn.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             if Library.Settings.Animations then
-                local targetScale = isHovered and 1.025 or 1
-                TweenService:Create(uiScale, springBounce, { Scale = targetScale }):Play()
+                TweenService:Create(uiScale, springBounce, { Scale = 1 }):Play()
             end
         end
     end)
@@ -341,7 +282,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     self.MainCard = outerBorder
     self.CardInner = card
 
-    -- ระบบคีย์ลัดซ่อน/แสดงหน้าต่าง
+    -- ระบบคีย์ลัด
     local isToggling = false
     function self:ToggleVisibility()
         if isToggling then return end
@@ -410,37 +351,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     titleLabel.ZIndex = 6
     titleLabel.Parent = titlePlate
 
-    local rainbowGrad = Instance.new("UIGradient")
-    rainbowGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 75, 75)),
-        ColorSequenceKeypoint.new(0.20, Color3.fromRGB(255, 185, 50)),
-        ColorSequenceKeypoint.new(0.40, Color3.fromRGB(255, 245, 80)),
-        ColorSequenceKeypoint.new(0.60, Color3.fromRGB(80, 240, 125)),
-        ColorSequenceKeypoint.new(0.80, Color3.fromRGB(80, 205, 255)),
-        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(215, 95, 255))
-    })
-    rainbowGrad.Parent = titleLabel
-
-    local titleStroke = Instance.new("UIStroke", titleLabel)
-    titleStroke.Thickness = 3.5
-    titleStroke.Color = Color3.fromRGB(22, 5, 36)
-
-    task.spawn(function()
-        while titleLabel and titleLabel.Parent do
-            if Library.Settings.Animations then
-                rainbowGrad.Offset = Vector2.new(-1, 0)
-                local tw = TweenService:Create(rainbowGrad, TweenInfo.new(3, Enum.EasingStyle.Linear), {
-                    Offset = Vector2.new(1, 0)
-                })
-                tw:Play()
-                tw.Completed:Wait()
-            else
-                task.wait(0.5)
-            end
-        end
-    end)
-
-    -- Widget แสดงค่าการทำงาน CPU | GPU | Ping (แทนที่ RightShift เดิม)
+    -- Widget Monitor: CPU | GPU | Ping
     local perfBadge = Instance.new("Frame")
     perfBadge.Size = UDim2.new(0, 195, 0, 28)
     perfBadge.Position = UDim2.new(1, -356, 0.5, -14)
@@ -577,64 +488,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     btn3D.ZIndex = 7
     btn3D.Parent = btn3DRim
     Instance.new("UICorner", btn3D).CornerRadius = UDim.new(0, 8)
-    local b3dts = Instance.new("UIStroke", btn3D)
-    b3dts.Thickness = 2.5
-    b3dts.Color = Color3.fromRGB(22, 5, 36)
     Library.AttachInteractiveEffects(btn3D, btn3DRim)
-
-    local is3DActive = true
-    local originalCamType = Enum.CameraType.Custom
-    local originalCamCFrame = nil
-
-    btn3D.Activated:Connect(function()
-        is3DActive = not is3DActive
-        Library.PlaySound(SOUND_TOGGLE)
-        local cam = workspace.CurrentCamera
-
-        if not is3DActive then
-            pcall(function()
-                if cam then
-                    originalCamType = cam.CameraType
-                    originalCamCFrame = cam.CFrame
-                    cam.CameraType = Enum.CameraType.Scriptable
-                end
-            end)
-            self.BlackoutFrame.Visible = true
-
-            if self.LockConnection then self.LockConnection:Disconnect() end
-            self.LockConnection = RunService.RenderStepped:Connect(function()
-                if not is3DActive then
-                    local c = workspace.CurrentCamera
-                    if c then
-                        c.CameraType = Enum.CameraType.Scriptable
-                        c.CFrame = CFrame.new(0, 50000, 0)
-                    end
-                    if self.BlackoutFrame and not self.BlackoutFrame.Visible then
-                        self.BlackoutFrame.Visible = true
-                    end
-                end
-            end)
-
-            btn3DRim.BackgroundColor3 = Color3.fromRGB(255, 140, 150)
-            btn3D.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
-            btn3D.Text = "3D: OFF"
-        else
-            if self.LockConnection then
-                self.LockConnection:Disconnect()
-                self.LockConnection = nil
-            end
-            pcall(function()
-                if cam then
-                    cam.CameraType = originalCamType or Enum.CameraType.Custom
-                    if originalCamCFrame then cam.CFrame = originalCamCFrame end
-                end
-            end)
-            self.BlackoutFrame.Visible = false
-            btn3DRim.BackgroundColor3 = Color3.fromRGB(190, 255, 145)
-            btn3D.BackgroundColor3 = Color3.fromRGB(115, 225, 70)
-            btn3D.Text = "3D: ON"
-        end
-    end)
 
     local mainView = Instance.new("Frame")
     mainView.Name = "MainView"
@@ -686,6 +540,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         return createColumnTray(pos, size)
     end
 
+    -- หน้าต่าง Settings Modal พร้อมปุ่มปิด Auto Challenge
     local settingDim = Instance.new("TextButton")
     settingDim.Name = "SettingDimBackdrop"
     settingDim.Size = UDim2.fromScale(1, 1)
@@ -700,8 +555,8 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
 
     local settingsModal = Instance.new("Frame")
     settingsModal.Name = "SettingsModal"
-    settingsModal.Size = UDim2.fromOffset(290, 310)
-    settingsModal.Position = UDim2.new(0.5, -145, 0.5, -155)
+    settingsModal.Size = UDim2.fromOffset(300, 330)
+    settingsModal.Position = UDim2.new(0.5, -150, 0.5, -165)
     settingsModal.BackgroundColor3 = Color3.fromRGB(65, 22, 105)
     settingsModal.BorderSizePixel = 0
     settingsModal.ZIndex = 70
@@ -728,7 +583,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     smTitle.Size = UDim2.new(1, -20, 0, 35)
     smTitle.Position = UDim2.fromOffset(12, 10)
     smTitle.BackgroundTransparency = 1
-    smTitle.Text = "VISUAL & SOUND"
+    smTitle.Text = "GAME & HUB SETTINGS"
     smTitle.TextColor3 = Color3.fromRGB(255, 225, 95)
     smTitle.TextSize = 16
     smTitle.Font = Enum.Font.FredokaOne
@@ -842,6 +697,7 @@ function Library:CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     createSettingRow("Click Ripple", "ClickRipple")
     createSettingRow("Anime Glint", "AnimeGlint")
     createSettingRow("Sound Effects", "SoundEffects")
+    createSettingRow("Auto Challenge (Train)", "AutoChallenge")
 
     local function toggleSettings()
         local isOpen = not settingsModal.Visible
@@ -934,13 +790,10 @@ function Library:CreateToggle(target: any, text: string, yPos: number, _: {On: C
     outerBlack.Thickness = 3
     outerBlack.Color = Color3.fromRGB(22, 5, 36)
 
-    local onColor = Color3.fromRGB(182, 130, 248)
-    local offColor = Color3.fromRGB(154, 102, 224)
-
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, -6, 1, -5)
     btn.Position = UDim2.fromOffset(3, 2)
-    btn.BackgroundColor3 = state and onColor or offColor
+    btn.BackgroundColor3 = state and Color3.fromRGB(182, 130, 248) or Color3.fromRGB(154, 102, 224)
     btn.BorderSizePixel = 0
     btn.AutoButtonColor = false
     btn.Text = ""
@@ -949,42 +802,7 @@ function Library:CreateToggle(target: any, text: string, yPos: number, _: {On: C
     btn.Parent = btnRim
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 11)
 
-    local btnGrad = Instance.new("UIGradient")
-    btnGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(188, 138, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(135, 82, 210)),
-        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(188, 138, 255))
-    })
-    btnGrad.Rotation = 0
-    btnGrad.Offset = Vector2.new(-1, 0)
-    btnGrad.Parent = btn
-
-    task.spawn(function()
-        while btn and btn.Parent do
-            if Library.Settings.Animations then
-                btnGrad.Offset = Vector2.new(-1, 0)
-                local tw = TweenService:Create(btnGrad, TweenInfo.new(3.5, Enum.EasingStyle.Linear), {
-                    Offset = Vector2.new(1, 0)
-                })
-                tw:Play()
-                tw.Completed:Wait()
-            else
-                task.wait(0.5)
-            end
-        end
-    end)
-
     applyCartoonSurface(btn, 7, 11, true)
-
-    local gloss = Instance.new("Frame")
-    gloss.Size = UDim2.new(1, -10, 0.42, 0)
-    gloss.Position = UDim2.fromOffset(5, 2)
-    gloss.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    gloss.BackgroundTransparency = 0.74
-    gloss.BorderSizePixel = 0
-    gloss.ZIndex = 8
-    gloss.Parent = btn
-    Instance.new("UICorner", gloss).CornerRadius = UDim.new(0, 9)
 
     local LIME_COLOR = Color3.fromRGB(180, 255, 75)
     local OFF_COLOR = Color3.fromRGB(255, 255, 255)
@@ -1003,31 +821,6 @@ function Library:CreateToggle(target: any, text: string, yPos: number, _: {On: C
     local ts = Instance.new("UIStroke", label)
     ts.Thickness = 3.2
     ts.Color = Color3.fromRGB(24, 5, 38)
-
-    local limeGrad = Instance.new("UIGradient")
-    limeGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0.0, Color3.fromRGB(175, 255, 65)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(245, 255, 215)),
-        ColorSequenceKeypoint.new(1.0, Color3.fromRGB(175, 255, 65))
-    })
-    limeGrad.Offset = Vector2.new(-1, 0)
-    limeGrad.Enabled = state
-    limeGrad.Parent = label
-
-    task.spawn(function()
-        while label and label.Parent do
-            if state and Library.Settings.Animations then
-                limeGrad.Offset = Vector2.new(-1, 0)
-                local twLime = TweenService:Create(limeGrad, TweenInfo.new(2.4, Enum.EasingStyle.Linear), {
-                    Offset = Vector2.new(1, 0)
-                })
-                twLime:Play()
-                twLime.Completed:Wait()
-            else
-                task.wait(0.4)
-            end
-        end
-    end)
 
     local switchTrack = Instance.new("Frame")
     switchTrack.Size = UDim2.fromOffset(42, 22)
@@ -1054,14 +847,10 @@ function Library:CreateToggle(target: any, text: string, yPos: number, _: {On: C
 
     local function setVisual(val: boolean)
         state = val
-        limeGrad.Enabled = state
-        local labelColor = state and LIME_COLOR or OFF_COLOR
-        local thumbColor = state and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(175, 175, 185)
-
-        TweenService:Create(label, toggleSlide, { TextColor3 = labelColor }):Play()
+        TweenService:Create(label, toggleSlide, { TextColor3 = state and LIME_COLOR or OFF_COLOR }):Play()
         TweenService:Create(thumb, toggleSlide, {
             Position = state and UDim2.fromOffset(22, 2) or UDim2.fromOffset(2, 2),
-            BackgroundColor3 = thumbColor
+            BackgroundColor3 = state and Color3.fromRGB(115, 245, 85) or Color3.fromRGB(175, 175, 185)
         }):Play()
     end
 
@@ -1113,8 +902,6 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     selectBtn.Parent = dropRim
     Instance.new("UICorner", selectBtn).CornerRadius = UDim.new(0, 11)
 
-    applyCartoonSurface(selectBtn, zBase + 2, 11, false)
-
     local selectLabel = Instance.new("TextLabel")
     selectLabel.Size = UDim2.new(1, -40, 1, 0)
     selectLabel.Position = UDim2.fromOffset(12, 0)
@@ -1129,25 +916,6 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     local sls = Instance.new("UIStroke", selectLabel)
     sls.Thickness = 3
     sls.Color = Color3.fromRGB(22, 5, 36)
-
-    local arrowBadge = Instance.new("Frame")
-    arrowBadge.Size = UDim2.fromOffset(24, 24)
-    arrowBadge.Position = UDim2.new(1, -30, 0.5, -12)
-    arrowBadge.BackgroundColor3 = Color3.fromRGB(32, 10, 56)
-    arrowBadge.BorderSizePixel = 0
-    arrowBadge.ZIndex = zBase + 3
-    arrowBadge.Parent = selectBtn
-    Instance.new("UICorner", arrowBadge).CornerRadius = UDim.new(0, 7)
-
-    local arrowLbl = Instance.new("TextLabel")
-    arrowLbl.Size = UDim2.fromScale(1, 1)
-    arrowLbl.BackgroundTransparency = 1
-    arrowLbl.Text = "▾"
-    arrowLbl.TextColor3 = Color3.fromRGB(255, 225, 95)
-    arrowLbl.TextSize = 14
-    arrowLbl.Font = Enum.Font.FredokaOne
-    arrowLbl.ZIndex = zBase + 4
-    arrowLbl.Parent = arrowBadge
 
     Library.AttachInteractiveEffects(selectBtn, dropShadow)
 
@@ -1198,8 +966,6 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
             local ols = Instance.new("UIStroke", optLbl)
             ols.Thickness = 2.5
             ols.Color = Color3.fromRGB(22, 5, 36)
-
-            Library.AttachInteractiveEffects(optBtn)
 
             optBtn.Activated:Connect(function()
                 selected = opt
