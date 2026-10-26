@@ -280,7 +280,7 @@ local function saveConfigState()
 end
 
 -- ========================================================
--- ตรวจจับ PLACE ID & MAP NAME
+-- ตรวจจับ PLACE ID & MAP NAME และเปิด AUTO PLACE อัตโนมัติ
 -- ========================================================
 local currentPlaceId = tostring(game.PlaceId)
 while (not currentPlaceId or currentPlaceId == "0") do
@@ -296,21 +296,31 @@ pcall(function()
     end
 end)
 
+local matchedPlaceStage = false
 if Library.Settings.PlaceIdStageMap and Library.Settings.PlaceIdStageMap[currentPlaceId] then
     local mapped = Library.Settings.PlaceIdStageMap[currentPlaceId]
     if StagePresets[mapped] then
         states.CurrentStage = mapped
         states.RecordStageName = mapped
         states.AutoPlace = true
-        print(string.format("[AutoStage] แมปตรงกับ PlaceId: %s -> ด่าน %s (เปิด Auto Place อัตโนมัติ)", currentPlaceId, mapped))
+        matchedPlaceStage = true
+        print(string.format("[AutoStage] พบ PlaceId '%s' ตรงกับด่าน '%s' -> เปิดใช้งาน Auto Place อัตโนมัติ", currentPlaceId, mapped))
     end
 elseif Library.Settings.SelectedStage and StagePresets[Library.Settings.SelectedStage] then
     states.CurrentStage = Library.Settings.SelectedStage
     states.RecordStageName = Library.Settings.SelectedStage
 end
 
-local refreshRecordUI: (() -> ())? = nil
-local lastRecordTick = 0
+-- เมื่อสร้าง Toggle Auto Place ให้ส่งค่า states.AutoPlace ปัจจุบัน และซิงก์อัปเดตปุ่มทันที
+local autoPlaceToggleUpdater = nil
+autoPlaceToggleUpdater = Window:CreateToggle(bottomSubTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
+    states.AutoPlace = v
+    saveConfigState()
+end)
+
+if matchedPlaceStage and autoPlaceToggleUpdater then
+    autoPlaceToggleUpdater(true)
+end
 
 -- ========================================================
 -- แก้ไขระบบ RECORD (รองรับ Remote & Direct Call)
