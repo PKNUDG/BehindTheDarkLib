@@ -1,5 +1,5 @@
 -- ========================================================
--- CANDY TD : IN-MATCH CONTROLLER (SUB-PAGE & CUSTOM STAGE)
+-- CANDY TD : IN-MATCH CONTROLLER (FULL SEPARATE PAGE & LIVE LOG)
 -- ========================================================
 repeat task.wait() until game:IsLoaded()
 
@@ -272,12 +272,57 @@ local states = {
     CurrentRounds = 0
 }
 
-local onUnitRecorded: (() -> ())? = nil
+local refreshRecordUI: (() -> ())? = nil
 
--- ========================================================
--- IN-GAME RECORDER HOOK (ปลอดภัย ไม่ทำเกมหลุด)
--- ========================================================
+-- ฟังก์ชันดักจับยูนิตที่วาง
+local function handleRecordInput(actionName, unitArg, p1, p2)
+    local targetStage = (states.RecordStageName and states.RecordStageName ~= "") and states.RecordStageName or states.CurrentStage
+    StagePresets[targetStage] = StagePresets[targetStage] or {}
+    local currentQueue = StagePresets[targetStage]
+
+    if tostring(actionName):lower() == "place" then
+        local uName = tostring(unitArg or "UnknownUnit")
+        local posX, posZ = 0, 0
+
+        if typeof(p1) == "Vector3" then
+            posX, posZ = p1.X, p1.Z
+        elseif typeof(p1) == "CFrame" then
+            posX, posZ = p1.Position.X, p1.Position.Z
+        elseif type(p1) == "number" and type(p2) == "number" then
+            posX, posZ = p1, p2
+        end
+
+        table.insert(currentQueue, {
+            unit = uName,
+            x = posX,
+            z = posZ
+        })
+        savePresetsToFile()
+        print(string.format("[Recorder] บันทึก: #%d %s (X: %.1f, Z: %.1f) ในด่าน '%s'", #currentQueue, uName, posX, posZ, targetStage))
+        if refreshRecordUI then refreshRecordUI() end
+    elseif tostring(actionName):lower() == "target" then
+        local targetMode = tostring(p1 or p2 or "strongest")
+        if #currentQueue > 0 then
+            currentQueue[#currentQueue].setTarget = targetMode
+            savePresetsToFile()
+            print(string.format("[Recorder] ตั้งเป้า: #%d %s -> %s", #currentQueue, currentQueue[#currentQueue].unit, targetMode))
+            if refreshRecordUI then refreshRecordUI() end
+        end
+    end
+end
+
+-- Hook ผ่าน Metatable และ Module
 local function hookPlacementRecorder()
+    if matchNet and type(matchNet.request) == "function" then
+        local oldReq = matchNet.request
+        matchNet.request = function(action, ...)
+            if states.RecordMode then
+                handleRecordInput(action, ...)
+            end
+            return oldReq(action, ...)
+        end
+    end
+
     local hookMeta = (type(hookmetamethod) == "function" and hookmetamethod) or nil
     if hookMeta then
         local oldNamecall
@@ -285,26 +330,7 @@ local function hookPlacementRecorder()
             local method = getnamecallmethod()
             local args = { ... }
             if states.RecordMode and (method == "InvokeServer" or method == "FireServer") and (tostring(self.Name) == "Act" or tostring(self.Name) == "Request") then
-                local targetStage = (states.RecordStageName and states.RecordStageName ~= "") and states.RecordStageName or states.CurrentStage
-                if args[1] == "place" and args[2] and args[3] and args[4] then
-                    StagePresets[targetStage] = StagePresets[targetStage] or {}
-                    local currentQueue = StagePresets[targetStage]
-                    table.insert(currentQueue, {
-                        unit = tostring(args[2]),
-                        x = tonumber(args[3]),
-                        z = tonumber(args[4])
-                    })
-                    savePresetsToFile()
-                    print(string.format("[Recorder] บันทึกลำดับที่ %d: %s (X: %.2f, Z: %.2f) ในด่าน '%s'", #currentQueue, tostring(args[2]), tonumber(args[3]), tonumber(args[4]), targetStage))
-                    if onUnitRecorded then onUnitRecorded() end
-                elseif args[1] == "target" and args[3] then
-                    local currentQueue = StagePresets[targetStage]
-                    if currentQueue and #currentQueue > 0 then
-                        currentQueue[#currentQueue].setTarget = tostring(args[3])
-                        savePresetsToFile()
-                        print(string.format("[Recorder] บันทึก Target ลำดับที่ %d: %s ในด่าน '%s'", #currentQueue, tostring(args[3]), targetStage))
-                    end
-                end
+                handleRecordInput(args[1], args[2], args[3], args[4])
             end
             if setnamecallmethod then
                 setnamecallmethod(method)
@@ -519,9 +545,7 @@ btnPlus.Activated:Connect(function()
     Library.StepWiggle(roundStatus)
 end)
 
--- ========================================================
--- ควบคุมฝั่งขวา (CONTROLS & STAGE SELECTION)
--- ========================================================
+-- ควบคุมฝั่งขวา (Controls)
 local rightCol = Window:GetColumn("Right")
 
 Window:CreateToggle("Right", "Auto Upgrade All", 0, { On = Color3.fromRGB(90, 195, 60), Off = Color3.fromRGB(120, 120, 130) }, true, function(v)
@@ -547,181 +571,266 @@ local stageDropdown = Window:CreateDropdown("Right", "Stage", 190, getStageNames
 end)
 
 -- ========================================================
--- หน้าต่างใหม่ RECORD MODE (SUB-PAGE MODAL)
+-- ระบบแยกหน้า (SEPARATE RECORD PAGE)
 -- ========================================================
-local RecordPage = Window:CreateSubPage({
-    Title = "RECORD & PRESET SETUP",
-    Size = UDim2.fromOffset(480, 310)
-})
+local RecordPage = Window:CreatePage("RecordView")
 
--- 1. ช่องกรอกชื่อด่าน (TextBox ไม่ทับด่านเดิม)
-local nameBoxShadow = Instance.new("Frame")
-nameBoxShadow.Size = UDim2.new(1, 0, 0, 42)
-nameBoxShadow.Position = UDim2.fromOffset(0, 0)
-nameBoxShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
-nameBoxShadow.BorderSizePixel = 0
-nameBoxShadow.ZIndex = 84
-nameBoxShadow.Parent = RecordPage.Content
-Instance.new("UICorner", nameBoxShadow).CornerRadius = UDim.new(0, 12)
+-- 1. แถบ Header (ปุ่มย้อนกลับ + หัวข้อ)
+local recHeader = Instance.new("Frame")
+recHeader.Size = UDim2.new(1, 0, 0, 36)
+recHeader.Position = UDim2.fromOffset(0, 0)
+recHeader.BackgroundTransparency = 1
+recHeader.ZIndex = 6
+recHeader.Parent = RecordPage.Container
 
-local nameBoxRim = Instance.new("Frame")
-nameBoxRim.Size = UDim2.new(1, 0, 0, 39)
-nameBoxRim.Position = UDim2.fromOffset(0, 0)
-nameBoxRim.BackgroundColor3 = Color3.fromRGB(115, 95, 175)
-nameBoxRim.BorderSizePixel = 0
-nameBoxRim.ZIndex = 85
-nameBoxRim.Parent = nameBoxShadow
-Instance.new("UICorner", nameBoxRim).CornerRadius = UDim.new(0, 12)
-local nbs = Instance.new("UIStroke", nameBoxRim)
-nbs.Thickness = 2.5
-nbs.Color = Color3.fromRGB(22, 5, 36)
+local backBtnShadow = Instance.new("Frame")
+backBtnShadow.Size = UDim2.fromOffset(105, 34)
+backBtnShadow.Position = UDim2.fromOffset(0, 0)
+backBtnShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+backBtnShadow.BorderSizePixel = 0
+backBtnShadow.ZIndex = 6
+backBtnShadow.Parent = recHeader
+Instance.new("UICorner", backBtnShadow).CornerRadius = UDim.new(0, 10)
 
-local stageInput = Instance.new("TextBox")
-stageInput.Size = UDim2.new(1, -8, 1, -6)
-stageInput.Position = UDim2.fromOffset(4, 3)
-stageInput.BackgroundColor3 = Color3.fromRGB(36, 12, 58)
-stageInput.BorderSizePixel = 0
-stageInput.Text = states.RecordStageName
-stageInput.PlaceholderText = "Type new stage name here..."
-stageInput.PlaceholderColor3 = Color3.fromRGB(160, 145, 185)
-stageInput.TextColor3 = Color3.fromRGB(255, 235, 110)
-stageInput.TextSize = 13.5
-stageInput.Font = Enum.Font.FredokaOne
-stageInput.ClearTextOnFocus = false
-stageInput.ZIndex = 86
-stageInput.Parent = nameBoxRim
-Instance.new("UICorner", stageInput).CornerRadius = UDim.new(0, 10)
+local backBtn = Instance.new("TextButton")
+backBtn.Size = UDim2.new(1, 0, 1, -3)
+backBtn.Position = UDim2.fromOffset(0, 0)
+backBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
+backBtn.Text = "⬅ BACK"
+backBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+backBtn.TextSize = 13
+backBtn.Font = Enum.Font.FredokaOne
+backBtn.BorderSizePixel = 0
+backBtn.AutoButtonColor = false
+backBtn.ZIndex = 7
+backBtn.Parent = backBtnShadow
+Instance.new("UICorner", backBtn).CornerRadius = UDim.new(0, 9)
+local bbs = Instance.new("UIStroke", backBtn)
+bbs.Thickness = 2
+bbs.Color = Color3.fromRGB(22, 5, 36)
+Library.AttachInteractiveEffects(backBtn, backBtnShadow)
 
--- 2. แถบแสดงสถานะยูนิตที่บันทึก
-local recordStatusLabel = Instance.new("TextLabel")
-recordStatusLabel.Size = UDim2.new(1, 0, 0, 34)
-recordStatusLabel.Position = UDim2.fromOffset(0, 52)
-recordStatusLabel.BackgroundColor3 = Color3.fromRGB(30, 8, 48)
-recordStatusLabel.BorderSizePixel = 0
-recordStatusLabel.Text = string.format("Target: '%s' | Recorded: %d units", states.RecordStageName, #(StagePresets[states.RecordStageName] or {}))
-recordStatusLabel.TextColor3 = Color3.fromRGB(242, 230, 255)
-recordStatusLabel.TextSize = 13
-recordStatusLabel.Font = Enum.Font.FredokaOne
-recordStatusLabel.ZIndex = 84
-recordStatusLabel.Parent = RecordPage.Content
-Instance.new("UICorner", recordStatusLabel).CornerRadius = UDim.new(0, 10)
-local rsls = Instance.new("UIStroke", recordStatusLabel)
-rsls.Thickness = 2
-rsls.Color = Color3.fromRGB(22, 5, 36)
-
-onUnitRecorded = function()
-    local tName = (stageInput.Text ~= "") and stageInput.Text or states.RecordStageName
-    local count = #(StagePresets[tName] or {})
-    recordStatusLabel.Text = string.format("Target: '%s' | Recorded: %d units", tName, count)
-end
-
-stageInput:GetPropertyChangedSignal("Text"):Connect(function()
-    states.RecordStageName = stageInput.Text
-    onUnitRecorded()
+backBtn.Activated:Connect(function()
+    RecordPage.Hide()
 end)
 
--- 3. ปุ่มสลับ Record ON/OFF ในหน้า Sub-Page
-local recordBtnShadow = Instance.new("Frame")
-recordBtnShadow.Size = UDim2.new(1, 0, 0, 44)
-recordBtnShadow.Position = UDim2.fromOffset(0, 96)
-recordBtnShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
-recordBtnShadow.BorderSizePixel = 0
-recordBtnShadow.ZIndex = 84
-recordBtnShadow.Parent = RecordPage.Content
-Instance.new("UICorner", recordBtnShadow).CornerRadius = UDim.new(0, 14)
-
-local recordBtnRim = Instance.new("Frame")
-recordBtnRim.Size = UDim2.new(1, 0, 0, 41)
-recordBtnRim.Position = UDim2.fromOffset(0, 0)
-recordBtnRim.BackgroundColor3 = Color3.fromRGB(195, 150, 250)
-recordBtnRim.BorderSizePixel = 0
-recordBtnRim.ZIndex = 85
-recordBtnRim.Parent = recordBtnShadow
-Instance.new("UICorner", recordBtnRim).CornerRadius = UDim.new(0, 14)
-local rbs = Instance.new("UIStroke", recordBtnRim)
-rbs.Thickness = 3
-rbs.Color = Color3.fromRGB(22, 5, 36)
-
-local recordBtn = Instance.new("TextButton")
-recordBtn.Size = UDim2.new(1, -6, 1, -5)
-recordBtn.Position = UDim2.fromOffset(3, 2)
-recordBtn.BackgroundColor3 = Color3.fromRGB(154, 102, 224)
-recordBtn.BorderSizePixel = 0
-recordBtn.AutoButtonColor = false
-recordBtn.Text = "START RECORDING (OFF)"
-recordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-recordBtn.TextSize = 14
-recordBtn.Font = Enum.Font.FredokaOne
-recordBtn.ZIndex = 86
-recordBtn.Parent = recordBtnRim
-Instance.new("UICorner", recordBtn).CornerRadius = UDim.new(0, 11)
-local rts = Instance.new("UIStroke", recordBtn)
+local recTitle = Instance.new("TextLabel")
+recTitle.Size = UDim2.new(1, -120, 1, 0)
+recTitle.Position = UDim2.fromOffset(115, 0)
+recTitle.BackgroundTransparency = 1
+recTitle.Text = "STAGE RECORDER & CUSTOM PRESETS"
+recTitle.TextColor3 = Color3.fromRGB(255, 225, 95)
+recTitle.TextSize = 14
+recTitle.Font = Enum.Font.FredokaOne
+recTitle.TextXAlignment = Enum.TextXAlignment.Left
+recTitle.ZIndex = 6
+recTitle.Parent = recHeader
+local rts = Instance.new("UIStroke", recTitle)
 rts.Thickness = 2.5
 rts.Color = Color3.fromRGB(22, 5, 36)
-Library.AttachInteractiveEffects(recordBtn, recordBtnShadow)
 
-recordBtn.Activated:Connect(function()
-    states.RecordMode = not states.RecordMode
-    local cleanName = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
-    if cleanName == "" then cleanName = "Custom Stage" end
-    states.RecordStageName = cleanName
-    stageInput.Text = cleanName
+-- 2. ช่องใส่ชื่อด่านใหม่ (Stage Name Input)
+local inputShadow = Instance.new("Frame")
+inputShadow.Size = UDim2.new(0.6, -8, 0, 38)
+inputShadow.Position = UDim2.fromOffset(0, 44)
+inputShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+inputShadow.BorderSizePixel = 0
+inputShadow.ZIndex = 6
+inputShadow.Parent = RecordPage.Container
+Instance.new("UICorner", inputShadow).CornerRadius = UDim.new(0, 10)
 
-    Library.PlaySound("rbxassetid://9069609268")
-    if states.RecordMode then
-        StagePresets[cleanName] = StagePresets[cleanName] or {}
-        recordBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
-        recordBtn.Text = "RECORDING NOW... (CLICK TO STOP)"
-        recordBtnRim.BackgroundColor3 = Color3.fromRGB(255, 140, 150)
+local stageInput = Instance.new("TextBox")
+stageInput.Size = UDim2.new(1, 0, 1, -3)
+stageInput.Position = UDim2.fromOffset(0, 0)
+stageInput.BackgroundColor3 = Color3.fromRGB(50, 18, 80)
+stageInput.BorderSizePixel = 0
+stageInput.Text = states.RecordStageName
+stageInput.PlaceholderText = "Type custom stage name..."
+stageInput.PlaceholderColor3 = Color3.fromRGB(170, 155, 195)
+stageInput.TextColor3 = Color3.fromRGB(255, 235, 110)
+stageInput.TextSize = 13
+stageInput.Font = Enum.Font.FredokaOne
+stageInput.ClearTextOnFocus = false
+stageInput.ZIndex = 7
+stageInput.Parent = inputShadow
+Instance.new("UICorner", stageInput).CornerRadius = UDim.new(0, 9)
+local sis = Instance.new("UIStroke", stageInput)
+sis.Thickness = 2
+sis.Color = Color3.fromRGB(22, 5, 36)
+
+-- 3. ปุ่มสลับ Record (Record Toggle Button)
+local recToggleShadow = Instance.new("Frame")
+recToggleShadow.Size = UDim2.new(0.4, 0, 0, 38)
+recToggleShadow.Position = UDim2.new(0.6, 0, 0, 44)
+recToggleShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+recToggleShadow.BorderSizePixel = 0
+recToggleShadow.ZIndex = 6
+recToggleShadow.Parent = RecordPage.Container
+Instance.new("UICorner", recToggleShadow).CornerRadius = UDim.new(0, 10)
+
+local recToggleBtn = Instance.new("TextButton")
+recToggleBtn.Size = UDim2.new(1, 0, 1, -3)
+recToggleBtn.Position = UDim2.fromOffset(0, 0)
+recToggleBtn.BackgroundColor3 = Color3.fromRGB(154, 102, 224)
+recToggleBtn.Text = "● START RECORD"
+recToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+recToggleBtn.TextSize = 12.5
+recToggleBtn.Font = Enum.Font.FredokaOne
+recToggleBtn.BorderSizePixel = 0
+recToggleBtn.AutoButtonColor = false
+recToggleBtn.ZIndex = 7
+recToggleBtn.Parent = recToggleShadow
+Instance.new("UICorner", recToggleBtn).CornerRadius = UDim.new(0, 9)
+local rts2 = Instance.new("UIStroke", recToggleBtn)
+rts2.Thickness = 2
+rts2.Color = Color3.fromRGB(22, 5, 36)
+Library.AttachInteractiveEffects(recToggleBtn, recToggleShadow)
+
+-- 4. กรอบแสดงรายการตัวละครที่วาง (Recorded Units Scrolling List)
+local listShadow = Instance.new("Frame")
+listShadow.Size = UDim2.new(1, 0, 1, -128)
+listShadow.Position = UDim2.fromOffset(0, 88)
+listShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+listShadow.BorderSizePixel = 0
+listShadow.ZIndex = 6
+listShadow.Parent = RecordPage.Container
+Instance.new("UICorner", listShadow).CornerRadius = UDim.new(0, 12)
+
+local unitScroll = Instance.new("ScrollingFrame")
+unitScroll.Size = UDim2.new(1, 0, 1, -3)
+unitScroll.Position = UDim2.fromOffset(0, 0)
+unitScroll.BackgroundColor3 = Color3.fromRGB(30, 8, 48)
+unitScroll.BorderSizePixel = 0
+unitScroll.ScrollBarThickness = 5
+unitScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+unitScroll.ZIndex = 7
+unitScroll.Parent = listShadow
+Instance.new("UICorner", unitScroll).CornerRadius = UDim.new(0, 11)
+local uss = Instance.new("UIStroke", unitScroll)
+uss.Thickness = 2
+uss.Color = Color3.fromRGB(22, 5, 36)
+
+local uListLayout = Instance.new("UIListLayout", unitScroll)
+uListLayout.Padding = UDim.new(0, 4)
+local uListPad = Instance.new("UIPadding", unitScroll)
+uListPad.PaddingTop = UDim.new(0, 6)
+uListPad.PaddingLeft = UDim.new(0, 6)
+uListPad.PaddingRight = UDim.new(0, 6)
+uListPad.PaddingBottom = UDim.new(0, 6)
+
+-- ฟังก์ชันรีเฟรชรายการที่วางลงจอ
+refreshRecordUI = function()
+    local cName = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
+    if cName == "" then cName = states.CurrentStage end
+
+    for _, ch in ipairs(unitScroll:GetChildren()) do
+        if ch:IsA("Frame") or ch:IsA("TextLabel") then ch:Destroy() end
+    end
+
+    local q = StagePresets[cName] or {}
+    if #q == 0 then
+        local emptyLbl = Instance.new("TextLabel")
+        emptyLbl.Size = UDim2.new(1, 0, 0, 60)
+        emptyLbl.BackgroundTransparency = 1
+        emptyLbl.Text = string.format("No units recorded for '%s' yet.\nTurn ON Record Mode and place units in match!", cName)
+        emptyLbl.TextColor3 = Color3.fromRGB(180, 170, 205)
+        emptyLbl.TextSize = 13
+        emptyLbl.Font = Enum.Font.FredokaOne
+        emptyLbl.ZIndex = 8
+        emptyLbl.Parent = unitScroll
     else
-        recordBtn.BackgroundColor3 = Color3.fromRGB(154, 102, 224)
-        recordBtn.Text = "START RECORDING (OFF)"
-        recordBtnRim.BackgroundColor3 = Color3.fromRGB(195, 150, 250)
+        for i, u in ipairs(q) do
+            local card = Instance.new("Frame")
+            card.Size = UDim2.new(1, 0, 0, 28)
+            card.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
+            card.BorderSizePixel = 0
+            card.ZIndex = 8
+            card.Parent = unitScroll
+            Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
+
+            local txt = Instance.new("TextLabel")
+            txt.Size = UDim2.fromScale(1, 1)
+            txt.Position = UDim2.fromOffset(8, 0)
+            txt.BackgroundTransparency = 1
+            txt.Text = string.format("#%d  %s  |  (X: %.1f, Z: %.1f)  |  Target: %s", i, u.unit, u.x or 0, u.z or 0, u.setTarget or "first")
+            txt.TextColor3 = Color3.fromRGB(255, 235, 120)
+            txt.TextSize = 12
+            txt.Font = Enum.Font.FredokaOne
+            txt.TextXAlignment = Enum.TextXAlignment.Left
+            txt.ZIndex = 9
+            txt.Parent = card
+        end
+    end
+end
+
+stageInput.FocusLost:Connect(function()
+    local clean = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
+    if clean ~= "" then
+        states.RecordStageName = clean
+        refreshRecordUI()
+    end
+end)
+
+recToggleBtn.Activated:Connect(function()
+    states.RecordMode = not states.RecordMode
+    local clean = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
+    if clean == "" then clean = "My New Stage" end
+    states.RecordStageName = clean
+    stageInput.Text = clean
+
+    Library.PlaySound(SOUND_TOGGLE)
+    if states.RecordMode then
+        recToggleBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
+        recToggleBtn.Text = "● RECORDING... (STOP)"
+    else
+        recToggleBtn.BackgroundColor3 = Color3.fromRGB(154, 102, 224)
+        recToggleBtn.Text = "● START RECORD"
         savePresetsToFile()
         stageDropdown.SetOptions(getStageNames())
     end
-    onUnitRecorded()
+    refreshRecordUI()
 end)
 
--- 4. ปุ่มล้างข้อมูลเฉพาะด่านนี้ (Clear Stage Data)
-local clearBtnShadow = Instance.new("Frame")
-clearBtnShadow.Size = UDim2.new(1, 0, 0, 40)
-clearBtnShadow.Position = UDim2.fromOffset(0, 150)
-clearBtnShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
-clearBtnShadow.BorderSizePixel = 0
-clearBtnShadow.ZIndex = 84
-clearBtnShadow.Parent = RecordPage.Content
-Instance.new("UICorner", clearBtnShadow).CornerRadius = UDim.new(0, 12)
+-- 5. ปุ่มล้างข้อมูลด่านนี้ (Clear Current Stage)
+local clearShadow = Instance.new("Frame")
+clearShadow.Size = UDim2.new(1, 0, 0, 34)
+clearShadow.Position = UDim2.new(0, 0, 1, -34)
+clearShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+clearShadow.BorderSizePixel = 0
+clearShadow.ZIndex = 6
+clearShadow.Parent = RecordPage.Container
+Instance.new("UICorner", clearShadow).CornerRadius = UDim.new(0, 10)
 
 local clearBtn = Instance.new("TextButton")
 clearBtn.Size = UDim2.new(1, 0, 1, -3)
 clearBtn.Position = UDim2.fromOffset(0, 0)
-clearBtn.BackgroundColor3 = Color3.fromRGB(190, 50, 60)
-clearBtn.BorderSizePixel = 0
-clearBtn.Text = "CLEAR CURRENT STAGE DATA"
+clearBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 60)
+clearBtn.Text = "CLEAR UNITS IN THIS STAGE"
 clearBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-clearBtn.TextSize = 13
+clearBtn.TextSize = 12.5
 clearBtn.Font = Enum.Font.FredokaOne
-clearBtn.ZIndex = 86
-clearBtn.Parent = clearBtnShadow
-Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 10)
+clearBtn.BorderSizePixel = 0
+clearBtn.AutoButtonColor = false
+clearBtn.ZIndex = 7
+clearBtn.Parent = clearShadow
+Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 9)
 local cs = Instance.new("UIStroke", clearBtn)
-cs.Thickness = 2.5
+cs.Thickness = 2
 cs.Color = Color3.fromRGB(22, 5, 36)
-Library.AttachInteractiveEffects(clearBtn, clearBtnShadow)
+Library.AttachInteractiveEffects(clearBtn, clearShadow)
 
 clearBtn.Activated:Connect(function()
-    local cleanName = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
-    if cleanName ~= "" then
-        StagePresets[cleanName] = {}
+    local clean = stageInput.Text:gsub("^%s*(.-)%s*$", "%1")
+    if clean ~= "" then
+        StagePresets[clean] = {}
         savePresetsToFile()
-        Library.PlaySound("rbxassetid://6895079853")
-        onUnitRecorded()
+        Library.PlaySound(SOUND_CLICK)
+        refreshRecordUI()
     end
 end)
 
 -- ========================================================
--- ปุ่มบนหน้าหลักสำหรับเปิดหน้า RECORD MODE (3D Button)
+-- ปุ่มหน้าหลักสำหรับเปิดหน้า RECORD MODE & RELOAD PRESETS
 -- ========================================================
 local function createNavButton(text: string, yPos: number, rimColor: Color3, btnColor: Color3, callback: () -> ())
     local shadow = Instance.new("Frame")
@@ -766,23 +875,21 @@ local function createNavButton(text: string, yPos: number, rimColor: Color3, btn
     btn.Activated:Connect(callback)
 end
 
--- 1. ปุ่มเปิดหน้า Record Mode Setup
+-- 1. ปุ่มเปิดหน้า Record View (สลับหน้า)
 createNavButton("Setup Record & Presets ⚙", 236, Color3.fromRGB(255, 145, 160), Color3.fromRGB(235, 65, 85), function()
     stageInput.Text = states.CurrentStage
     states.RecordStageName = states.CurrentStage
-    onUnitRecorded()
-    RecordPage.Open()
+    refreshRecordUI()
+    RecordPage.Show()
 end)
 
--- 2. ปุ่ม Reload Presets
+-- 2. ปุ่ม Reload Presets จากไฟล์
 createNavButton("Reload Presets ↺", 282, Color3.fromRGB(255, 220, 110), Color3.fromRGB(240, 160, 45), function()
     loadPresetsFromFile()
     stageDropdown.SetOptions(getStageNames())
-    Library.PlaySound("rbxassetid://6895079853")
+    Library.PlaySound(SOUND_CLICK)
     print(string.format("[PresetManager] โหลดค่าพรีเซ็ตจาก %s สำเร็จ!", PRESET_FILE))
 end)
-
-Window:Create3DRenderToggle("Right")
 
 -- ========================================================
 -- GAMEPLAY LOGIC LOOPS
