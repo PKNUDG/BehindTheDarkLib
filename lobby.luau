@@ -347,22 +347,23 @@ local function triggerButton(btn: GuiButton)
 end
 
 local function findTrainFrame()
+    local area = playerGui:FindFirstChild("HubWindows")
+    if area then
+        local challengesArea = area:FindFirstChild("Area_challenges", true)
+        if challengesArea and challengesArea:IsA("GuiObject") and challengesArea.Visible then
+            return challengesArea, area
+        end
+    end
+
     local searchContainers = { playerGui, CoreGui }
     for _, container in ipairs(searchContainers) do
         for _, desc in ipairs(container:GetDescendants()) do
-            -- ข้ามพวกป้ายแจ้งเตือนหน้ารถไฟ (HubPrompts / BillboardGui)
             if desc:IsA("TextLabel") and not desc:FindFirstAncestor("HubPrompts") and not desc:FindFirstAncestorWhichIsA("BillboardGui") then
                 local txt = desc.Text:upper()
                 if txt:find("DUNGEON TRAIN") or txt:find("NEW CARS IN") then
-                    local frame = desc:FindFirstAncestorWhichIsA("Frame") or desc.Parent
+                    local frame = desc:FindFirstAncestor("Area_challenges") or desc:FindFirstAncestorWhichIsA("Frame") or desc.Parent
                     if frame then
-                        -- ไต่ขึ้นไปหาหน้าต่างหลักที่เป็น Modal จริงๆ (ขนาดใหญ่)
-                        local topModal = frame
-                        while topModal.Parent and (topModal.Parent:IsA("Frame") or topModal.Parent:IsA("ScreenGui")) do
-                            if topModal.Parent:IsA("ScreenGui") then break end
-                            topModal = topModal.Parent
-                        end
-                        return topModal, container
+                        return frame, container
                     end
                 end
             end
@@ -398,79 +399,76 @@ local function findAndPlayFirstWinCar()
 
     -- 3. สแกนหาตู้รถไฟที่มีป้าย FIRST WIN
     local targetPlayButton = nil
-    local hasAnyFirstWin = false
+    local playButtons = {}
+    local firstWinBadges = {}
 
-    -- ค้นหาป้าย FIRST WIN ภายในหน้าต่างหลัก
+    -- สแกนองค์ประกอบทั้งหมดในหน้าต่าง Area_challenges
     for _, desc in ipairs(trainFrame:GetDescendants()) do
-        if desc:IsA("TextLabel") and desc.Text:upper():find("FIRST WIN") then
-            hasAnyFirstWin = true
-            print("[AutoChallenge] ตรวจพบป้ายรางวัล:", desc.Text, "ที่", desc:GetFullName())
+        if desc:IsA("TextLabel") then
+            local txt = desc.Text:upper():gsub("%s+", " ")
+            if txt:find("FIRST") and txt:find("WIN") then
+                table.insert(firstWinBadges, desc)
+                print("[AutoChallenge] >> เจอป้าย FIRST WIN:", desc:GetFullName())
+            end
+        elseif desc:IsA("ImageLabel") or desc:IsA("Frame") then
+            local n = desc.Name:upper()
+            if n:find("FIRST") or n:find("FIRSTWIN") then
+                table.insert(firstWinBadges, desc)
+                print("[AutoChallenge] >> เจอป้าย First Win (จากชื่อ Object):", desc:GetFullName())
+            end
+        end
 
-            -- ค้นหาการ์ดตู้รถไฟใบนี้ที่มีปุ่ม PLAY
-            local carCard = desc.Parent
-            local playBtn = nil
-
-            while carCard and carCard ~= trainFrame and carCard ~= activeGui do
-                for _, btn in ipairs(carCard:GetDescendants()) do
-                    if btn:IsA("TextButton") or btn:IsA("ImageButton") then
-                        local btnText = (btn:IsA("TextButton") and btn.Text:upper()) or ""
-                        for _, t in ipairs(btn:GetDescendants()) do
-                            if t:IsA("TextLabel") then
-                                btnText = btnText .. " " .. t.Text:upper()
-                            end
-                        end
-                        if btnText:find("PLAY") then
-                            playBtn = btn
-                            break
-                        end
-                    end
+        if desc:IsA("TextButton") or desc:IsA("ImageButton") then
+            local bText = (desc:IsA("TextButton") and desc.Text:upper()) or ""
+            for _, t in ipairs(desc:GetDescendants()) do
+                if t:IsA("TextLabel") then
+                    bText = bText .. " " .. t.Text:upper()
                 end
-                if playBtn then break end
-                carCard = carCard.Parent
+            end
+            if bText:find("PLAY") then
+                table.insert(playButtons, { Button = desc, PosX = desc.AbsolutePosition.X })
+                print("[AutoChallenge] >> เจอปุ่ม PLAY:", desc:GetFullName(), "ตำแหน่ง X:", desc.AbsolutePosition.X)
+            end
+        end
+    end
+
+    -- เรียงลำดับปุ่ม PLAY ตามตำแหน่งแนวนอน (ซ้ายไปขวา: Car 1 -> Car 2 -> Car 3)
+    table.sort(playButtons, function(a, b) return a.PosX < b.PosX end)
+
+    -- จับคู่ป้าย FIRST WIN กับปุ่ม PLAY ที่อยู่ในการ์ดเดียวกัน
+    if #firstWinBadges > 0 then
+        for _, badge in ipairs(firstWinBadges) do
+            local badgeX = badge.AbsolutePosition.X
+            -- หาปุ่ม PLAY ที่พิกัด X ใกล้เคียงกับป้าย FIRST WIN ที่สุด
+            local bestBtn = nil
+            local minDiff = 99999
+            for _, pData in ipairs(playButtons) do
+                local diff = math.abs(pData.PosX - badgeX)
+                if diff < minDiff then
+                    minDiff = diff
+                    bestBtn = pData.Button
+                end
             end
 
-            if playBtn then
-                targetPlayButton = playBtn
-                print("[AutoChallenge] เจอปุ่ม PLAY ของตู้ First Win นี้แล้ว:", playBtn:GetFullName())
+            if bestBtn then
+                targetPlayButton = bestBtn
+                print("[AutoChallenge] จับคู่สำเร็จ! เจอปุ่ม PLAY ประจำตู้ First Win:", bestBtn:GetFullName())
                 break
             end
         end
     end
 
-    -- หากสแกนทั่วทั้งหน้าต่างแล้วยังไม่เจอปุ่ม PLAY จากป้าย FIRST WIN ให้ fallback หาปุ่ม PLAY ตรงๆ
-    if not targetPlayButton then
-        for _, btn in ipairs(trainFrame:GetDescendants()) do
-            if btn:IsA("TextButton") or btn:IsA("ImageButton") then
-                local bText = (btn:IsA("TextButton") and btn.Text:upper()) or ""
-                for _, t in ipairs(btn:GetDescendants()) do
-                    if t:IsA("TextLabel") then
-                        bText = bText .. " " .. t.Text:upper()
-                    end
-                end
-                if bText:find("PLAY") then
-                    -- เช็คว่าในโซนการ์ดใบนี้มีป้าย FIRST WIN หรือไม่
-                    local pCard = btn.Parent
-                    local isFirstWinZone = false
-                    while pCard and pCard ~= trainFrame do
-                        for _, lbl in ipairs(pCard:GetDescendants()) do
-                            if lbl:IsA("TextLabel") and lbl.Text:upper():find("FIRST WIN") then
-                                isFirstWinZone = true
-                                break
-                            end
-                        end
-                        if isFirstWinZone then break end
-                        pCard = pCard.Parent
-                    end
-
-                    if isFirstWinZone then
-                        targetPlayButton = btn
-                        hasAnyFirstWin = true
-                        print("[AutoChallenge] เจอปุ่ม PLAY โดยการจับคู่การ์ด:", btn:GetFullName())
-                        break
-                    end
-                end
+    -- หากสแกนทั้งหน้าต่างแล้วไม่มีป้าย First Win ใดๆ เลย
+    if #firstWinBadges == 0 then
+        local countdownText = ""
+        for _, l in ipairs(trainFrame:GetDescendants()) do
+            if l:IsA("TextLabel") and l.Text:upper():find("NEW CARS IN") then
+                countdownText = l.Text
+                break
             end
         end
+        print("[AutoChallenge] รับของ First Win ครบหมดทุกตู้แล้ว! " .. countdownText)
+        return false
     end
 
     -- หากสแกนแล้วไม่พบ FIRST WIN เลย
