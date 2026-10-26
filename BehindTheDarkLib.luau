@@ -170,7 +170,6 @@ local function spawnClickRipple(btn: GuiButton, inputPos: Vector3)
 end
 
 function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
-    local isHovered = false
     btn.ClipsDescendants = true
 
     local targetObj: Instance = (typeof(scaleTarget) == "Instance") and scaleTarget or btn
@@ -203,7 +202,6 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
     sharpLine.Parent = glint
 
     btn.MouseEnter:Connect(function()
-        isHovered = true
         if Library.Settings.Animations then
             TweenService:Create(uiScale, springBounce, { Scale = 1.025 }):Play()
             if Library.Settings.AnimeGlint then
@@ -218,7 +216,6 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
     end)
 
     btn.MouseLeave:Connect(function()
-        isHovered = false
         if Library.Settings.Animations then
             TweenService:Create(uiScale, springBounce, { Scale = 1 }):Play()
         end
@@ -237,8 +234,7 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
     btn.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             if Library.Settings.Animations then
-                local targetScale = isHovered and 1.025 or 1
-                TweenService:Create(uiScale, springBounce, { Scale = targetScale }):Play()
+                TweenService:Create(uiScale, springBounce, { Scale = 1 }):Play()
             end
         end
     end)
