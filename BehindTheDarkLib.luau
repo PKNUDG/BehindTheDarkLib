@@ -129,6 +129,7 @@ local function applyCartoonSurface(target: GuiObject, zIndex: number, cornerRad:
         end)
     end
 end
+Library.ApplyCartoonSurface = applyCartoonSurface
 
 local function spawnClickRipple(btn: GuiButton, inputPos: Vector3)
     if not (Library.Settings.Animations and Library.Settings.ClickRipple) then return end
@@ -1523,7 +1524,40 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     selectBtn.Parent = dropRim
     Instance.new("UICorner", selectBtn).CornerRadius = UDim.new(0, 11)
 
-    applyCartoonSurface(selectBtn, zBase + 2, 11, true)
+    -- แสงวาบไล่สีซ้ายไปขวาแบบวนลูป (Continuous Light Sweep)
+    local selectSweepGrad = Instance.new("UIGradient")
+    selectSweepGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.40, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.50, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(0.60, Color3.fromRGB(255, 255, 255)),
+        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 255, 255))
+    })
+    selectSweepGrad.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0.00, 0.95),
+        NumberSequenceKeypoint.new(0.40, 0.85),
+        NumberSequenceKeypoint.new(0.50, 0.20),
+        NumberSequenceKeypoint.new(0.60, 0.85),
+        NumberSequenceKeypoint.new(1.00, 0.95)
+    })
+    selectSweepGrad.Offset = Vector2.new(-1, 0)
+    selectSweepGrad.Parent = selectBtn
+
+    task.spawn(function()
+        while selectBtn and selectBtn.Parent do
+            if Library.Settings.Animations then
+                selectSweepGrad.Offset = Vector2.new(-1, 0)
+                local twSweep = TweenService:Create(selectSweepGrad, TweenInfo.new(2.8, Enum.EasingStyle.Linear), {
+                    Offset = Vector2.new(1, 0)
+                })
+                twSweep:Play()
+                twSweep.Completed:Wait()
+                task.wait(0.3)
+            else
+                task.wait(0.5)
+            end
+        end
+    end)
 
     local selectLabel = Instance.new("TextLabel")
     selectLabel.Size = UDim2.new(1, -24, 1, 0)
@@ -1658,6 +1692,9 @@ function Library:CreateActionButton(target: any, text: string, yPos: number, rim
     rim.ZIndex = 6
     rim.Parent = shadow
     Instance.new("UICorner", rim).CornerRadius = UDim.new(0, 14)
+
+    -- ลวดลายลูปขยับที่พื้นหลังของตัวปุ่ม (Rim Background)
+    applyCartoonSurface(rim, 6, 14, true)
 
     local rimStroke = Instance.new("UIStroke")
     rimStroke.Parent = rim

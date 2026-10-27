@@ -1341,6 +1341,7 @@ local function createSideBySideActionButtons()
     setupRim.ZIndex = 6
     setupRim.Parent = setupShadow
     Instance.new("UICorner", setupRim).CornerRadius = UDim.new(0, 14)
+    Library.ApplyCartoonSurface(setupRim, 6, 14, true)
     local srs = Instance.new("UIStroke")
     srs.Parent = setupRim
     srs.Thickness = 3
@@ -1390,6 +1391,7 @@ local function createSideBySideActionButtons()
     reloadRim.ZIndex = 6
     reloadRim.Parent = reloadShadow
     Instance.new("UICorner", reloadRim).CornerRadius = UDim.new(0, 14)
+    Library.ApplyCartoonSurface(reloadRim, 6, 14, true)
     local rrs = Instance.new("UIStroke")
     rrs.Parent = reloadRim
     rrs.Thickness = 3
