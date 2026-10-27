@@ -1614,14 +1614,16 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
 
     Library.AttachInteractiveEffects(selectBtn, dropShadow)
 
-    -- Dropdown Popup Container (ติดที่ self.Gui เพื่อไม่ให้โดน ClipsDescendants ตัด และสามารถแสดงเลยขอบ UI ได้)
+    -- Dropdown Popup Container (ติดที่ ScreenGui เพื่อไม่ให้โดน ClipsDescendants ตัด และสามารถแสดงเลยขอบ UI ได้)
+    local targetScreenGui = self.Gui or dropRim:FindFirstAncestorOfClass("ScreenGui")
     local popupHolder = Instance.new("Frame")
     popupHolder.Name = "DropdownPopup_" .. title
     popupHolder.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
     popupHolder.BorderSizePixel = 0
     popupHolder.Visible = false
     popupHolder.ZIndex = 800
-    popupHolder.Parent = self.Gui or dropRim
+    popupHolder.AnchorPoint = Vector2.new(0, 0)
+    popupHolder.Parent = targetScreenGui or dropRim
     Instance.new("UICorner", popupHolder).CornerRadius = UDim.new(0, 15)
 
     local popupRim = Instance.new("Frame")
@@ -1671,14 +1673,28 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     listPad.PaddingRight = UDim.new(0, 5)
 
     local function updatePopupPosition()
-        if not popupHolder.Visible then return end
-        local pos = dropRim.AbsolutePosition
+        local curGui = popupHolder:FindFirstAncestorOfClass("ScreenGui")
+        local isDirectUnderRim = (popupHolder.Parent == dropRim)
+
         local size = dropRim.AbsoluteSize
-        local targetX = pos.X
-        local targetY = pos.Y + size.Y + 4
         local listH = math.clamp(#options * 34 + 14, 48, 180)
-        popupHolder.Size = UDim2.fromOffset(size.X, listH)
-        popupHolder.Position = UDim2.fromOffset(targetX, targetY)
+
+        if isDirectUnderRim then
+            popupHolder.Position = UDim2.new(0, 0, 1, 4)
+            popupHolder.Size = UDim2.new(1, 0, 0, listH)
+        else
+            local pos = dropRim.AbsolutePosition
+            local insetY = 0
+            if curGui and not curGui.IgnoreGuiInset then
+                pcall(function()
+                    insetY = GuiService:GetGuiInset().Y
+                end)
+            end
+            local targetX = pos.X
+            local targetY = pos.Y + size.Y + 4 - insetY
+            popupHolder.Size = UDim2.fromOffset(size.X, listH)
+            popupHolder.Position = UDim2.fromOffset(targetX, targetY)
+        end
     end
 
     local function populate()
@@ -1749,18 +1765,25 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     end
 
     selectBtn.Activated:Connect(function()
-        popupHolder.Visible = not popupHolder.Visible
-        arrowLabel.Text = popupHolder.Visible and "▲" or "▼"
-        if popupHolder.Visible then
+        local willOpen = not popupHolder.Visible
+        if willOpen then
             populate()
             updatePopupPosition()
         end
+        popupHolder.Visible = willOpen
+        arrowLabel.Text = willOpen and "▲" or "▼"
     end)
 
     -- Auto close if main card or dropdown is hidden / removed
     dropRim.AncestryChanged:Connect(function(_, newParent)
         if not newParent then
             popupHolder:Destroy()
+        end
+    end)
+
+    dropRim:GetPropertyChangedSignal("AbsolutePosition"):Connect(function()
+        if popupHolder.Visible then
+            updatePopupPosition()
         end
     end)
 

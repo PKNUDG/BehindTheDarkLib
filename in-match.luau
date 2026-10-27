@@ -423,18 +423,12 @@ end
 
 -- ลูปสแกนตรวจจับด่านแบบต่อเนื่อง (Continuous Scanner)
 task.spawn(function()
+    local scanAttempts = 0
     while Controller.Running and not isStageVerified do
+        scanAttempts = scanAttempts + 1
         task.wait(0.75)
 
-        -- 1. ตรวจสอบค่าจาก Genv / Library.Settings
-        local fromLobby = _G.CandyTD_SelectedStage or Library.Settings.SelectedStage
-        local m1 = findMatchingPresetName(fromLobby)
-        if m1 then
-            applyDetectedStage(m1, "Lobby Handshake")
-            break
-        end
-
-        -- 2. ตรวจสอบ Workspace Models / Map (แม่นยำสูงสุดใน In-Match)
+        -- 1. ตรวจสอบ Workspace Models / Map (แม่นยำสูงสุดใน In-Match เพราะเป็น World จริงที่โหลดอยู่)
         local mapFolder = workspace:FindFirstChild("Map") or workspace:FindFirstChild("Stage") or workspace:FindFirstChild("Arena")
         if mapFolder then
             local m = findMatchingPresetName(mapFolder.Name)
@@ -453,14 +447,14 @@ task.spawn(function()
         end
         if isStageVerified then break end
 
-        -- 3. ตรวจสอบ ReplicatedStorage / MatchRemotes / CandyTD
+        -- 2. ตรวจสอบ ReplicatedStorage / MatchRemotes / CandyTD
         local matchFolder = ReplicatedStorage:FindFirstChild("CandyTD") or ReplicatedStorage:FindFirstChild("Match")
         if matchFolder then
             for _, child in ipairs(matchFolder:GetDescendants()) do
                 if child:IsA("StringValue") and child.Value ~= "" then
                     local m = findMatchingPresetName(child.Value)
                     if m then
-                        applyDetectedStage(m, "ReplicatedStorage." .. child.Name)
+                        applyDetectedStage(m, "ReplicatedStorage." .. child.Name .. " (" .. child.Value .. ")")
                         break
                     end
                 end
@@ -468,13 +462,13 @@ task.spawn(function()
         end
         if isStageVerified then break end
 
-        -- 4. ตรวจสอบข้อความบน UI เฉพาะข้อความที่เกี่ยวข้องกับ Stage (หลีกเลี่ยงชื่อเกม CandyTD)
+        -- 3. ตรวจสอบข้อความบน UI เฉพาะข้อความที่เกี่ยวข้องกับ Stage ในการแข่งขันจริง
         for _, gui in ipairs(playerGui:GetChildren()) do
             if gui:IsA("ScreenGui") and gui.Enabled and gui.Name ~= "CandyTD_BehindTheDarkHub" and gui.Name ~= "BehindTheDark_UI" then
                 for _, desc in ipairs(gui:GetDescendants()) do
                     if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" and desc.TextSize >= 14 then
                         local txt = desc.Text:upper()
-                        if not txt:find("CANDY TD") and not txt:find("CREDITS") and not txt:find("SHOP") then
+                        if not txt:find("CANDY TD") and not txt:find("CREDITS") and not txt:find("SHOP") and not txt:find("SETTINGS") then
                             local m = findMatchingPresetName(desc.Text)
                             if m then
                                 applyDetectedStage(m, "UI (" .. desc.Name .. ": " .. desc.Text .. ")")
@@ -487,6 +481,32 @@ task.spawn(function()
             end
         end
         if isStageVerified then break end
+
+        -- 4. ตรวจสอบ Marketplace Place Name หากด่านมีชื่อเฉพาะตาม PlaceId
+        if currentMapName and currentMapName ~= "Custom Match" then
+            local mPlace = findMatchingPresetName(currentMapName)
+            if mPlace then
+                applyDetectedStage(mPlace, "PlaceName (" .. currentMapName .. ")")
+                break
+            end
+        end
+        if isStageVerified then break end
+
+        -- 5. ตรวจสอบค่าจาก Genv ที่ส่งต่อมาจาก Lobby (_G.CandyTD_SelectedStage เท่านั้น โดยไม่ใช้ Settings.SelectedStage ที่ตกค้างจากไฟล์บันทึก)
+        if _G.CandyTD_SelectedStage then
+            local mHandshake = findMatchingPresetName(_G.CandyTD_SelectedStage)
+            if mHandshake then
+                applyDetectedStage(mHandshake, "Lobby Handshake (" .. tostring(_G.CandyTD_SelectedStage) .. ")")
+                _G.CandyTD_SelectedStage = nil -- ล้างค่าทิ้งเพื่อไม่ให้ใช้ซ้ำในแมตช์ถัดไป
+                break
+            end
+        end
+
+        -- หากวนสแกนเกิน 10 ครั้ง (~8 วินาที) แล้วยังไม่เจอด่านใดๆ ใน Workspace ให้คงไว้เป็น Unverified เพื่อป้องกันการวางมั่ว
+        if scanAttempts >= 12 then
+            print("[AutoStage] สแกนยังไม่พบชื่อด่านที่ตรงกับ Preset ในเกม กำลังรอการโหลดแมตช์ต่อไป...")
+            task.wait(2)
+        end
     end
 end)
 
