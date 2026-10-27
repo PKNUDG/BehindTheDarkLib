@@ -20,6 +20,9 @@ Library.Settings = {
     ClickRipple = true,
     AnimeGlint = true,
     AutoChallenge = false,
+    UltraLowCPU = false,
+    ResourceSaver = false,
+    DiscordWebhook = "",
     WindowPos = nil,
     SelectedStage = nil,
     PlaceIdStageMap = {},
@@ -1119,11 +1122,111 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         rowClickBtn.Activated:Connect(doToggle)
     end
 
+    local function applyUltraLowCpu(enabled: boolean)
+        pcall(function()
+            if type(setfpscap) == "function" then
+                setfpscap(enabled and 15 or 60)
+            end
+            local rend = settings():FindFirstChild("Rendering")
+            if rend then
+                rend.QualityLevel = enabled and 1 or 0
+            end
+            RunService:Set3dRenderingEnabled(not enabled)
+        end)
+    end
+
+    if Library.Settings.UltraLowCPU then
+        task.spawn(function()
+            task.wait(1)
+            applyUltraLowCpu(true)
+        end)
+    end
+
     createSettingRow("All Animations", "Animations")
     createSettingRow("Looping Pattern", "MovingPattern")
     createSettingRow("Click Ripple", "ClickRipple")
     createSettingRow("Anime Glint", "AnimeGlint")
     createSettingRow("Auto Challenge (Train)", "AutoChallenge")
+    createSettingRow("Ultra Low CPU (15 FPS)", "UltraLowCPU", function(val)
+        applyUltraLowCpu(val)
+    end)
+    createSettingRow("Resource Saver (AFK/Bg)", "ResourceSaver")
+
+    -- Row สำหรับกรอก Discord Webhook URL
+    local whShadow = Instance.new("Frame")
+    whShadow.Size = UDim2.new(1, -8, 0, 48)
+    whShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+    whShadow.BorderSizePixel = 0
+    whShadow.ZIndex = 73
+    whShadow.Parent = settingsScroll
+    Instance.new("UICorner", whShadow).CornerRadius = UDim.new(0, 12)
+
+    local whRim = Instance.new("Frame")
+    whRim.Size = UDim2.new(1, 0, 0, 45)
+    whRim.Position = UDim2.fromOffset(0, 0)
+    whRim.BackgroundColor3 = Color3.fromRGB(98, 52, 148)
+    whRim.BorderSizePixel = 0
+    whRim.ZIndex = 74
+    whRim.Parent = whShadow
+    Instance.new("UICorner", whRim).CornerRadius = UDim.new(0, 12)
+    local whrs = Instance.new("UIStroke")
+    whrs.Parent = whRim
+    whrs.Thickness = 2.2
+    whrs.Color = Color3.fromRGB(22, 5, 36)
+
+    local whRow = Instance.new("Frame")
+    whRow.Size = UDim2.new(1, -4, 1, -4)
+    whRow.Position = UDim2.fromOffset(2, 2)
+    whRow.BackgroundColor3 = Color3.fromRGB(44, 14, 70)
+    whRow.BorderSizePixel = 0
+    whRow.ZIndex = 75
+    whRow.Parent = whRim
+    Instance.new("UICorner", whRow).CornerRadius = UDim.new(0, 10)
+
+    local whInput = Instance.new("TextBox")
+    whInput.Size = UDim2.new(1, -16, 1, -10)
+    whInput.Position = UDim2.fromOffset(8, 5)
+    whInput.BackgroundColor3 = Color3.fromRGB(30, 9, 48)
+    whInput.PlaceholderText = "Discord Webhook URL (https://...)"
+    whInput.PlaceholderColor3 = Color3.fromRGB(150, 140, 175)
+    whInput.Text = Library.Settings.DiscordWebhook or ""
+    whInput.TextColor3 = Color3.fromRGB(255, 235, 120)
+    whInput.TextSize = 11.5
+    whInput.Font = Enum.Font.FredokaOne
+    whInput.ClearTextOnFocus = false
+    whInput.BorderSizePixel = 0
+    whInput.ZIndex = 76
+    whInput.Parent = whRow
+    Instance.new("UICorner", whInput).CornerRadius = UDim.new(0, 8)
+    local whis = Instance.new("UIStroke")
+    whis.Parent = whInput
+    whis.Thickness = 1.5
+    whis.Color = Color3.fromRGB(22, 5, 36)
+
+    whInput.FocusLost:Connect(function()
+        local cleanUrl = whInput.Text:gsub("^%s*(.-)%s*$", "%1")
+        Library.Settings.DiscordWebhook = cleanUrl
+        Library.SaveSettings()
+    end)
+
+    -- AFK & Inactive Resource Saver listener
+    task.spawn(function()
+        local lastActive = os.clock()
+        UserInputService.InputBegan:Connect(function()
+            lastActive = os.clock()
+        end)
+        while smOuter and smOuter.Parent do
+            task.wait(10)
+            if Library.Settings.ResourceSaver then
+                local isAfk = (os.clock() - lastActive > 600)
+                if isAfk and Library.Settings.Animations then
+                    Library.Settings.Animations = false
+                elseif not isAfk and not Library.Settings.Animations then
+                    Library.Settings.Animations = true
+                end
+            end
+        end
+    end)
 
     local function toggleSettings()
         local isOpen = not smOuter.Visible

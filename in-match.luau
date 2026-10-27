@@ -1401,6 +1401,70 @@ local function checkIsMatchEnded()
     return false
 end
 
+local matchStartTime = os.clock()
+local matchResultSent = false
+
+local function sendDiscordMatchSummary(resultType: string)
+    local webhookUrl = Library.Settings.DiscordWebhook
+    if not webhookUrl or webhookUrl == "" or not webhookUrl:find("^https://") then return end
+    if matchResultSent then return end
+    matchResultSent = true
+
+    task.spawn(function()
+        local elapsed = math.floor(os.clock() - matchStartTime)
+        local timeStr = string.format("%02d:%02d", math.floor(elapsed / 60), elapsed % 60)
+        if elapsed >= 3600 then
+            timeStr = string.format("%02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), elapsed % 60)
+        end
+
+        local stagePlayed = states.CurrentStage or "Unknown"
+
+        -- รวบรวมข้อความไอเทมดรอปหรือของรางวัล
+        local rewardsList = {}
+        for _, desc in ipairs(candyTD:GetDescendants()) do
+            if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" then
+                local txt = desc.Text:gsub("^%s*(.-)%s*$", "%1")
+                local pName = (desc.Parent and desc.Parent.Name:lower()) or ""
+                if (pName:find("reward") or pName:find("drop") or pName:find("item") or pName:find("loot") or pName:find("win")) and #txt > 1 and not table.find(rewardsList, txt) then
+                    table.insert(rewardsList, "• " .. txt)
+                end
+            end
+        end
+
+        local rewardsContent = (#rewardsList > 0) and table.concat(rewardsList, "\n") or "No rewards detected / None"
+        local isVictory = (resultType == "VICTORY")
+        local embedColor = isVictory and 3407680 or 16723509 -- 3407680 = Green, 16723509 = Red
+
+        local payload = {
+            embeds = {
+                {
+                    title = string.format("🎮 Match Ended: %s", resultType),
+                    color = embedColor,
+                    fields = {
+                        { name = "🗺️ Stage", value = stagePlayed, inline = true },
+                        { name = "⏱️ Time Elapsed", value = timeStr, inline = true },
+                        { name = "🎁 Dropped Rewards", value = string.sub(rewardsContent, 1, 1000), inline = false }
+                    },
+                    footer = { text = "Behind The Dark Hub • Candy TD" },
+                    timestamp = DateTime.now():ToIsoDate()
+                }
+            }
+        }
+
+        local req = (type(request) == "function" and request) or (type(http_request) == "function" and http_request) or (type(syn) == "table" and type(syn.request) == "function" and syn.request)
+        if req then
+            pcall(function()
+                req({
+                    Url = webhookUrl,
+                    Method = "POST",
+                    Headers = { ["Content-Type"] = "application/json" },
+                    Body = HttpService:JSONEncode(payload)
+                })
+            end)
+        end
+    end)
+end
+
 local matchHandled = false
 task.spawn(function()
     while Controller.Running do
@@ -1410,47 +1474,87 @@ task.spawn(function()
 
             if not isGameOver then
                 matchHandled = false
+                matchResultSent = false
             else
+                if not matchHandled then
+                    local result = "GAME OVER"
+                    for _, desc in ipairs(candyTD:GetDescendants()) do
+                        if desc:IsA("GuiObject") and desc.Visible then
+                            local n = desc.Name:lower()
+                            if n:find("victory") or n:find("win") then
+                                result = "VICTORY"
+                                break
+                            elseif n:find("defeat") or n:find("loss") or n:find("over") then
+                                result = "DEFEAT"
+                                break
+                            end
+                        end
+                    end
+                    sendDiscordMatchSummary(result)
+                end
+
                 if not matchHandled and states.EndChoice ~= "NONE" then
                     matchHandled = true
                     task.wait(1.2)
 
                     local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
-                    local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
+                    local replayRemote = matchRemotes and matchRemotes:FindFirstChild("Replay")
 
-                    if states.EndChoice == "NEXT" then
-                        if actRemote and actRemote:IsA("RemoteFunction") then
-                            print("[AutoNext] สั่ง Remote: Act -> 'next'")
-                            actRemote:InvokeServer("next")
+                    -- ตรวจสอบว่าเป็นด่าน Halloween Raid หรือมีระบบ Replay นมแมลง (Bug Milk) หรือไม่
+                    local isHalloweenReplay = false
+                    if replayRemote and replayRemote:IsA("RemoteFunction") then
+                        isHalloweenReplay = true
+                    end
+
+                    if isHalloweenReplay and (states.EndChoice == "AGAIN" or states.EndChoice == "NEXT") then
+                        print("[HalloweenRaid] กำลังส่งคำสั่ง Replay: 'info' -> 'pay' (Bug Milk)...")
+                        local okInfo = pcall(function()
+                            replayRemote:InvokeServer("info")
+                        end)
+                        if okInfo then
+                            task.wait(0.6)
+                            pcall(function()
+                                replayRemote:InvokeServer("pay")
+                            end)
+                            print("[HalloweenRaid] ยืนยันการจ่าย 1 Bug Milk เริ่มรอบใหม่สำเร็จ!")
                         end
-                        for _, d in ipairs(candyTD:GetDescendants()) do
-                            if d:IsA("GuiButton") and d.Visible and (d.Name:lower():find("next") or (d:IsA("TextButton") and d.Text:lower():find("next"))) then
-                                triggerInternalButton(d)
+                    else
+                        local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
+
+                        if states.EndChoice == "NEXT" then
+                            if actRemote and actRemote:IsA("RemoteFunction") then
+                                print("[AutoNext] สั่ง Remote: Act -> 'next'")
+                                actRemote:InvokeServer("next")
                             end
-                        end
-
-                    elseif states.EndChoice == "AGAIN" then
-                        if actRemote and actRemote:IsA("RemoteFunction") then
-                            print("[AutoAgain] สั่ง Remote: Act -> 'again'")
-                            actRemote:InvokeServer("again")
-                        end
-
-                    elseif states.EndChoice == "HOME" then
-                        print("[AutoHome] ส่งคำสั่งกลับ HOME/ReturnToHub...")
-                        local retRemote = matchRemotes and matchRemotes:FindFirstChild("ReturnToHub")
-                        if retRemote then
-                            if retRemote:IsA("RemoteEvent") then
-                                retRemote:FireServer()
-                            elseif retRemote:IsA("RemoteFunction") then
-                                retRemote:InvokeServer()
-                            end
-                        end
-                        for _, d in ipairs(candyTD:GetDescendants()) do
-                            if d:IsA("GuiButton") and d.Visible then
-                                local n = d.Name:lower()
-                                local txt = (d:IsA("TextButton") and d.Text:lower()) or ""
-                                if n:find("home") or n:find("lobby") or txt:find("home") or txt:find("lobby") then
+                            for _, d in ipairs(candyTD:GetDescendants()) do
+                                if d:IsA("GuiButton") and d.Visible and (d.Name:lower():find("next") or (d:IsA("TextButton") and d.Text:lower():find("next"))) then
                                     triggerInternalButton(d)
+                                end
+                            end
+
+                        elseif states.EndChoice == "AGAIN" then
+                            if actRemote and actRemote:IsA("RemoteFunction") then
+                                print("[AutoAgain] สั่ง Remote: Act -> 'again'")
+                                actRemote:InvokeServer("again")
+                            end
+
+                        elseif states.EndChoice == "HOME" then
+                            print("[AutoHome] ส่งคำสั่งกลับ HOME/ReturnToHub...")
+                            local retRemote = matchRemotes and matchRemotes:FindFirstChild("ReturnToHub")
+                            if retRemote then
+                                if retRemote:IsA("RemoteEvent") then
+                                    retRemote:FireServer()
+                                elseif retRemote:IsA("RemoteFunction") then
+                                    retRemote:InvokeServer()
+                                end
+                            end
+                            for _, d in ipairs(candyTD:GetDescendants()) do
+                                if d:IsA("GuiButton") and d.Visible then
+                                    local n = d.Name:lower()
+                                    local txt = (d:IsA("TextButton") and d.Text:lower()) or ""
+                                    if n:find("home") or n:find("lobby") or txt:find("home") or txt:find("lobby") then
+                                        triggerInternalButton(d)
+                                    end
                                 end
                             end
                         end
