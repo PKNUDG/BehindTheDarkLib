@@ -1500,9 +1500,10 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     Instance.new("UICorner", dropShadow).CornerRadius = UDim.new(0, 14)
 
     local dropRim = Instance.new("Frame")
+    dropRim.Name = "Dropdown3DRim"
     dropRim.Size = UDim2.new(1, 0, 0, 41)
     dropRim.Position = UDim2.fromOffset(0, 0)
-    dropRim.BackgroundColor3 = Color3.fromRGB(115, 95, 175)
+    dropRim.BackgroundColor3 = Color3.fromRGB(195, 150, 250)
     dropRim.BorderSizePixel = 0
     dropRim.ZIndex = zBase + 1
     dropRim.Parent = dropShadow
@@ -1515,7 +1516,7 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     local selectBtn = Instance.new("TextButton")
     selectBtn.Size = UDim2.new(1, -6, 1, -5)
     selectBtn.Position = UDim2.fromOffset(3, 2)
-    selectBtn.BackgroundColor3 = Color3.fromRGB(48, 20, 82)
+    selectBtn.BackgroundColor3 = Color3.fromRGB(154, 102, 224)
     selectBtn.BorderSizePixel = 0
     selectBtn.AutoButtonColor = false
     selectBtn.Text = ""
@@ -1524,6 +1525,17 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     selectBtn:SetAttribute("NoDotsPattern", true)
     selectBtn.Parent = dropRim
     Instance.new("UICorner", selectBtn).CornerRadius = UDim.new(0, 11)
+
+    -- สันแสงไฮไลท์โค้งการ์ตูนด้านบนปุ่ม (Gloss Highlight)
+    local gloss = Instance.new("Frame")
+    gloss.Size = UDim2.new(1, -10, 0.42, 0)
+    gloss.Position = UDim2.fromOffset(5, 2)
+    gloss.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    gloss.BackgroundTransparency = 0.74
+    gloss.BorderSizePixel = 0
+    gloss.ZIndex = zBase + 3
+    gloss.Parent = selectBtn
+    Instance.new("UICorner", gloss).CornerRadius = UDim.new(0, 9)
 
     -- แสงวาบไล่สีซ้ายไปขวาแบบวนลูป (Continuous Light Sweep)
     local selectSweepGrad = Instance.new("UIGradient")
@@ -1536,9 +1548,9 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     })
     selectSweepGrad.Transparency = NumberSequence.new({
         NumberSequenceKeypoint.new(0.00, 0.95),
-        NumberSequenceKeypoint.new(0.40, 0.85),
-        NumberSequenceKeypoint.new(0.50, 0.20),
-        NumberSequenceKeypoint.new(0.60, 0.85),
+        NumberSequenceKeypoint.new(0.40, 0.82),
+        NumberSequenceKeypoint.new(0.50, 0.15),
+        NumberSequenceKeypoint.new(0.60, 0.82),
         NumberSequenceKeypoint.new(1.00, 0.95)
     })
     selectSweepGrad.Offset = Vector2.new(-1, 0)
@@ -1561,45 +1573,90 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     end)
 
     local selectLabel = Instance.new("TextLabel")
-    selectLabel.Size = UDim2.new(1, -24, 1, 0)
+    selectLabel.Size = UDim2.new(1, -56, 1, 0)
     selectLabel.Position = UDim2.fromOffset(12, 0)
     selectLabel.BackgroundTransparency = 1
     selectLabel.Text = string.format("%s: %s", title, tostring(selected))
-    selectLabel.TextColor3 = Color3.fromRGB(255, 225, 95)
+    selectLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     selectLabel.TextSize = 13.5
     selectLabel.Font = Enum.Font.FredokaOne
     selectLabel.TextXAlignment = Enum.TextXAlignment.Left
-    selectLabel.ZIndex = zBase + 3
+    selectLabel.ZIndex = zBase + 4
     selectLabel.Parent = selectBtn
     local sls = Instance.new("UIStroke")
     sls.Parent = selectLabel
-    sls.Thickness = 3
+    sls.Thickness = 2.8
     sls.Color = Color3.fromRGB(22, 5, 36)
+
+    -- ไอคอนลูกศรเปิด/ปิด Dropdown ทางขวามือ
+    local arrowBadge = Instance.new("Frame")
+    arrowBadge.Size = UDim2.fromOffset(26, 24)
+    arrowBadge.Position = UDim2.new(1, -34, 0.5, -12)
+    arrowBadge.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
+    arrowBadge.BorderSizePixel = 0
+    arrowBadge.ZIndex = zBase + 4
+    arrowBadge.Parent = selectBtn
+    Instance.new("UICorner", arrowBadge).CornerRadius = UDim.new(0, 7)
+    local absStroke = Instance.new("UIStroke")
+    absStroke.Parent = arrowBadge
+    absStroke.Thickness = 2
+    absStroke.Color = Color3.fromRGB(22, 5, 36)
+
+    local arrowLabel = Instance.new("TextLabel")
+    arrowLabel.Size = UDim2.fromScale(1, 1)
+    arrowLabel.BackgroundTransparency = 1
+    arrowLabel.Text = "▼"
+    arrowLabel.TextColor3 = Color3.fromRGB(255, 225, 95)
+    arrowLabel.TextSize = 11
+    arrowLabel.Font = Enum.Font.FredokaOne
+    arrowLabel.ZIndex = zBase + 5
+    arrowLabel.Parent = arrowBadge
 
     Library.AttachInteractiveEffects(selectBtn, dropShadow)
 
     -- Dropdown Popup Container (ติดที่ self.Gui เพื่อไม่ให้โดน ClipsDescendants ตัด และสามารถแสดงเลยขอบ UI ได้)
     local popupHolder = Instance.new("Frame")
     popupHolder.Name = "DropdownPopup_" .. title
-    popupHolder.BackgroundTransparency = 1
+    popupHolder.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
     popupHolder.BorderSizePixel = 0
     popupHolder.Visible = false
     popupHolder.ZIndex = 800
     popupHolder.Parent = self.Gui or dropRim
+    Instance.new("UICorner", popupHolder).CornerRadius = UDim.new(0, 15)
+
+    local popupRim = Instance.new("Frame")
+    popupRim.Name = "PopupRim"
+    popupRim.Size = UDim2.new(1, 0, 1, -3)
+    popupRim.Position = UDim2.fromOffset(0, 0)
+    popupRim.BackgroundColor3 = Color3.fromRGB(98, 52, 148)
+    popupRim.BorderSizePixel = 0
+    popupRim.ZIndex = 801
+    popupRim.Parent = popupHolder
+    Instance.new("UICorner", popupRim).CornerRadius = UDim.new(0, 15)
+    local prStroke = Instance.new("UIStroke")
+    prStroke.Parent = popupRim
+    prStroke.Thickness = 3
+    prStroke.Color = Color3.fromRGB(22, 5, 36)
+
+    local popupInner = Instance.new("Frame")
+    popupInner.Name = "PopupInner"
+    popupInner.Size = UDim2.new(1, -6, 1, -6)
+    popupInner.Position = UDim2.fromOffset(3, 3)
+    popupInner.BackgroundColor3 = Color3.fromRGB(38, 12, 62)
+    popupInner.BorderSizePixel = 0
+    popupInner.ZIndex = 802
+    popupInner.Parent = popupRim
+    Instance.new("UICorner", popupInner).CornerRadius = UDim.new(0, 12)
+    applyCartoonSurface(popupInner, 802, 12, true)
 
     local scroll = Instance.new("ScrollingFrame")
     scroll.Size = UDim2.fromScale(1, 1)
     scroll.Position = UDim2.fromOffset(0, 0)
-    scroll.BackgroundColor3 = Color3.fromRGB(34, 10, 58)
+    scroll.BackgroundTransparency = 1
     scroll.BorderSizePixel = 0
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scroll.ZIndex = 801
-    scroll.Parent = popupHolder
-    Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 12)
-    local ss = Instance.new("UIStroke")
-    ss.Parent = scroll
-    ss.Thickness = 3
-    ss.Color = Color3.fromRGB(22, 5, 36)
+    scroll.ZIndex = 803
+    scroll.Parent = popupInner
     Library.ApplyCartoonScrollbar(scroll)
 
     local list = Instance.new("UIListLayout")
@@ -1617,9 +1674,11 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
         if not popupHolder.Visible then return end
         local pos = dropRim.AbsolutePosition
         local size = dropRim.AbsoluteSize
-        local listH = math.clamp(#options * 32 + 10, 42, 175)
+        local targetX = pos.X
+        local targetY = pos.Y + size.Y + 4
+        local listH = math.clamp(#options * 34 + 14, 48, 180)
         popupHolder.Size = UDim2.fromOffset(size.X, listH)
-        popupHolder.Position = UDim2.fromOffset(pos.X, pos.Y + size.Y + 4)
+        popupHolder.Position = UDim2.fromOffset(targetX, targetY)
     end
 
     local function populate()
@@ -1627,9 +1686,10 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
             if ch:IsA("TextButton") then ch:Destroy() end
         end
         for _, opt in ipairs(options) do
+            local isSelected = (selected == opt)
             local optBtn = Instance.new("TextButton")
-            optBtn.Size = UDim2.new(1, 0, 0, 28)
-            optBtn.BackgroundColor3 = (selected == opt) and Color3.fromRGB(115, 70, 185) or Color3.fromRGB(52, 20, 88)
+            optBtn.Size = UDim2.new(1, 0, 0, 30)
+            optBtn.BackgroundColor3 = isSelected and Color3.fromRGB(154, 102, 224) or Color3.fromRGB(48, 18, 76)
             optBtn.Text = ""
             optBtn.AutoButtonColor = false
             optBtn.BorderSizePixel = 0
@@ -1638,13 +1698,18 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
             Instance.new("UICorner", optBtn).CornerRadius = UDim.new(0, 8)
             applyCartoonSurface(optBtn, 805, 8, true)
 
+            local optStroke = Instance.new("UIStroke")
+            optStroke.Parent = optBtn
+            optStroke.Thickness = isSelected and 2 or 1.5
+            optStroke.Color = isSelected and Color3.fromRGB(255, 225, 95) or Color3.fromRGB(22, 5, 36)
+
             local optLbl = Instance.new("TextLabel")
-            optLbl.Size = UDim2.new(1, -16, 1, 0)
+            optLbl.Size = UDim2.new(1, -26, 1, 0)
             optLbl.Position = UDim2.fromOffset(10, 0)
             optLbl.BackgroundTransparency = 1
             optLbl.Text = tostring(opt)
-            optLbl.TextColor3 = (selected == opt) and Color3.fromRGB(255, 225, 95) or Color3.fromRGB(242, 230, 255)
-            optLbl.TextSize = 12.5
+            optLbl.TextColor3 = isSelected and Color3.fromRGB(255, 225, 95) or Color3.fromRGB(242, 230, 255)
+            optLbl.TextSize = 13
             optLbl.Font = Enum.Font.FredokaOne
             optLbl.TextXAlignment = Enum.TextXAlignment.Left
             optLbl.ZIndex = 806
@@ -1654,11 +1719,29 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
             ols.Thickness = 2.5
             ols.Color = Color3.fromRGB(22, 5, 36)
 
+            if isSelected then
+                local checkMark = Instance.new("TextLabel")
+                checkMark.Size = UDim2.fromOffset(20, 20)
+                checkMark.Position = UDim2.new(1, -24, 0.5, -10)
+                checkMark.BackgroundTransparency = 1
+                checkMark.Text = "✔"
+                checkMark.TextColor3 = Color3.fromRGB(255, 225, 95)
+                checkMark.TextSize = 13
+                checkMark.Font = Enum.Font.FredokaOne
+                checkMark.ZIndex = 806
+                checkMark.Parent = optBtn
+                local cks = Instance.new("UIStroke")
+                cks.Parent = checkMark
+                cks.Thickness = 2
+                cks.Color = Color3.fromRGB(22, 5, 36)
+            end
+
             Library.AttachInteractiveEffects(optBtn)
 
             optBtn.Activated:Connect(function()
                 selected = opt
                 selectLabel.Text = string.format("%s: %s", title, tostring(selected))
+                arrowLabel.Text = "▼"
                 popupHolder.Visible = false
                 callback(selected)
             end)
@@ -1667,6 +1750,7 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
 
     selectBtn.Activated:Connect(function()
         popupHolder.Visible = not popupHolder.Visible
+        arrowLabel.Text = popupHolder.Visible and "▲" or "▼"
         if popupHolder.Visible then
             populate()
             updatePopupPosition()
@@ -1684,6 +1768,7 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
         self.MainCard:GetPropertyChangedSignal("Visible"):Connect(function()
             if not self.MainCard.Visible then
                 popupHolder.Visible = false
+                arrowLabel.Text = "▼"
             end
         end)
         self.MainCard:GetPropertyChangedSignal("Position"):Connect(function()
