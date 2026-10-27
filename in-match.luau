@@ -1404,6 +1404,20 @@ end
 local matchStartTime = os.clock()
 local matchResultSent = false
 
+-- Reset match timer when Wave 1 actually starts or when game starts
+pcall(function()
+    local startWaveBtn = candyTD:WaitForChild("StartWave", 10)
+    if startWaveBtn then
+        startWaveBtn:GetPropertyChangedSignal("Visible"):Connect(function()
+            local txtLabel = startWaveBtn:FindFirstChildWhichIsA("TextLabel", true)
+            local txt = (txtLabel and txtLabel.Text:upper()) or (startWaveBtn:IsA("TextButton") and startWaveBtn.Text:upper()) or ""
+            if txt:find("WAVE 1") and not txt:find("WAVE 10") and not txt:find("WAVE 11") and not txt:find("WAVE 12") then
+                matchStartTime = os.clock()
+            end
+        end)
+    end
+end)
+
 local function sendDiscordMatchSummary(resultType: string)
     local webhookUrl = Library.Settings.DiscordWebhook
     if not webhookUrl or webhookUrl == "" or not webhookUrl:find("^https://") then return end
@@ -1411,7 +1425,10 @@ local function sendDiscordMatchSummary(resultType: string)
     matchResultSent = true
 
     task.spawn(function()
-        local elapsed = math.floor(os.clock() - matchStartTime)
+        -- รอ 1.5 วินาทีเพื่อให้ GUI หน้าต่างสรุปผลและไอเทมรางวัลโหลดขึ้นมาครบถ้วน
+        task.wait(1.5)
+
+        local elapsed = math.max(1, math.floor(os.clock() - matchStartTime))
         local timeStr = string.format("%02d:%02d", math.floor(elapsed / 60), elapsed % 60)
         if elapsed >= 3600 then
             timeStr = string.format("%02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), elapsed % 60)
@@ -1419,26 +1436,75 @@ local function sendDiscordMatchSummary(resultType: string)
 
         local stagePlayed = states.CurrentStage or "Unknown"
 
-        -- รวบรวมข้อความไอเทมดรอปหรือของรางวัล
-        local rewardsList = {}
-        for _, desc in ipairs(candyTD:GetDescendants()) do
+        -- ตรวจสอบผลการเล่นอีกครั้งหลังรอ UI โหลด
+        local finalResult = resultType
+        local victoryKeywords = { "VICTORY", "YOU WIN", "STAGE CLEAR", "WINNER", "MATCH WON" }
+        local defeatKeywords = { "DEFEAT", "GAME OVER", "YOU LOSE", "MATCH LOST" }
+
+        local overlayObj = candyTD:FindFirstChild("Overlay") or candyTD
+        for _, desc in ipairs(overlayObj:GetDescendants()) do
             if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" then
-                local txt = desc.Text:gsub("^%s*(.-)%s*$", "%1")
-                local pName = (desc.Parent and desc.Parent.Name:lower()) or ""
-                if (pName:find("reward") or pName:find("drop") or pName:find("item") or pName:find("loot") or pName:find("win")) and #txt > 1 and not table.find(rewardsList, txt) then
-                    table.insert(rewardsList, "• " .. txt)
+                local upperTxt = desc.Text:upper()
+                for _, kw in ipairs(victoryKeywords) do
+                    if upperTxt:find(kw, 1, true) then
+                        finalResult = "VICTORY"
+                        break
+                    end
+                end
+                if finalResult ~= "VICTORY" then
+                    for _, kw in ipairs(defeatKeywords) do
+                        if upperTxt:find(kw, 1, true) then
+                            finalResult = "DEFEAT"
+                            break
+                        end
+                    end
                 end
             end
         end
 
-        local rewardsContent = (#rewardsList > 0) and table.concat(rewardsList, "\n") or "No rewards detected / None"
-        local isVictory = (resultType == "VICTORY")
+        -- ค้นหาและรวบรวมของรางวัล (Reward items / currency / drops)
+        local rewardsList = {}
+        local ignoredKeywords = { "START", "WAVE", "SKIP", "NEXT", "AGAIN", "HOME", "REPLAY", "SETTINGS", "AUTO", "RECORD", "PRESET", "UPGRADE", "VOTE", "CHAT" }
+
+        for _, desc in ipairs(candyTD:GetDescendants()) do
+            if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" then
+                local txt = desc.Text:gsub("^%s*(.-)%s*$", "%1")
+                local upperTxt = txt:upper()
+                local pName = (desc.Parent and desc.Parent.Name:lower()) or ""
+                local grandName = (desc.Parent and desc.Parent.Parent and desc.Parent.Parent.Name:lower()) or ""
+
+                -- ข้ามปุ่ม UI หรือข้อความของระบบหลัก
+                local isIgnored = false
+                for _, ign in ipairs(ignoredKeywords) do
+                    if upperTxt:find(ign, 1, true) then
+                        isIgnored = true
+                        break
+                    end
+                end
+
+                if not isIgnored and #txt >= 2 and #txt <= 60 then
+                    local isRewardContainer = pName:find("reward") or pName:find("drop") or pName:find("loot")
+                        or pName:find("item") or pName:find("win") or pName:find("prize")
+                        or grandName:find("reward") or grandName:find("drop") or grandName:find("loot")
+
+                    -- หากขึ้นต้นด้วย x (เช่น x1, x10) หรือมีเครื่องหมาย + (เช่น +50 Candy, +1 Trait Crystal)
+                    local isLootFormat = txt:match("^x%s*%d+") or txt:match("^%+%s*%d+") or txt:match("%d+x%s*")
+
+                    if (isRewardContainer or isLootFormat) and not table.find(rewardsList, txt) then
+                        table.insert(rewardsList, "• " .. txt)
+                    end
+                end
+            end
+        end
+
+        local rewardsContent = (#rewardsList > 0) and table.concat(rewardsList, "\n") or "• No rewards detected / None"
+        local isVictory = (finalResult == "VICTORY")
         local embedColor = isVictory and 3407680 or 16723509 -- 3407680 = Green, 16723509 = Red
 
         local payload = {
             embeds = {
                 {
-                    title = string.format("🎮 Match Ended: %s", resultType),
+                    title = string.format("🎮 Match Ended: %s", finalResult),
                     color = embedColor,
                     fields = {
                         { name = "🗺️ Stage", value = stagePlayed, inline = true },
@@ -1477,15 +1543,20 @@ task.spawn(function()
                 matchResultSent = false
             else
                 if not matchHandled then
-                    local result = "GAME OVER"
-                    for _, desc in ipairs(candyTD:GetDescendants()) do
-                        if desc:IsA("GuiObject") and desc.Visible then
-                            local n = desc.Name:lower()
-                            if n:find("victory") or n:find("win") then
+                    local result = "DEFEAT"
+                    local overlayObj = candyTD:FindFirstChild("Overlay") or candyTD
+                    for _, desc in ipairs(overlayObj:GetDescendants()) do
+                        if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" then
+                            local upper = desc.Text:upper()
+                            if upper:find("VICTORY") or upper:find("YOU WIN") or upper:find("STAGE CLEAR") then
                                 result = "VICTORY"
                                 break
-                            elseif n:find("defeat") or n:find("loss") or n:find("over") then
-                                result = "DEFEAT"
+                            end
+                        end
+                        if desc:IsA("GuiObject") and desc.Visible then
+                            local n = desc.Name:lower()
+                            if n == "victory" or n == "win" then
+                                result = "VICTORY"
                                 break
                             end
                         end
