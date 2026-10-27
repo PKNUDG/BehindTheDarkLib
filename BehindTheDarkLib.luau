@@ -182,7 +182,7 @@ function Library.AttachInteractiveEffects(btn: GuiButton, scaleTarget: any)
         uiScale.Parent = targetObj
     end
 
-    if not btn:FindFirstChild("DotsClipper") then
+    if not btn:GetAttribute("NoDotsPattern") and not btn:FindFirstChild("DotsClipper") then
         local btnCorner = btn:FindFirstChildOfClass("UICorner")
         local radius = btnCorner and btnCorner.CornerRadius.Offset or 10
         applyCartoonSurface(btn, btn.ZIndex + 1, radius, true)
@@ -865,7 +865,7 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
         trayInner.Parent = trayRim
         Instance.new("UICorner", trayInner).CornerRadius = UDim.new(0, 17)
 
-        applyCartoonSurface(trayInner, 3, 17, false)
+        applyCartoonSurface(trayInner, 3, 17, true)
 
         local container = Instance.new("Frame")
         container.Size = UDim2.new(1, -20, 1, -20)
@@ -1521,6 +1521,7 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
     selectBtn.Text = ""
     selectBtn.ClipsDescendants = true
     selectBtn.ZIndex = zBase + 2
+    selectBtn:SetAttribute("NoDotsPattern", true)
     selectBtn.Parent = dropRim
     Instance.new("UICorner", selectBtn).CornerRadius = UDim.new(0, 11)
 
@@ -1577,15 +1578,23 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
 
     Library.AttachInteractiveEffects(selectBtn, dropShadow)
 
+    -- Dropdown Popup Container (ติดที่ self.Gui เพื่อไม่ให้โดน ClipsDescendants ตัด และสามารถแสดงเลยขอบ UI ได้)
+    local popupHolder = Instance.new("Frame")
+    popupHolder.Name = "DropdownPopup_" .. title
+    popupHolder.BackgroundTransparency = 1
+    popupHolder.BorderSizePixel = 0
+    popupHolder.Visible = false
+    popupHolder.ZIndex = 800
+    popupHolder.Parent = self.Gui or dropRim
+
     local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, 0, 0, 88)
-    scroll.Position = UDim2.fromOffset(0, 46)
+    scroll.Size = UDim2.fromScale(1, 1)
+    scroll.Position = UDim2.fromOffset(0, 0)
     scroll.BackgroundColor3 = Color3.fromRGB(34, 10, 58)
     scroll.BorderSizePixel = 0
     scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    scroll.Visible = false
-    scroll.ZIndex = zBase + 20
-    scroll.Parent = dropRim
+    scroll.ZIndex = 801
+    scroll.Parent = popupHolder
     Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 12)
     local ss = Instance.new("UIStroke")
     ss.Parent = scroll
@@ -1599,10 +1608,19 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
 
     local listPad = Instance.new("UIPadding")
     listPad.Parent = scroll
-    listPad.PaddingTop = UDim.new(0, 4)
-    listPad.PaddingBottom = UDim.new(0, 4)
-    listPad.PaddingLeft = UDim.new(0, 4)
-    listPad.PaddingRight = UDim.new(0, 4)
+    listPad.PaddingTop = UDim.new(0, 5)
+    listPad.PaddingBottom = UDim.new(0, 5)
+    listPad.PaddingLeft = UDim.new(0, 5)
+    listPad.PaddingRight = UDim.new(0, 5)
+
+    local function updatePopupPosition()
+        if not popupHolder.Visible then return end
+        local pos = dropRim.AbsolutePosition
+        local size = dropRim.AbsoluteSize
+        local listH = math.clamp(#options * 32 + 10, 42, 175)
+        popupHolder.Size = UDim2.fromOffset(size.X, listH)
+        popupHolder.Position = UDim2.fromOffset(pos.X, pos.Y + size.Y + 4)
+    end
 
     local function populate()
         for _, ch in ipairs(scroll:GetChildren()) do
@@ -1615,10 +1633,10 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
             optBtn.Text = ""
             optBtn.AutoButtonColor = false
             optBtn.BorderSizePixel = 0
-            optBtn.ZIndex = zBase + 21
+            optBtn.ZIndex = 805
             optBtn.Parent = scroll
             Instance.new("UICorner", optBtn).CornerRadius = UDim.new(0, 8)
-            applyCartoonSurface(optBtn, zBase + 21, 8, true)
+            applyCartoonSurface(optBtn, 805, 8, true)
 
             local optLbl = Instance.new("TextLabel")
             optLbl.Size = UDim2.new(1, -16, 1, 0)
@@ -1629,7 +1647,7 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
             optLbl.TextSize = 12.5
             optLbl.Font = Enum.Font.FredokaOne
             optLbl.TextXAlignment = Enum.TextXAlignment.Left
-            optLbl.ZIndex = zBase + 22
+            optLbl.ZIndex = 806
             optLbl.Parent = optBtn
             local ols = Instance.new("UIStroke")
             ols.Parent = optLbl
@@ -1641,16 +1659,39 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
             optBtn.Activated:Connect(function()
                 selected = opt
                 selectLabel.Text = string.format("%s: %s", title, tostring(selected))
-                scroll.Visible = false
+                popupHolder.Visible = false
                 callback(selected)
             end)
         end
     end
 
     selectBtn.Activated:Connect(function()
-        scroll.Visible = not scroll.Visible
-        if scroll.Visible then populate() end
+        popupHolder.Visible = not popupHolder.Visible
+        if popupHolder.Visible then
+            populate()
+            updatePopupPosition()
+        end
     end)
+
+    -- Auto close if main card or dropdown is hidden / removed
+    dropRim.AncestryChanged:Connect(function(_, newParent)
+        if not newParent then
+            popupHolder:Destroy()
+        end
+    end)
+
+    if self.MainCard then
+        self.MainCard:GetPropertyChangedSignal("Visible"):Connect(function()
+            if not self.MainCard.Visible then
+                popupHolder.Visible = false
+            end
+        end)
+        self.MainCard:GetPropertyChangedSignal("Position"):Connect(function()
+            if popupHolder.Visible then
+                updatePopupPosition()
+            end
+        end)
+    end
 
     return {
         Set = function(newVal: any)
@@ -1664,7 +1705,10 @@ function Library:CreateDropdown(target: any, title: string, yPos: number, option
                 selectLabel.Text = string.format("%s: %s", title, tostring(selected))
                 callback(selected)
             end
-            if scroll.Visible then populate() end
+            if popupHolder.Visible then
+                populate()
+                updatePopupPosition()
+            end
         end
     }
 end
