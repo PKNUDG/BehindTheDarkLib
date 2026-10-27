@@ -72,6 +72,9 @@ local states = {
     AutoSummon = (savedCfg.AutoSummon ~= nil) and savedCfg.AutoSummon or false,
     BannerType = savedCfg.BannerType or "Standard",
     RollAmount = savedCfg.RollAmount or 10,
+    StopOnMythic = (savedCfg.StopOnMythic ~= nil) and savedCfg.StopOnMythic or true,
+    AutoClaimQuests = (savedCfg.AutoClaimQuests ~= nil) and savedCfg.AutoClaimQuests or true,
+    AutoClaimBattlepass = (savedCfg.AutoClaimBattlepass ~= nil) and savedCfg.AutoClaimBattlepass or true,
     AutoChallenge = (Library.Settings.AutoChallenge ~= nil) and Library.Settings.AutoChallenge or false,
     AutoDelete = {
         Rare = (savedCfg.AutoDelete and savedCfg.AutoDelete.Rare ~= nil) and savedCfg.AutoDelete.Rare or false,
@@ -86,6 +89,9 @@ local function saveConfigState()
         AutoSummon = states.AutoSummon,
         BannerType = states.BannerType,
         RollAmount = states.RollAmount,
+        StopOnMythic = states.StopOnMythic,
+        AutoClaimQuests = states.AutoClaimQuests,
+        AutoClaimBattlepass = states.AutoClaimBattlepass,
         AutoDelete = states.AutoDelete
     }
     Library.SaveSettings()
@@ -172,12 +178,22 @@ Window:CreateToggle("Left", "Delete Legendary", 236, { On = Color3.fromRGB(245, 
     setServerAutoDelete("Legendary", v)
 end)
 
+Window:CreateToggle("Left", "Stop On Mythic/Secret", 282, { On = Color3.fromRGB(255, 65, 95), Off = Color3.fromRGB(120, 120, 130) }, states.StopOnMythic, function(v)
+    states.StopOnMythic = v
+    saveConfigState()
+end)
+
 -- ฝั่งขวา (2 กล่องแยก)
-local challengeSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 68))
+local challengeSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 114))
 
 local challengeToggleUpdater = nil
 challengeToggleUpdater = Window:CreateToggle(challengeSubTray, "Auto Challenge", 0, { On = Color3.fromRGB(255, 90, 150), Off = Color3.fromRGB(120, 120, 130) }, states.AutoChallenge, function(v)
     states.AutoChallenge = v
+    saveConfigState()
+end)
+
+Window:CreateToggle(challengeSubTray, "Auto Claim Quests", 46, { On = Color3.fromRGB(75, 230, 175), Off = Color3.fromRGB(120, 120, 130) }, states.AutoClaimQuests, function(v)
+    states.AutoClaimQuests = v
     saveConfigState()
 end)
 
@@ -192,7 +208,7 @@ task.spawn(function()
     end
 end)
 
-local shopSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 76), UDim2.new(0.5, -20, 1, -88))
+local shopSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 122), UDim2.new(0.5, -20, 1, -134))
 
 Window:CreateActionButton(shopSubTray, "Buy Trait Crystal x10", 0, Color3.fromRGB(140, 240, 180), Color3.fromRGB(60, 210, 140), function()
     buyItemFromTeller("crystal", 10)
@@ -202,7 +218,12 @@ Window:CreateActionButton(shopSubTray, "Buy Unit of Juice x10", 46, Color3.fromR
     buyItemFromTeller("statroll", 10)
 end)
 
--- Auto Summon Loop
+Window:CreateToggle(shopSubTray, "Auto Claim Battlepass", 92, { On = Color3.fromRGB(255, 205, 75), Off = Color3.fromRGB(120, 120, 130) }, states.AutoClaimBattlepass, function(v)
+    states.AutoClaimBattlepass = v
+    saveConfigState()
+end)
+
+-- Auto Summon Loop (พร้อมระบบหยุดเมื่อได้ Mythic / Secret)
 task.spawn(function()
     while Controller.Running do
         task.wait(0.5)
@@ -212,8 +233,107 @@ task.spawn(function()
                 local remoteName = (states.BannerType == "Event") and "SummonEvent" or "Summon"
                 local summonRemote = hubRemotes:FindFirstChild(remoteName)
                 if summonRemote and summonRemote:IsA("RemoteFunction") then
-                    pcall(function() summonRemote:InvokeServer(states.RollAmount) end)
+                    local ok, res = pcall(function() return summonRemote:InvokeServer(states.RollAmount) end)
+                    if ok and res and states.StopOnMythic then
+                        local hasRareUnit = false
+                        local resStr = (type(res) == "table" and HttpService:JSONEncode(res):upper()) or tostring(res):upper()
+                        if resStr:find("MYTHIC") or resStr:find("SECRET") or resStr:find("EXCLUSIVE") then
+                            hasRareUnit = true
+                        end
+                        if hasRareUnit then
+                            states.AutoSummon = false
+                            saveConfigState()
+                            print("[AutoSummon] ได้รับยูนิตระดับ Mythic/Secret แล้ว! สั่งหยุดสุ่มอัตโนมัติเพื่อความปลอดภัย")
+                        end
+                    end
                     task.wait(0.8)
+                end
+            end
+        end
+    end
+end)
+
+-- Auto Claim Quests & Battlepass Loop
+task.spawn(function()
+    while Controller.Running do
+        task.wait(2.5)
+        local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
+        local questRemotes = ReplicatedStorage:FindFirstChild("QuestRemotes")
+        local passRemotes = ReplicatedStorage:FindFirstChild("BattlepassRemotes") or ReplicatedStorage:FindFirstChild("PassRemotes")
+        local candyTDGui = playerGui:FindFirstChild("CandyTD")
+
+        -- 1. Auto Claim Quests
+        if states.AutoClaimQuests then
+            pcall(function()
+                if questRemotes then
+                    local claimAll = questRemotes:FindFirstChild("ClaimAll") or questRemotes:FindFirstChild("Claim")
+                    if claimAll then
+                        if claimAll:IsA("RemoteFunction") then claimAll:InvokeServer()
+                        elseif claimAll:IsA("RemoteEvent") then claimAll:FireServer() end
+                    end
+                end
+                if hubRemotes then
+                    local claimQuests = hubRemotes:FindFirstChild("ClaimAllQuests") or hubRemotes:FindFirstChild("ClaimQuests")
+                    if claimQuests then
+                        if claimQuests:IsA("RemoteFunction") then claimQuests:InvokeServer()
+                        elseif claimQuests:IsA("RemoteEvent") then claimQuests:FireServer() end
+                    end
+                end
+            end)
+
+            if candyTDGui then
+                for _, desc in ipairs(candyTDGui:GetDescendants()) do
+                    if desc:IsA("GuiButton") and desc.Visible then
+                        local n = desc.Name:lower()
+                        local txt = (desc:IsA("TextButton") and desc.Text:lower()) or ""
+                        if (n:find("claim") or txt:find("claim")) and (n:find("quest") or n:find("daily") or txt:find("quest") or txt:find("all")) then
+                            pcall(function()
+                                local firesig = (rawget(env, "firesignal") or firesignal) :: any
+                                if firesig then
+                                    firesig(desc.Activated)
+                                    firesig(desc.MouseButton1Click)
+                                end
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+
+        -- 2. Auto Claim Battlepass
+        if states.AutoClaimBattlepass then
+            pcall(function()
+                if passRemotes then
+                    local claimPass = passRemotes:FindFirstChild("ClaimAll") or passRemotes:FindFirstChild("Claim")
+                    if claimPass then
+                        if claimPass:IsA("RemoteFunction") then claimPass:InvokeServer()
+                        elseif claimPass:IsA("RemoteEvent") then claimPass:FireServer() end
+                    end
+                end
+                if hubRemotes then
+                    local claimPass = hubRemotes:FindFirstChild("ClaimAllBattlepass") or hubRemotes:FindFirstChild("ClaimPass")
+                    if claimPass then
+                        if claimPass:IsA("RemoteFunction") then claimPass:InvokeServer()
+                        elseif claimPass:IsA("RemoteEvent") then claimPass:FireServer() end
+                    end
+                end
+            end)
+
+            if candyTDGui then
+                for _, desc in ipairs(candyTDGui:GetDescendants()) do
+                    if desc:IsA("GuiButton") and desc.Visible then
+                        local n = desc.Name:lower()
+                        local txt = (desc:IsA("TextButton") and desc.Text:lower()) or ""
+                        if (n:find("claim") or txt:find("claim")) and (n:find("pass") or n:find("battlepass") or txt:find("pass")) then
+                            pcall(function()
+                                local firesig = (rawget(env, "firesignal") or firesignal) :: any
+                                if firesig then
+                                    firesig(desc.Activated)
+                                    firesig(desc.MouseButton1Click)
+                                end
+                            end)
+                        end
+                    end
                 end
             end
         end

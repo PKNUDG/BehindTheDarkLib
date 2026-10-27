@@ -264,6 +264,7 @@ local states = {
     AutoUpgrade = (savedCfg.AutoUpgrade ~= nil) and savedCfg.AutoUpgrade or true,
     AgainBeforeHomeActive = (savedCfg.AgainBeforeHomeActive ~= nil) and savedCfg.AgainBeforeHomeActive or false,
     AutoSkipWave = (savedCfg.AutoSkipWave ~= nil) and savedCfg.AutoSkipWave or true,
+    AutoAbility = (savedCfg.AutoAbility ~= nil) and savedCfg.AutoAbility or true,
     BoostFPS = (savedCfg.BoostFPS ~= nil) and savedCfg.BoostFPS or false,
     AutoPlace = false, -- เริ่มต้นเป็น OFF เสมอ เพื่อป้องกันการวางยูนิตมั่วก่อนตรวจเจอด่านจริง
     RecordMode = false,
@@ -279,6 +280,7 @@ local function saveConfigState()
         AutoUpgrade = states.AutoUpgrade,
         AgainBeforeHomeActive = states.AgainBeforeHomeActive,
         AutoSkipWave = states.AutoSkipWave,
+        AutoAbility = states.AutoAbility,
         BoostFPS = states.BoostFPS,
         AutoPlace = states.AutoPlace,
         TargetRounds = states.TargetRounds,
@@ -848,24 +850,29 @@ end)
 -- ========================================================
 -- ฝั่งขวา: สร้าง SUBTRAY ก่อน
 -- ========================================================
-local topSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 154))
+local topSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 0), UDim2.new(0.5, -20, 0, 200))
 Window:CreateToggle(topSubTray, "Auto Upgrade All", 0, { On = Color3.fromRGB(90, 195, 60), Off = Color3.fromRGB(120, 120, 130) }, states.AutoUpgrade, function(v)
     states.AutoUpgrade = v
     saveConfigState()
 end)
 
-Window:CreateToggle(topSubTray, "Auto Skip Wave", 46, { On = Color3.fromRGB(160, 75, 235), Off = Color3.fromRGB(120, 120, 130) }, states.AutoSkipWave, function(v)
+Window:CreateToggle(topSubTray, "Auto Ability / Ult", 46, { On = Color3.fromRGB(255, 75, 130), Off = Color3.fromRGB(120, 120, 130) }, states.AutoAbility, function(v)
+    states.AutoAbility = v
+    saveConfigState()
+end)
+
+Window:CreateToggle(topSubTray, "Auto Skip Wave", 92, { On = Color3.fromRGB(160, 75, 235), Off = Color3.fromRGB(120, 120, 130) }, states.AutoSkipWave, function(v)
     states.AutoSkipWave = v
     saveConfigState()
 end)
 
-Window:CreateToggle(topSubTray, "Boost FPS", 92, { On = Color3.fromRGB(50, 205, 150), Off = Color3.fromRGB(120, 120, 130) }, states.BoostFPS, function(v)
+Window:CreateToggle(topSubTray, "Boost FPS", 138, { On = Color3.fromRGB(50, 205, 150), Off = Color3.fromRGB(120, 120, 130) }, states.BoostFPS, function(v)
     states.BoostFPS = v
     saveConfigState()
     applyUltraBoostFPS(v)
 end)
 
-local bottomSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 162), UDim2.new(0.5, -20, 1, -174))
+local bottomSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 208), UDim2.new(0.5, -20, 1, -220))
 
 -- สร้าง Toggle Auto Place
 autoPlaceToggleUpdater = Window:CreateToggle(bottomSubTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
@@ -1714,6 +1721,44 @@ task.spawn(function()
                     requestMatchAction("skip")
                     requestMatchAction("startWave")
                     task.wait(0.5)
+                end
+            end
+        end
+    end
+end)
+
+-- Auto Ultimate / Ability Loop (กดใช้สกิลของยูนิตทั้งหมดอัตโนมัติเมื่อคูลดาวน์พร้อม)
+task.spawn(function()
+    while Controller.Running do
+        task.wait(1)
+        if states.AutoAbility and not checkIsMatchEnded() then
+            -- 1. ยิงผ่าน MatchRemotes / matchNet
+            pcall(function()
+                requestMatchAction("ability")
+                requestMatchAction("useAbility")
+                requestMatchAction("ult")
+                requestMatchAction("useUlt")
+            end)
+
+            local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
+            local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
+            if actRemote and actRemote:IsA("RemoteFunction") then
+                pcall(function() actRemote:InvokeServer("ability") end)
+                pcall(function() actRemote:InvokeServer("ult") end)
+            end
+
+            -- 2. ค้นหาและคลิกปุ่มสกิลใน GUI (เช่น AbilityBtn, SkillBtn, Ult, UseAbility)
+            for _, desc in ipairs(candyTD:GetDescendants()) do
+                if desc:IsA("GuiButton") and desc.Visible then
+                    local n = desc.Name:lower()
+                    local txt = (desc:IsA("TextButton") and desc.Text:lower()) or ""
+                    if n:find("ability") or n:find("skill") or n:find("ult") or txt:find("ability") or txt:find("ult") then
+                        -- ตรวจสอบว่าปุ่มไม่ได้อยู่ในสถานะคูลดาวน์ (เช่น ตัวหนังสือไม่ได้มีเลขอุณหภูมิ/วินาทีคูลดาวน์)
+                        local isCooldown = txt:match("%d+s") ~= nil or txt:match("^%d+$") ~= nil
+                        if not isCooldown then
+                            triggerInternalButton(desc)
+                        end
+                    end
                 end
             end
         end
