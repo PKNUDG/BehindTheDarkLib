@@ -645,7 +645,6 @@ pcall(installPlacementHook)
 local Window = Library:CreateWindow({
     Title = "BEHIND THE DARK",
     Name = "CandyTD_BehindTheDarkHub",
-    Size = UDim2.fromOffset(660, 495),
     OnUnload = function()
         Controller.Running = false
         pcall(function()
@@ -873,7 +872,7 @@ Window:CreateToggle(topSubTray, "Boost FPS", 138, { On = Color3.fromRGB(50, 205,
     applyUltraBoostFPS(v)
 end)
 
-local bottomSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 208), UDim2.new(0.5, -20, 0, 200))
+local bottomSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 208), UDim2.new(0.5, -20, 1, -220))
 
 -- สร้าง Toggle Auto Place
 autoPlaceToggleUpdater = Window:CreateToggle(bottomSubTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
@@ -893,10 +892,6 @@ stageDropdown = Window:CreateDropdown(bottomSubTray, "Stage", 46, getStageNames(
     Library.Settings.PlaceIdStageMap[currentPlaceId] = selected
     Library.SaveSettings()
 end)
-
-local function createBottomActionButton(text: string, yPos: number, rimColor: Color3, btnColor: Color3, callback: () -> ())
-    Window:CreateActionButton(bottomSubTray, text, yPos, rimColor, btnColor, callback)
-end
 
 -- ========================================================
 -- RECORD PAGE
@@ -1319,18 +1314,114 @@ delPresetBtn.Activated:Connect(function()
     end
 end)
 
-createBottomActionButton("Setup Record & Presets", 92, Color3.fromRGB(255, 145, 160), Color3.fromRGB(235, 65, 85), function()
-    stageInput.Text = states.CurrentStage
-    states.RecordStageName = states.CurrentStage
-    refreshRecordUI()
-    RecordPage.Show()
-end)
+-- ปุ่มคู่เคียงข้างกัน: SETUP และ RELOAD
+local function createSideBySideActionButtons()
+    local rowShadow = Instance.new("Frame")
+    rowShadow.Size = UDim2.new(1, 0, 0, 44)
+    rowShadow.Position = UDim2.fromOffset(0, 92)
+    rowShadow.BackgroundTransparency = 1
+    rowShadow.ZIndex = 5
+    rowShadow.Parent = bottomSubTray
 
-createBottomActionButton("Reload Presets", 136, Color3.fromRGB(255, 220, 110), Color3.fromRGB(240, 160, 45), function()
-    loadPresetsFromFile()
-    stageDropdown.SetOptions(getStageNames())
-    print("[PresetManager] โหลดค่าพรีเซ็ตสำเร็จ!")
-end)
+    -- ปุ่มซ้าย: Setup
+    local setupShadow = Instance.new("Frame")
+    setupShadow.Size = UDim2.new(0.5, -4, 1, 0)
+    setupShadow.Position = UDim2.fromOffset(0, 0)
+    setupShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+    setupShadow.BorderSizePixel = 0
+    setupShadow.ZIndex = 5
+    setupShadow.Parent = rowShadow
+    Instance.new("UICorner", setupShadow).CornerRadius = UDim.new(0, 14)
+
+    local setupRim = Instance.new("Frame")
+    setupRim.Size = UDim2.new(1, 0, 0, 41)
+    setupRim.Position = UDim2.fromOffset(0, 0)
+    setupRim.BackgroundColor3 = Color3.fromRGB(255, 145, 160)
+    setupRim.BorderSizePixel = 0
+    setupRim.ZIndex = 6
+    setupRim.Parent = setupShadow
+    Instance.new("UICorner", setupRim).CornerRadius = UDim.new(0, 14)
+    local srs = Instance.new("UIStroke")
+    srs.Parent = setupRim
+    srs.Thickness = 3
+    srs.Color = Color3.fromRGB(22, 5, 36)
+
+    local setupBtn = Instance.new("TextButton")
+    setupBtn.Size = UDim2.new(1, -6, 1, -5)
+    setupBtn.Position = UDim2.fromOffset(3, 2)
+    setupBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 85)
+    setupBtn.Text = "Setup"
+    setupBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    setupBtn.TextSize = 13.5
+    setupBtn.Font = Enum.Font.FredokaOne
+    setupBtn.BorderSizePixel = 0
+    setupBtn.AutoButtonColor = false
+    setupBtn.ZIndex = 7
+    setupBtn.Parent = setupRim
+    Instance.new("UICorner", setupBtn).CornerRadius = UDim.new(0, 11)
+    local sbs = Instance.new("UIStroke")
+    sbs.Parent = setupBtn
+    sbs.Thickness = 2.5
+    sbs.Color = Color3.fromRGB(22, 5, 36)
+    Library.AttachInteractiveEffects(setupBtn, setupShadow)
+
+    setupBtn.Activated:Connect(function()
+        stageInput.Text = states.CurrentStage
+        states.RecordStageName = states.CurrentStage
+        refreshRecordUI()
+        RecordPage.Show()
+    end)
+
+    -- ปุ่มขวา: Reload
+    local reloadShadow = Instance.new("Frame")
+    reloadShadow.Size = UDim2.new(0.5, -4, 1, 0)
+    reloadShadow.Position = UDim2.new(0.5, 4, 0, 0)
+    reloadShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+    reloadShadow.BorderSizePixel = 0
+    reloadShadow.ZIndex = 5
+    reloadShadow.Parent = rowShadow
+    Instance.new("UICorner", reloadShadow).CornerRadius = UDim.new(0, 14)
+
+    local reloadRim = Instance.new("Frame")
+    reloadRim.Size = UDim2.new(1, 0, 0, 41)
+    reloadRim.Position = UDim2.fromOffset(0, 0)
+    reloadRim.BackgroundColor3 = Color3.fromRGB(255, 220, 110)
+    reloadRim.BorderSizePixel = 0
+    reloadRim.ZIndex = 6
+    reloadRim.Parent = reloadShadow
+    Instance.new("UICorner", reloadRim).CornerRadius = UDim.new(0, 14)
+    local rrs = Instance.new("UIStroke")
+    rrs.Parent = reloadRim
+    rrs.Thickness = 3
+    rrs.Color = Color3.fromRGB(22, 5, 36)
+
+    local reloadBtn = Instance.new("TextButton")
+    reloadBtn.Size = UDim2.new(1, -6, 1, -5)
+    reloadBtn.Position = UDim2.fromOffset(3, 2)
+    reloadBtn.BackgroundColor3 = Color3.fromRGB(240, 160, 45)
+    reloadBtn.Text = "Reload"
+    reloadBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    reloadBtn.TextSize = 13.5
+    reloadBtn.Font = Enum.Font.FredokaOne
+    reloadBtn.BorderSizePixel = 0
+    reloadBtn.AutoButtonColor = false
+    reloadBtn.ZIndex = 7
+    reloadBtn.Parent = reloadRim
+    Instance.new("UICorner", reloadBtn).CornerRadius = UDim.new(0, 11)
+    local rbs = Instance.new("UIStroke")
+    rbs.Parent = reloadBtn
+    rbs.Thickness = 2.5
+    rbs.Color = Color3.fromRGB(22, 5, 36)
+    Library.AttachInteractiveEffects(reloadBtn, reloadShadow)
+
+    reloadBtn.Activated:Connect(function()
+        loadPresetsFromFile()
+        stageDropdown.SetOptions(getStageNames())
+        print("[PresetManager] โหลดค่าพรีเซ็ตสำเร็จ!")
+    end)
+end
+
+createSideBySideActionButtons()
 
 -- ========================================================
 -- GAMEPLAY LOGIC LOOPS (AUTO PLACE & UPGRADE & SKIP)
