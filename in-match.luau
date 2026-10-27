@@ -645,6 +645,7 @@ pcall(installPlacementHook)
 local Window = Library:CreateWindow({
     Title = "BEHIND THE DARK",
     Name = "CandyTD_BehindTheDarkHub",
+    Size = UDim2.fromOffset(660, 495),
     OnUnload = function()
         Controller.Running = false
         pcall(function()
@@ -872,7 +873,7 @@ Window:CreateToggle(topSubTray, "Boost FPS", 138, { On = Color3.fromRGB(50, 205,
     applyUltraBoostFPS(v)
 end)
 
-local bottomSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 208), UDim2.new(0.5, -20, 1, -220))
+local bottomSubTray = Window:CreateSubTray(UDim2.new(0.5, 6, 0, 208), UDim2.new(0.5, -20, 0, 200))
 
 -- สร้าง Toggle Auto Place
 autoPlaceToggleUpdater = Window:CreateToggle(bottomSubTray, "Auto Place", 0, { On = Color3.fromRGB(255, 110, 80), Off = Color3.fromRGB(120, 120, 130) }, states.AutoPlace, function(v)
