@@ -327,7 +327,7 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     blackout.Name = "BlackoutFrame"
     blackout.Size = UDim2.fromScale(1, 1)
     blackout.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    blackout.BackgroundTransparency = 0.05
+    blackout.BackgroundTransparency = 0
     blackout.BorderSizePixel = 0
     blackout.ZIndex = 1
     blackout.Visible = false
@@ -764,6 +764,19 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     local originalCamType = Enum.CameraType.Custom
     local originalCamCFrame = nil
 
+    local function applyUltraLow(enable: boolean)
+        pcall(function()
+            if type(setfpscap) == "function" then
+                setfpscap(enable and 15 or 60)
+            end
+            local rend = settings():FindFirstChild("Rendering")
+            if rend then
+                rend.QualityLevel = enable and 1 or 0
+            end
+            RunService:Set3dRenderingEnabled(not enable)
+        end)
+    end
+
     btn3D.Activated:Connect(function()
         is3DActive = not is3DActive
         local cam = workspace.CurrentCamera
@@ -792,6 +805,8 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
                 end
             end)
 
+            applyUltraLow(true)
+
             btn3DRim.BackgroundColor3 = Color3.fromRGB(160, 160, 170)
             btn3D.BackgroundColor3 = Color3.fromRGB(120, 120, 130)
             btn3D.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -806,6 +821,9 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
                     if originalCamCFrame then cam.CFrame = originalCamCFrame end
                 end
             end)
+
+            applyUltraLow(false)
+
             self.BlackoutFrame.Visible = false
             btn3DRim.BackgroundColor3 = Color3.fromRGB(190, 255, 145)
             btn3D.BackgroundColor3 = Color3.fromRGB(115, 225, 70)
