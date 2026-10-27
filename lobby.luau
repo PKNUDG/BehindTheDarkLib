@@ -14,6 +14,15 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
+local candyTDStorage = ReplicatedStorage:WaitForChild("CandyTD", 30)
+local hubNet: any = nil
+pcall(function()
+    local module = candyTDStorage and (candyTDStorage:FindFirstChild("HubNet") or candyTDStorage:FindFirstChild("Net") or candyTDStorage:FindFirstChild("Network"))
+    if module and module:IsA("ModuleScript") then
+        hubNet = (require :: any)(module)
+    end
+end)
+
 if _G.CandyTD_LobbyInstance then
     pcall(function()
         _G.CandyTD_LobbyInstance.Running = false
@@ -253,87 +262,132 @@ task.spawn(function()
     end
 end)
 
--- Auto Claim Quests & Battlepass Loop
+-- Auto Claim Quests & Battlepass Loop (ค้นหาและยิงเข้า Remote โดยตรงทั่วทั้งเกม)
 task.spawn(function()
     while Controller.Running do
-        task.wait(2.5)
-        local hubRemotes = ReplicatedStorage:FindFirstChild("HubRemotes")
-        local questRemotes = ReplicatedStorage:FindFirstChild("QuestRemotes")
-        local passRemotes = ReplicatedStorage:FindFirstChild("BattlepassRemotes") or ReplicatedStorage:FindFirstChild("PassRemotes")
-        local candyTDGui = playerGui:FindFirstChild("CandyTD")
+        task.wait(2)
 
         -- 1. Auto Claim Quests
         if states.AutoClaimQuests then
-            pcall(function()
-                if questRemotes then
-                    local claimAll = questRemotes:FindFirstChild("ClaimAll") or questRemotes:FindFirstChild("Claim")
-                    if claimAll then
-                        if claimAll:IsA("RemoteFunction") then claimAll:InvokeServer()
-                        elseif claimAll:IsA("RemoteEvent") then claimAll:FireServer() end
-                    end
-                end
-                if hubRemotes then
-                    local claimQuests = hubRemotes:FindFirstChild("ClaimAllQuests") or hubRemotes:FindFirstChild("ClaimQuests")
-                    if claimQuests then
-                        if claimQuests:IsA("RemoteFunction") then claimQuests:InvokeServer()
-                        elseif claimQuests:IsA("RemoteEvent") then claimQuests:FireServer() end
-                    end
-                end
-            end)
+            -- ค้นหา RemoteFunction / RemoteEvent ทุกตัวในเกมที่เกี่ยวกับ Quest / Claim
+            for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+                local n = obj.Name:lower()
+                local pName = (obj.Parent and obj.Parent.Name:lower()) or ""
+                local isQuestTarget = n:find("quest") or pName:find("quest") or n:find("claim")
 
-            if candyTDGui then
-                for _, desc in ipairs(candyTDGui:GetDescendants()) do
+                if isQuestTarget then
+                    if obj:IsA("RemoteFunction") then
+                        pcall(function() obj:InvokeServer() end)
+                        pcall(function() obj:InvokeServer("claim") end)
+                        pcall(function() obj:InvokeServer("claimall") end)
+                        pcall(function() obj:InvokeServer("ClaimAll") end)
+                        pcall(function() obj:InvokeServer("daily") end)
+                        for i = 1, 10 do
+                            pcall(function() obj:InvokeServer(i) end)
+                            pcall(function() obj:InvokeServer("claim", i) end)
+                        end
+                    elseif obj:IsA("RemoteEvent") then
+                        pcall(function() obj:FireServer() end)
+                        pcall(function() obj:FireServer("claim") end)
+                        pcall(function() obj:FireServer("claimall") end)
+                        pcall(function() obj:FireServer("ClaimAll") end)
+                        pcall(function() obj:FireServer("daily") end)
+                        for i = 1, 10 do
+                            pcall(function() obj:FireServer(i) end)
+                            pcall(function() obj:FireServer("claim", i) end)
+                        end
+                    end
+                end
+            end
+
+            -- ตรวจสอบผ่าน hubNet หรือ net module ถ้ามี
+            if hubNet and type(hubNet.request) == "function" then
+                pcall(function() hubNet.request("claimQuest") end)
+                pcall(function() hubNet.request("claimAllQuests") end)
+                pcall(function() hubNet.request("claimDaily") end)
+                for i = 1, 10 do
+                    pcall(function() hubNet.request("claimQuest", i) end)
+                end
+            end
+
+            -- ค้นหาปุ่ม CLAIM บนหน้า GUI เพื่อจำลองการคลิกแบบ Full Fallback
+            local function tryClickGui(parentObj: Instance)
+                for _, desc in ipairs(parentObj:GetDescendants()) do
                     if desc:IsA("GuiButton") and desc.Visible then
                         local n = desc.Name:lower()
-                        local txt = (desc:IsA("TextButton") and desc.Text:lower()) or ""
-                        if (n:find("claim") or txt:find("claim")) and (n:find("quest") or n:find("daily") or txt:find("quest") or txt:find("all")) then
+                        local t = (desc:IsA("TextButton") and desc.Text:lower()) or ""
+                        local hasClaimText = (t:find("claim") ~= nil)
+                        if not hasClaimText then
+                            for _, child in ipairs(desc:GetDescendants()) do
+                                if child:IsA("TextLabel") and child.Text:lower():find("claim") then
+                                    hasClaimText = true
+                                    break
+                                end
+                            end
+                        end
+
+                        if hasClaimText or n:find("claim") then
                             pcall(function()
                                 local firesig = (rawget(env, "firesignal") or firesignal) :: any
                                 if firesig then
                                     firesig(desc.Activated)
                                     firesig(desc.MouseButton1Click)
+                                    firesig(desc.MouseButton1Down)
+                                    firesig(desc.MouseButton1Up)
                                 end
                             end)
                         end
                     end
                 end
             end
+
+            pcall(function()
+                local candyTDGui = playerGui:FindFirstChild("CandyTD")
+                if candyTDGui then tryClickGui(candyTDGui) end
+                for _, g in ipairs(playerGui:GetChildren()) do
+                    if g:IsA("ScreenGui") and g.Name ~= "BehindTheDarkHub" and g.Name ~= "CandyTD_BehindTheDarkLobby" then
+                        tryClickGui(g)
+                    end
+                end
+            end)
         end
 
         -- 2. Auto Claim Battlepass
         if states.AutoClaimBattlepass then
-            pcall(function()
-                if passRemotes then
-                    local claimPass = passRemotes:FindFirstChild("ClaimAll") or passRemotes:FindFirstChild("Claim")
-                    if claimPass then
-                        if claimPass:IsA("RemoteFunction") then claimPass:InvokeServer()
-                        elseif claimPass:IsA("RemoteEvent") then claimPass:FireServer() end
-                    end
-                end
-                if hubRemotes then
-                    local claimPass = hubRemotes:FindFirstChild("ClaimAllBattlepass") or hubRemotes:FindFirstChild("ClaimPass")
-                    if claimPass then
-                        if claimPass:IsA("RemoteFunction") then claimPass:InvokeServer()
-                        elseif claimPass:IsA("RemoteEvent") then claimPass:FireServer() end
-                    end
-                end
-            end)
+            for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+                local n = obj.Name:lower()
+                local pName = (obj.Parent and obj.Parent.Name:lower()) or ""
+                local isPassTarget = n:find("pass") or pName:find("pass") or n:find("battlepass") or pName:find("battlepass")
 
-            if candyTDGui then
-                for _, desc in ipairs(candyTDGui:GetDescendants()) do
-                    if desc:IsA("GuiButton") and desc.Visible then
-                        local n = desc.Name:lower()
-                        local txt = (desc:IsA("TextButton") and desc.Text:lower()) or ""
-                        if (n:find("claim") or txt:find("claim")) and (n:find("pass") or n:find("battlepass") or txt:find("pass")) then
-                            pcall(function()
-                                local firesig = (rawget(env, "firesignal") or firesignal) :: any
-                                if firesig then
-                                    firesig(desc.Activated)
-                                    firesig(desc.MouseButton1Click)
-                                end
-                            end)
+                if isPassTarget and (n:find("claim") or pName:find("claim") or n:find("pass")) then
+                    if obj:IsA("RemoteFunction") then
+                        pcall(function() obj:InvokeServer() end)
+                        pcall(function() obj:InvokeServer("claim") end)
+                        pcall(function() obj:InvokeServer("claimall") end)
+                        pcall(function() obj:InvokeServer("ClaimAll") end)
+                        for i = 1, 50 do
+                            pcall(function() obj:InvokeServer(i) end)
+                            pcall(function() obj:InvokeServer("claim", i) end)
+                        end
+                    elseif obj:IsA("RemoteEvent") then
+                        pcall(function() obj:FireServer() end)
+                        pcall(function() obj:FireServer("claim") end)
+                        pcall(function() obj:FireServer("claimall") end)
+                        pcall(function() obj:FireServer("ClaimAll") end)
+                        for i = 1, 50 do
+                            pcall(function() obj:FireServer(i) end)
+                            pcall(function() obj:FireServer("claim", i) end)
                         end
                     end
+                end
+            end
+
+            if hubNet and type(hubNet.request) == "function" then
+                pcall(function() hubNet.request("claimPass") end)
+                pcall(function() hubNet.request("claimAllPass") end)
+                pcall(function() hubNet.request("claimBattlepass") end)
+                for i = 1, 50 do
+                    pcall(function() hubNet.request("claimPass", i) end)
                 end
             end
         end

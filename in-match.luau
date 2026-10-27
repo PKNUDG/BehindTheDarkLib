@@ -1335,6 +1335,8 @@ end)
 -- GAMEPLAY LOGIC LOOPS (AUTO PLACE & UPGRADE & SKIP)
 -- ========================================================
 local hasPlacedThisMatch = false
+local activePlacedUnitIds = {}
+
 local function runAutoPlaceSequence()
     local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
     local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
@@ -1346,6 +1348,7 @@ local function runAutoPlaceSequence()
         return
     end
 
+    table.clear(activePlacedUnitIds)
     print(string.format("[AutoPlace] เริ่มวางยูนิต %d ตัวในด่าน: %s", #currentQueue, states.CurrentStage))
     for _, item in ipairs(currentQueue) do
         local ok, result = pcall(function()
@@ -1353,8 +1356,14 @@ local function runAutoPlaceSequence()
         end)
         local targetId = nil
         if ok then
-            if type(result) == "table" and result.id then targetId = result.id
-            elseif type(result) == "number" then targetId = result end
+            if type(result) == "table" and result.id then
+                targetId = result.id
+            elseif type(result) == "number" or type(result) == "string" then
+                targetId = result
+            end
+        end
+        if targetId then
+            table.insert(activePlacedUnitIds, targetId)
         end
         if ok and item.setTarget and targetId then
             task.wait(0.25)
@@ -1727,33 +1736,45 @@ task.spawn(function()
     end
 end)
 
--- Auto Ultimate / Ability Loop (กดใช้สกิลของยูนิตทั้งหมดอัตโนมัติเมื่อคูลดาวน์พร้อม)
+-- Auto Ultimate / Ability Loop (กดใช้สกิลของยูนิตทั้งหมดผ่าน Remote โดยตรง)
 task.spawn(function()
     while Controller.Running do
         task.wait(1)
         if states.AutoAbility and not checkIsMatchEnded() then
-            -- 1. ยิงผ่าน MatchRemotes / matchNet
+            local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
+            local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
+
+            -- ยิงสกิลยูนิตผ่าน actRemote โดยระบุ id ของยูนิตที่วางไว้
+            if actRemote and actRemote:IsA("RemoteFunction") then
+                -- Global ability call
+                pcall(function() actRemote:InvokeServer("ability") end)
+                pcall(function() actRemote:InvokeServer("ult") end)
+
+                -- Per-unit ability call
+                for _, uId in ipairs(activePlacedUnitIds) do
+                    pcall(function() actRemote:InvokeServer("ability", uId) end)
+                    pcall(function() actRemote:InvokeServer("useAbility", uId) end)
+                    pcall(function() actRemote:InvokeServer("ult", uId) end)
+                end
+            end
+
+            -- ยิงผ่าน matchNet
             pcall(function()
                 requestMatchAction("ability")
                 requestMatchAction("useAbility")
                 requestMatchAction("ult")
-                requestMatchAction("useUlt")
+                for _, uId in ipairs(activePlacedUnitIds) do
+                    requestMatchAction("ability", uId)
+                    requestMatchAction("useAbility", uId)
+                end
             end)
 
-            local matchRemotes = ReplicatedStorage:FindFirstChild("MatchRemotes")
-            local actRemote = matchRemotes and matchRemotes:FindFirstChild("Act")
-            if actRemote and actRemote:IsA("RemoteFunction") then
-                pcall(function() actRemote:InvokeServer("ability") end)
-                pcall(function() actRemote:InvokeServer("ult") end)
-            end
-
-            -- 2. ค้นหาและคลิกปุ่มสกิลใน GUI (เช่น AbilityBtn, SkillBtn, Ult, UseAbility)
+            -- Backup ยิงผ่านปุ่ม GUI ที่ผูก Event
             for _, desc in ipairs(candyTD:GetDescendants()) do
                 if desc:IsA("GuiButton") and desc.Visible then
                     local n = desc.Name:lower()
                     local txt = (desc:IsA("TextButton") and desc.Text:lower()) or ""
                     if n:find("ability") or n:find("skill") or n:find("ult") or txt:find("ability") or txt:find("ult") then
-                        -- ตรวจสอบว่าปุ่มไม่ได้อยู่ในสถานะคูลดาวน์ (เช่น ตัวหนังสือไม่ได้มีเลขอุณหภูมิ/วินาทีคูลดาวน์)
                         local isCooldown = txt:match("%d+s") ~= nil or txt:match("^%d+$") ~= nil
                         if not isCooldown then
                             triggerInternalButton(desc)
