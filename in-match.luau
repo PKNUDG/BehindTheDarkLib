@@ -1464,34 +1464,51 @@ local function sendDiscordMatchSummary(resultType: string)
 
         -- ค้นหาและรวบรวมของรางวัล (Reward items / currency / drops)
         local rewardsList = {}
-        local ignoredKeywords = { "START", "WAVE", "SKIP", "NEXT", "AGAIN", "HOME", "REPLAY", "SETTINGS", "AUTO", "RECORD", "PRESET", "UPGRADE", "VOTE", "CHAT" }
+        local seenRewards = {}
+        local ignoredKeywords = {
+            "START", "WAVE", "SKIP", "NEXT", "AGAIN", "HOME", "REPLAY", "SETTINGS",
+            "AUTO", "RECORD", "PRESET", "UPGRADE", "VOTE", "CHAT", "DPS", "DAMAGE",
+            "TIME", "VICTORY", "DEFEAT", "STAGE", "TOTAL"
+        }
 
-        for _, desc in ipairs(candyTD:GetDescendants()) do
+        for _, desc in ipairs(overlayObj:GetDescendants()) do
             if desc:IsA("TextLabel") and desc.Visible and desc.Text ~= "" then
-                local txt = desc.Text:gsub("^%s*(.-)%s*$", "%1")
-                local upperTxt = txt:upper()
+                local rawTxt = desc.Text:gsub("^%s*(.-)%s*$", "%1")
+                local upperTxt = rawTxt:upper()
                 local pName = (desc.Parent and desc.Parent.Name:lower()) or ""
                 local grandName = (desc.Parent and desc.Parent.Parent and desc.Parent.Parent.Name:lower()) or ""
 
-                -- ข้ามปุ่ม UI หรือข้อความของระบบหลัก
+                -- กรองข้อความของระบบหลัก หรือเปอร์เซ็นต์โบนัส เช่น +60%, 100%
                 local isIgnored = false
-                for _, ign in ipairs(ignoredKeywords) do
-                    if upperTxt:find(ign, 1, true) then
-                        isIgnored = true
-                        break
+                if rawTxt:find("%%") then
+                    isIgnored = true
+                else
+                    for _, ign in ipairs(ignoredKeywords) do
+                        if upperTxt:find(ign, 1, true) then
+                            isIgnored = true
+                            break
+                        end
                     end
                 end
 
-                if not isIgnored and #txt >= 2 and #txt <= 60 then
+                if not isIgnored and #rawTxt >= 2 and #rawTxt <= 60 then
                     local isRewardContainer = pName:find("reward") or pName:find("drop") or pName:find("loot")
                         or pName:find("item") or pName:find("win") or pName:find("prize")
                         or grandName:find("reward") or grandName:find("drop") or grandName:find("loot")
 
-                    -- หากขึ้นต้นด้วย x (เช่น x1, x10) หรือมีเครื่องหมาย + (เช่น +50 Candy, +1 Trait Crystal)
-                    local isLootFormat = txt:match("^x%s*%d+") or txt:match("^%+%s*%d+") or txt:match("%d+x%s*")
+                    -- กรองตัวเลขสถิติเพียวๆ เช่น +3688 (ดาเมจ), +2.6, +128 ที่ไม่มีชื่อไอเทม/เงินกำกับ
+                    local isPureNumber = rawTxt:match("^[%+%-]?%s*%d+%.?%d*%s*$") ~= nil
+                    local isLootFormat = rawTxt:match("^x%s*%d+") or rawTxt:match("^%+%s*%d+") or rawTxt:match("%d+x%s*")
 
-                    if (isRewardContainer or isLootFormat) and not table.find(rewardsList, txt) then
-                        table.insert(rewardsList, "• " .. txt)
+                    local isIntegerReward = isRewardContainer and isPureNumber and not rawTxt:find("%.")
+                    local isValidReward = (isRewardContainer and not isPureNumber) or (isLootFormat and not isPureNumber) or isIntegerReward
+
+                    if isValidReward then
+                        local cleanKey = upperTxt:gsub("[^%w]", "")
+                        if not seenRewards[cleanKey] then
+                            seenRewards[cleanKey] = true
+                            table.insert(rewardsList, "• " .. rawTxt)
+                        end
                     end
                 end
             end
