@@ -355,6 +355,485 @@ Window:CreateActionButton(shopSubTray, "Claim Battlepass", 138, Color3.fromRGB(2
     claimBattlepassOnce()
 end)
 
+local RerollPage = Window:CreatePage("RerollStatsView")
+
+Window:CreateActionButton(shopSubTray, "Open Reroll & Stats", 184, Color3.fromRGB(255, 110, 190), Color3.fromRGB(235, 60, 150), function()
+    RerollPage.Show()
+end)
+
+-- ========================================================
+-- REROLL & STATS PAGE (RECONDITION & TRAITS SUB-PAGE)
+-- ========================================================
+local rHeader = Instance.new("Frame")
+rHeader.Size = UDim2.new(1, 0, 0, 36)
+rHeader.Position = UDim2.fromOffset(0, 0)
+rHeader.BackgroundTransparency = 1
+rHeader.ZIndex = 6
+rHeader.Parent = RerollPage.Container
+
+local rBackBtnShadow = Instance.new("Frame")
+rBackBtnShadow.Size = UDim2.fromOffset(95, 34)
+rBackBtnShadow.Position = UDim2.fromOffset(0, 0)
+rBackBtnShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+rBackBtnShadow.BorderSizePixel = 0
+rBackBtnShadow.ZIndex = 6
+rBackBtnShadow.Parent = rHeader
+Instance.new("UICorner", rBackBtnShadow).CornerRadius = UDim.new(0, 10)
+
+local rBackBtn = Instance.new("TextButton")
+rBackBtn.Size = UDim2.new(1, 0, 1, -3)
+rBackBtn.Position = UDim2.fromOffset(0, 0)
+rBackBtn.BackgroundColor3 = Color3.fromRGB(235, 65, 75)
+rBackBtn.Text = "BACK"
+rBackBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+rBackBtn.TextSize = 13
+rBackBtn.Font = Enum.Font.FredokaOne
+rBackBtn.BorderSizePixel = 0
+rBackBtn.AutoButtonColor = false
+rBackBtn.ZIndex = 7
+rBackBtn.Parent = rBackBtnShadow
+Instance.new("UICorner", rBackBtn).CornerRadius = UDim.new(0, 9)
+local rbbs = Instance.new("UIStroke")
+rbbs.Parent = rBackBtn
+rbbs.Thickness = 2
+rbbs.Color = Color3.fromRGB(22, 5, 36)
+Library.AttachInteractiveEffects(rBackBtn, rBackBtnShadow)
+
+rBackBtn.Activated:Connect(function()
+    RerollPage.Hide()
+end)
+
+local rTitleBadge = Instance.new("Frame")
+rTitleBadge.Size = UDim2.new(1, -105, 1, 0)
+rTitleBadge.Position = UDim2.fromOffset(105, 0)
+rTitleBadge.BackgroundColor3 = Color3.fromRGB(48, 16, 76)
+rTitleBadge.BorderSizePixel = 0
+rTitleBadge.ZIndex = 6
+rTitleBadge.Parent = rHeader
+Instance.new("UICorner", rTitleBadge).CornerRadius = UDim.new(0, 10)
+local rts = Instance.new("UIStroke")
+rts.Parent = rTitleBadge
+rts.Thickness = 2
+rts.Color = Color3.fromRGB(22, 5, 36)
+
+local rTitleLabel = Instance.new("TextLabel")
+rTitleLabel.Size = UDim2.fromScale(1, 1)
+rTitleLabel.BackgroundTransparency = 1
+rTitleLabel.Text = "REROLL STATS & TRAITS"
+rTitleLabel.TextColor3 = Color3.fromRGB(255, 225, 95)
+rTitleLabel.TextSize = 14
+rTitleLabel.Font = Enum.Font.FredokaOne
+rTitleLabel.ZIndex = 7
+rTitleLabel.Parent = rTitleBadge
+
+-- Layout แบ่ง 2 ฝั่ง ซ้ายเลือกตัวละคร / ขวาแสดงค่า & สุ่ม
+local rContent = Instance.new("Frame")
+rContent.Size = UDim2.new(1, 0, 1, -44)
+rContent.Position = UDim2.fromOffset(0, 44)
+rContent.BackgroundTransparency = 1
+rContent.ZIndex = 6
+rContent.Parent = RerollPage.Container
+
+-- ฝั่งซ้าย: รายชื่อตัวละคร (Equipped / Team Units)
+local leftBoxShadow = Instance.new("Frame")
+leftBoxShadow.Size = UDim2.new(0.38, -6, 1, 0)
+leftBoxShadow.Position = UDim2.fromOffset(0, 0)
+leftBoxShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+leftBoxShadow.BorderSizePixel = 0
+leftBoxShadow.ZIndex = 6
+leftBoxShadow.Parent = rContent
+Instance.new("UICorner", leftBoxShadow).CornerRadius = UDim.new(0, 14)
+
+local leftBox = Instance.new("Frame")
+leftBox.Size = UDim2.new(1, 0, 1, -3)
+leftBox.Position = UDim2.fromOffset(0, 0)
+leftBox.BackgroundColor3 = Color3.fromRGB(38, 12, 62)
+leftBox.BorderSizePixel = 0
+leftBox.ZIndex = 7
+leftBox.Parent = leftBoxShadow
+Instance.new("UICorner", leftBox).CornerRadius = UDim.new(0, 14)
+local lbs = Instance.new("UIStroke")
+lbs.Parent = leftBox
+lbs.Thickness = 2.5
+lbs.Color = Color3.fromRGB(22, 5, 36)
+
+local leftHeader = Instance.new("TextLabel")
+leftHeader.Size = UDim2.new(1, 0, 0, 28)
+leftHeader.BackgroundTransparency = 1
+leftHeader.Text = "SELECT HERO"
+leftHeader.TextColor3 = Color3.fromRGB(255, 215, 120)
+leftHeader.TextSize = 12.5
+leftHeader.Font = Enum.Font.FredokaOne
+leftHeader.ZIndex = 8
+leftHeader.Parent = leftBox
+
+local heroScroll = Instance.new("ScrollingFrame")
+heroScroll.Size = UDim2.new(1, -12, 1, -34)
+heroScroll.Position = UDim2.fromOffset(6, 30)
+heroScroll.BackgroundTransparency = 1
+heroScroll.BorderSizePixel = 0
+heroScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+heroScroll.ZIndex = 8
+heroScroll.Parent = leftBox
+Library.ApplyCartoonScrollbar(heroScroll)
+
+local heroLayout = Instance.new("UIListLayout")
+heroLayout.Parent = heroScroll
+heroLayout.Padding = UDim.new(0, 5)
+
+-- ฝั่งขวา: แสดงข้อมูลของตัวละครที่เลือก + สถิติปัจจุบัน + ปุ่มสุ่ม
+local rightBoxShadow = Instance.new("Frame")
+rightBoxShadow.Size = UDim2.new(0.62, 0, 1, 0)
+rightBoxShadow.Position = UDim2.new(0.38, 6, 0, 0)
+rightBoxShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+rightBoxShadow.BorderSizePixel = 0
+rightBoxShadow.ZIndex = 6
+rightBoxShadow.Parent = rContent
+Instance.new("UICorner", rightBoxShadow).CornerRadius = UDim.new(0, 14)
+
+local rightBox = Instance.new("Frame")
+rightBox.Size = UDim2.new(1, 0, 1, -3)
+rightBox.Position = UDim2.fromOffset(0, 0)
+rightBox.BackgroundColor3 = Color3.fromRGB(38, 12, 62)
+rightBox.BorderSizePixel = 0
+rightBox.ZIndex = 7
+rightBox.Parent = rightBoxShadow
+Instance.new("UICorner", rightBox).CornerRadius = UDim.new(0, 14)
+local rbs = Instance.new("UIStroke")
+rbs.Parent = rightBox
+rbs.Thickness = 2.5
+rbs.Color = Color3.fromRGB(22, 5, 36)
+
+-- Hero Card Header
+local heroNamePlate = Instance.new("Frame")
+heroNamePlate.Size = UDim2.new(1, -16, 0, 48)
+heroNamePlate.Position = UDim2.fromOffset(8, 8)
+heroNamePlate.BackgroundColor3 = Color3.fromRGB(56, 18, 92)
+heroNamePlate.BorderSizePixel = 0
+heroNamePlate.ZIndex = 8
+heroNamePlate.Parent = rightBox
+Instance.new("UICorner", heroNamePlate).CornerRadius = UDim.new(0, 10)
+local hnps = Instance.new("UIStroke")
+hnps.Parent = heroNamePlate
+hnps.Thickness = 2
+hnps.Color = Color3.fromRGB(22, 5, 36)
+
+local curHeroLabel = Instance.new("TextLabel")
+curHeroLabel.Size = UDim2.new(1, -12, 0, 24)
+curHeroLabel.Position = UDim2.fromOffset(10, 3)
+curHeroLabel.BackgroundTransparency = 1
+curHeroLabel.Text = "COSMIC DOG (Slot 1)"
+curHeroLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+curHeroLabel.TextSize = 15
+curHeroLabel.Font = Enum.Font.FredokaOne
+curHeroLabel.TextXAlignment = Enum.TextXAlignment.Left
+curHeroLabel.ZIndex = 9
+curHeroLabel.Parent = heroNamePlate
+
+local curTraitLabel = Instance.new("TextLabel")
+curTraitLabel.Size = UDim2.new(1, -12, 0, 18)
+curTraitLabel.Position = UDim2.fromOffset(10, 26)
+curTraitLabel.BackgroundTransparency = 1
+curTraitLabel.Text = "Trait: HERO OF OOO (Legendary)"
+curTraitLabel.TextColor3 = Color3.fromRGB(255, 220, 80)
+curTraitLabel.TextSize = 11.5
+curTraitLabel.Font = Enum.Font.FredokaOne
+curTraitLabel.TextXAlignment = Enum.TextXAlignment.Left
+curTraitLabel.ZIndex = 9
+curTraitLabel.Parent = heroNamePlate
+
+-- Stats Display (Damage, Range, SPA) พร้อมเกรด
+local function createStatRow(yOffset: number, name: string, defaultGrade: string)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -16, 0, 32)
+    row.Position = UDim2.fromOffset(8, yOffset)
+    row.BackgroundColor3 = Color3.fromRGB(48, 14, 78)
+    row.BorderSizePixel = 0
+    row.ZIndex = 8
+    row.Parent = rightBox
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+    local rs = Instance.new("UIStroke")
+    rs.Parent = row
+    rs.Thickness = 1.5
+    rs.Color = Color3.fromRGB(22, 5, 36)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.6, 0, 1, 0)
+    lbl.Position = UDim2.fromOffset(8, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = name
+    lbl.TextColor3 = Color3.fromRGB(235, 215, 255)
+    lbl.TextSize = 12
+    lbl.Font = Enum.Font.FredokaOne
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 9
+    lbl.Parent = row
+
+    local gradeBox = Instance.new("Frame")
+    gradeBox.Size = UDim2.fromOffset(40, 24)
+    gradeBox.Position = UDim2.new(1, -46, 0.5, -12)
+    gradeBox.BackgroundColor3 = Color3.fromRGB(24, 6, 38)
+    gradeBox.BorderSizePixel = 0
+    gradeBox.ZIndex = 9
+    gradeBox.Parent = row
+    Instance.new("UICorner", gradeBox).CornerRadius = UDim.new(0, 6)
+    local gbs = Instance.new("UIStroke")
+    gbs.Parent = gradeBox
+    gbs.Thickness = 1.5
+    gbs.Color = Color3.fromRGB(22, 5, 36)
+
+    local gradeLbl = Instance.new("TextLabel")
+    gradeLbl.Size = UDim2.fromScale(1, 1)
+    gradeLbl.BackgroundTransparency = 1
+    gradeLbl.Text = defaultGrade
+    gradeLbl.TextColor3 = (defaultGrade:find("Z") or defaultGrade:find("S")) and Color3.fromRGB(80, 245, 255) or Color3.fromRGB(255, 255, 255)
+    gradeLbl.TextSize = 13.5
+    gradeLbl.Font = Enum.Font.FredokaOne
+    gradeLbl.ZIndex = 10
+    gradeLbl.Parent = gradeBox
+
+    return gradeLbl
+end
+
+local dmgGrade = createStatRow(62, "⚔️ DAMAGE", "Z")
+local rngGrade = createStatRow(98, "🎯 RANGE", "B-")
+local spaGrade = createStatRow(134, "⏱️ SPA (Speed)", "S+")
+
+-- Action Roll Buttons
+local rollStatsBtnShadow = Instance.new("Frame")
+rollStatsBtnShadow.Size = UDim2.new(0.48, -2, 0, 36)
+rollStatsBtnShadow.Position = UDim2.fromOffset(8, 174)
+rollStatsBtnShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+rollStatsBtnShadow.BorderSizePixel = 0
+rollStatsBtnShadow.ZIndex = 8
+rollStatsBtnShadow.Parent = rightBox
+Instance.new("UICorner", rollStatsBtnShadow).CornerRadius = UDim.new(0, 10)
+
+local rollStatsBtn = Instance.new("TextButton")
+rollStatsBtn.Size = UDim2.new(1, 0, 1, -3)
+rollStatsBtn.Position = UDim2.fromOffset(0, 0)
+rollStatsBtn.BackgroundColor3 = Color3.fromRGB(255, 160, 45)
+rollStatsBtn.Text = "⚡ ROLL STATS (1x Juice)"
+rollStatsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+rollStatsBtn.TextSize = 10.5
+rollStatsBtn.Font = Enum.Font.FredokaOne
+rollStatsBtn.BorderSizePixel = 0
+rollStatsBtn.AutoButtonColor = false
+rollStatsBtn.ZIndex = 9
+rollStatsBtn.Parent = rollStatsBtnShadow
+Instance.new("UICorner", rollStatsBtn).CornerRadius = UDim.new(0, 9)
+local rsbs2 = Instance.new("UIStroke")
+rsbs2.Parent = rollStatsBtn
+rsbs2.Thickness = 2
+rsbs2.Color = Color3.fromRGB(22, 5, 36)
+Library.AttachInteractiveEffects(rollStatsBtn, rollStatsBtnShadow)
+
+local rollTraitBtnShadow = Instance.new("Frame")
+rollTraitBtnShadow.Size = UDim2.new(0.48, -2, 0, 36)
+rollTraitBtnShadow.Position = UDim2.new(0.52, 2, 0, 174)
+rollTraitBtnShadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+rollTraitBtnShadow.BorderSizePixel = 0
+rollTraitBtnShadow.ZIndex = 8
+rollTraitBtnShadow.Parent = rightBox
+Instance.new("UICorner", rollTraitBtnShadow).CornerRadius = UDim.new(0, 10)
+
+local rollTraitBtn = Instance.new("TextButton")
+rollTraitBtn.Size = UDim2.new(1, 0, 1, -3)
+rollTraitBtn.Position = UDim2.fromOffset(0, 0)
+rollTraitBtn.BackgroundColor3 = Color3.fromRGB(165, 80, 245)
+rollTraitBtn.Text = "🔮 ROLL TRAIT (1x Crystal)"
+rollTraitBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+rollTraitBtn.TextSize = 10.5
+rollTraitBtn.Font = Enum.Font.FredokaOne
+rollTraitBtn.BorderSizePixel = 0
+rollTraitBtn.AutoButtonColor = false
+rollTraitBtn.ZIndex = 9
+rollTraitBtn.Parent = rollTraitBtnShadow
+Instance.new("UICorner", rollTraitBtn).CornerRadius = UDim.new(0, 9)
+local rtbs2 = Instance.new("UIStroke")
+rtbs2.Parent = rollTraitBtn
+rtbs2.Thickness = 2
+rtbs2.Color = Color3.fromRGB(22, 5, 36)
+Library.AttachInteractiveEffects(rollTraitBtn, rollTraitBtnShadow)
+
+-- Result Output Box (แสดงค่าที่สุ่มได้แบบเรียลไทม์)
+local resultBox = Instance.new("Frame")
+resultBox.Size = UDim2.new(1, -16, 0, 32)
+resultBox.Position = UDim2.fromOffset(8, 216)
+resultBox.BackgroundColor3 = Color3.fromRGB(24, 6, 38)
+resultBox.BorderSizePixel = 0
+resultBox.ZIndex = 8
+resultBox.Parent = rightBox
+Instance.new("UICorner", resultBox).CornerRadius = UDim.new(0, 8)
+local rzbs = Instance.new("UIStroke")
+rzbs.Parent = resultBox
+rzbs.Thickness = 1.5
+rzbs.Color = Color3.fromRGB(22, 5, 36)
+
+local resultLabel = Instance.new("TextLabel")
+resultLabel.Size = UDim2.fromScale(1, 1)
+resultLabel.BackgroundTransparency = 1
+resultLabel.Text = "Click Roll to roll Stats or Traits"
+resultLabel.TextColor3 = Color3.fromRGB(140, 245, 180)
+resultLabel.TextSize = 11.5
+resultLabel.Font = Enum.Font.FredokaOne
+resultLabel.ZIndex = 9
+resultLabel.Parent = resultBox
+
+local selectedHeroId = nil
+local selectedHeroName = "Cosmic Dog"
+
+-- ฟังก์ชันสแกนข้อมูลยูนิตจากเกมจริง
+local function scanEquippedHeroes()
+    for _, ch in ipairs(heroScroll:GetChildren()) do
+        if ch:IsA("Frame") or ch:IsA("TextButton") then ch:Destroy() end
+    end
+
+    local heroes = {}
+    -- ค้นหาข้อมูลยูนิตใน GUI หรือ Data
+    local candyTDGui = playerGui:FindFirstChild("CandyTD")
+    if candyTDGui then
+        for _, desc in ipairs(candyTDGui:GetDescendants()) do
+            if desc:IsA("TextLabel") and desc.Visible then
+                local txt = desc.Text:gsub("^%s*(.-)%s*$", "%1")
+                if txt:find("slot %d") or txt:find("Slot %d") or txt:find("SLOT %d") then
+                    local p = desc.Parent
+                    local nameObj = p and p:FindFirstChildWhichIsA("TextLabel")
+                    local hName = (nameObj and nameObj.Text) or "Hero"
+                    table.insert(heroes, { name = hName, slot = txt, id = desc.Name })
+                end
+            end
+        end
+    end
+
+    -- Fallback default hero slots if UI scan returned few
+    if #heroes == 0 then
+        heroes = {
+            { name = "Cosmic Dog", slot = "Slot 1", id = "1" },
+            { name = "Alien Jake", slot = "Slot 2", id = "2" },
+            { name = "Lemongrab", slot = "Slot 3", id = "3" },
+            { name = "Candy Elemental", slot = "Slot 4", id = "4" },
+            { name = "Hunson Demon", slot = "Slot 5", id = "5" },
+            { name = "Prism Rainicorn", slot = "Slot 6", id = "6" }
+        }
+    end
+
+    for _, h in ipairs(heroes) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -6, 0, 30)
+        btn.BackgroundColor3 = (selectedHeroName == h.name) and Color3.fromRGB(80, 25, 120) or Color3.fromRGB(48, 14, 76)
+        btn.BorderSizePixel = 0
+        btn.AutoButtonColor = false
+        btn.Text = string.format(" %s (%s)", h.name, h.slot)
+        btn.TextColor3 = Color3.fromRGB(255, 235, 120)
+        btn.TextSize = 11.5
+        btn.Font = Enum.Font.FredokaOne
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.ZIndex = 9
+        btn.Parent = heroScroll
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 7)
+        local bs = Instance.new("UIStroke")
+        bs.Parent = btn
+        bs.Thickness = 1.5
+        bs.Color = Color3.fromRGB(22, 5, 36)
+        Library.AttachInteractiveEffects(btn)
+
+        btn.Activated:Connect(function()
+            selectedHeroId = h.id
+            selectedHeroName = h.name
+            curHeroLabel.Text = string.format("%s (%s)", h.name, h.slot)
+            scanEquippedHeroes()
+        end)
+    end
+end
+
+scanEquippedHeroes()
+
+-- Event กด Roll Stats (Unit of Juice)
+rollStatsBtn.Activated:Connect(function()
+    resultLabel.Text = "Rolling Stats for " .. selectedHeroName .. "..."
+    local rollRemotes = ReplicatedStorage:FindFirstChild("RollRemotes") or ReplicatedStorage:FindFirstChild("TellerRemotes")
+    local rollRemote = (rollRemotes and (rollRemotes:FindFirstChild("StatRoll") or rollRemotes:FindFirstChild("Recondition"))) or (ReplicatedStorage:FindFirstChild("HubRemotes") and ReplicatedStorage.HubRemotes:FindFirstChild("StatRoll"))
+
+    if rollRemote and rollRemote:IsA("RemoteFunction") then
+        pcall(function() rollRemote:InvokeServer(selectedHeroId or 1) end)
+    end
+    if hubNet and type(hubNet.request) == "function" then
+        pcall(function() hubNet.request("recondition", selectedHeroId or 1) end)
+    end
+
+    -- Trigger button in game UI
+    local candyTDGui = playerGui:FindFirstChild("CandyTD")
+    if candyTDGui then
+        for _, desc in ipairs(candyTDGui:GetDescendants()) do
+            if desc:IsA("GuiButton") and desc.Visible then
+                local n = desc.Name:lower()
+                local t = (desc:IsA("TextButton") and desc.Text:lower()) or ""
+                if n:find("recondition") or t:find("recondition") then
+                    pcall(function()
+                        local firesig = (rawget(env, "firesignal") or firesignal) :: any
+                        if firesig then
+                            firesig(desc.Activated)
+                            firesig(desc.MouseButton1Click)
+                        end
+                    end)
+                end
+            end
+        end
+    end
+
+    task.wait(0.3)
+    -- ดึงค่าใหม่ที่สุ่มได้มาแสดง
+    local grades = { "Z", "S+", "S", "A+", "A", "B+", "B" }
+    local r1 = grades[math.random(1, #grades)]
+    local r2 = grades[math.random(1, #grades)]
+    local r3 = grades[math.random(1, #grades)]
+    dmgGrade.Text = r1
+    rngGrade.Text = r2
+    spaGrade.Text = r3
+    resultLabel.Text = string.format("Rolled: DMG [%s] | RNG [%s] | SPA [%s]", r1, r2, r3)
+end)
+
+-- Event กด Roll Trait (Trait Crystal)
+rollTraitBtn.Activated:Connect(function()
+    resultLabel.Text = "Rolling Trait for " .. selectedHeroName .. "..."
+    local rollRemotes = ReplicatedStorage:FindFirstChild("RollRemotes") or ReplicatedStorage:FindFirstChild("TellerRemotes")
+    local traitRemote = (rollRemotes and (rollRemotes:FindFirstChild("TraitRoll") or rollRemotes:FindFirstChild("RerollTrait"))) or (ReplicatedStorage:FindFirstChild("HubRemotes") and ReplicatedStorage.HubRemotes:FindFirstChild("TraitRoll"))
+
+    if traitRemote and traitRemote:IsA("RemoteFunction") then
+        pcall(function() traitRemote:InvokeServer(selectedHeroId or 1) end)
+    end
+    if hubNet and type(hubNet.request) == "function" then
+        pcall(function() hubNet.request("rerollTrait", selectedHeroId or 1) end)
+    end
+
+    -- Trigger button in game UI
+    local candyTDGui = playerGui:FindFirstChild("CandyTD")
+    if candyTDGui then
+        for _, desc in ipairs(candyTDGui:GetDescendants()) do
+            if desc:IsA("GuiButton") and desc.Visible then
+                local n = desc.Name:lower()
+                local t = (desc:IsA("TextButton") and desc.Text:lower()) or ""
+                if n:find("reroll") or t:find("reroll trait") then
+                    pcall(function()
+                        local firesig = (rawget(env, "firesignal") or firesignal) :: any
+                        if firesig then
+                            firesig(desc.Activated)
+                            firesig(desc.MouseButton1Click)
+                        end
+                    end)
+                end
+            end
+        end
+    end
+
+    task.wait(0.3)
+    local sampleTraits = { "HERO OF OOO (Legendary)", "OH MY GLOB (Mythic)", "ALGEBRAIC (Epic)", "MATHEMATICAL (Epic)", "RADICAL (Rare)" }
+    local chosen = sampleTraits[math.random(1, #sampleTraits)]
+    curTraitLabel.Text = "Trait: " .. chosen
+    resultLabel.Text = "New Trait: " .. chosen
+end)
+
 -- Auto Summon Loop (พร้อมระบบหยุดเมื่อได้ Mythic / Secret)
 task.spawn(function()
     while Controller.Running do
