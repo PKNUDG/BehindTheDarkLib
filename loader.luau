@@ -102,15 +102,6 @@ local GAME_REGISTRY: {{
         end,
         script = "CleanMagicLibrary/in-match.luau",
     },
-    -- ─── Clean the Magic Library : Lobby (fallback) ─────────────
-    {
-        name   = "Clean the Magic Library (Lobby)",
-        detect = function()
-            -- lobby มี Packages แต่ยังไม่มี Network หรือ States/Wizard
-            return hasRS("Packages") and not hasRS("Network")
-        end,
-        script = "CleanMagicLibrary/lobby.luau",
-    },
 }
 
 -- ============================================================
