@@ -19,7 +19,7 @@ Library.Settings = {
     MovingPattern = true,
     ClickRipple = true,
     AnimeGlint = true,
-    AutoChallenge = false,
+    AntiAfk = true,
     UltraLowCPU = false,
     ResourceSaver = false,
     DiscordWebhook = "",
@@ -51,14 +51,61 @@ local function loadSavedSettings()
             local decodedOk, parsed = pcall(HttpService.JSONDecode, HttpService, data)
             if decodedOk and type(parsed) == "table" then
                 for k, v in pairs(parsed) do
-                    Library.Settings[k] = v
+                    if k ~= "AutoChallenge" then
+                        Library.Settings[k] = v
+                    end
                 end
             end
         end
     end
+    if Library.Settings.AntiAfk == nil then
+        Library.Settings.AntiAfk = true
+    end
 end
 
 loadSavedSettings()
+
+-- Global Anti-AFK Service (Dual Method: VirtualUser + VirtualInputManager fallback)
+local function setupAntiAfk()
+    task.spawn(function()
+        local player = Players.LocalPlayer
+        while not player do
+            Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
+            player = Players.LocalPlayer
+        end
+
+        local virtualUser = nil
+        pcall(function()
+            virtualUser = game:GetService("VirtualUser")
+        end)
+
+        local virtualInputManager = nil
+        pcall(function()
+            virtualInputManager = game:GetService("VirtualInputManager")
+        end)
+
+        player.Idled:Connect(function()
+            if not Library.Settings.AntiAfk then return end
+            local handled = false
+            if virtualUser then
+                pcall(function()
+                    virtualUser:CaptureController()
+                    virtualUser:ClickButton2(Vector2.new())
+                    handled = true
+                end)
+            end
+            if not handled and virtualInputManager then
+                pcall(function()
+                    virtualInputManager:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
+                    task.wait(0.05)
+                    virtualInputManager:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
+                end)
+            end
+        end)
+    end)
+end
+
+setupAntiAfk()
 
 local springBounce = TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local pressSquish = TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
@@ -1165,7 +1212,7 @@ function Library.CreateWindow(config: {Title: string, Name: string, Size: UDim2?
     createSettingRow("Looping Pattern", "MovingPattern")
     createSettingRow("Click Ripple", "ClickRipple")
     createSettingRow("Anime Glint", "AnimeGlint")
-    createSettingRow("Auto Challenge (Train)", "AutoChallenge")
+    createSettingRow("Anti-AFK (Prevent Kick)", "AntiAfk")
     createSettingRow("Ultra Low CPU (15 FPS)", "UltraLowCPU", function(val)
         applyUltraLowCpu(val)
     end)
