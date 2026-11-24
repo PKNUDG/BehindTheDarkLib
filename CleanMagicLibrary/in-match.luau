@@ -114,9 +114,18 @@ local ALL_SPELL_IDS = {
 local DefaultConfig = {
     AutoFarm = false,     -- ฟาร์มหนังสือส่งตู้
     AutoGems = false,     -- ฟาร์มเก็บเพชร (แยกปุ่มอิสระ)
+    AutoSkill = false,    -- กดใช้สกิลอัตโนมัติ (เฉพาะสกิลที่ติดตั้ง)
     BookESP = false,      -- Dynamic Series Book & Shelf ESP
     AutoUpgrade = false,  -- อัปเกรดอัตโนมัติ
-    PowerUpOrder = table.clone(PURE_POWERUP_DEFAULT),
+    AutoSkillCheckboxes = {}, -- สกิลในโหลดเอาท์ที่เปิดใช้งาน { [id] = true/false }
+    AutoSkillOrder = {},      -- ลำดับการกดสกิล { id1, id2, ... }
+    PowerUpCheckboxes = {
+        ["Extension"] = true,
+        ["Haste"] = true,
+        ["Owls"] = true,
+        ["Reach"] = true,
+        ["Levitation"] = true
+    },
     SpellCheckboxes = {
         ["Summon"] = true,
         ["March"] = true,
@@ -139,27 +148,6 @@ local DefaultConfig = {
 
 local Config = table.clone(DefaultConfig)
 
-local function sanitizePowerUpOrder(list)
-    local allowed = { Extension = true, Haste = true, Owls = true, Reach = true, Levitation = true }
-    local result = {}
-    local seen = {}
-    if type(list) == "table" then
-        for _, id in ipairs(list) do
-            if allowed[id] and not seen[id] then
-                table.insert(result, id)
-                seen[id] = true
-            end
-        end
-    end
-    for _, id in ipairs(PURE_POWERUP_DEFAULT) do
-        if not seen[id] then
-            table.insert(result, id)
-            seen[id] = true
-        end
-    end
-    return result
-end
-
 local function saveConfig()
     local wf = (type(writefile) == "function" and writefile) or nil
     if wf then
@@ -180,12 +168,13 @@ local function loadConfig()
                 for k, v in pairs(parsed) do
                     Config[k] = v
                 end
-                Config.PowerUpOrder = sanitizePowerUpOrder(Config.PowerUpOrder)
+                Config.AutoSkillCheckboxes = Config.AutoSkillCheckboxes or {}
+                Config.AutoSkillOrder = Config.AutoSkillOrder or {}
+                Config.PowerUpCheckboxes = Config.PowerUpCheckboxes or DefaultConfig.PowerUpCheckboxes
                 Config.SpellCheckboxes = Config.SpellCheckboxes or DefaultConfig.SpellCheckboxes
             end
         end
     end
-    Config.PowerUpOrder = sanitizePowerUpOrder(Config.PowerUpOrder)
 end
 
 loadConfig()
@@ -322,14 +311,14 @@ local function sweepNearbyGems(maxDist: number?)
     end
 end
 
--- เก็บหนังสือแบบ Dynamic Fast-Retry (สปีดสูงสุดระดับมิลลิวินาที ไม่ค้างรอ)
+-- เก็บหนังสือแบบ Dynamic Fast-Retry (สปีดสูงสุด Hyper-Speed ไม่รอดีเลย์)
 local function fastPickUpBook(root: BasePart, book: Instance): boolean
     if not book or not book.Parent or not Network or not Network.pickUp then return false end
     root.CFrame = CFrame.new(book.Position + Vector3.new(0, 1.2, 0))
-    sweepNearbyGems(18)
+    sweepNearbyGems(25)
 
     local startT = os.clock()
-    while (os.clock() - startT) < 0.20 and book.Parent and ScriptInstance.Running and _G.CleanMagic_CurrentToken == currentToken do
+    while (os.clock() - startT) < 0.12 and book.Parent and ScriptInstance.Running and _G.CleanMagic_CurrentToken == currentToken do
         local res = Network.pickUp.call(book)
         if res and res.status == "Ok" then
             return true
@@ -337,16 +326,31 @@ local function fastPickUpBook(root: BasePart, book: Instance): boolean
             -- หากเซิร์ฟเวอร์แจ้งว่ามือเต็มแล้ว ให้ตัดจบเพื่อไปส่งตู้ทันที
             return false
         end
-        task.wait(0.01)
+        task.wait()
     end
     return false
 end
 
 -- --------------------------------------------------------
--- 5. FOCUSED SINGLE-SHELF RUSH (ฟาร์มจบทีละตู้เพื่อ SPELL POINTS)
+-- 5. FOCUSED SINGLE-SHELF RUSH (ฟาร์มจบทีละตู้ / ทีละห้อง เพื่อ SPELL POINTS ไวสุด)
 -- --------------------------------------------------------
 local isFarming = false
 local currentTargetSeries = nil
+local currentTargetRoom = nil
+
+local function getShelfRoom(shelf: BasePart): Instance?
+    local secModel = shelf:FindFirstAncestorOfClass("Model")
+    if secModel and secModel.Parent and secModel.Parent.Name ~= "Sections" then
+        local anc = shelf.Parent
+        while anc and anc.Parent and anc.Parent.Name ~= "Sections" do
+            anc = anc.Parent
+        end
+        if anc and anc.Parent and anc.Parent.Name == "Sections" then
+            secModel = anc
+        end
+    end
+    return secModel
+end
 
 local function getBestTargetSeries(looseBooks: {Instance}): string?
     local targetCopies = getTargetCopies()
@@ -372,11 +376,13 @@ local function getBestTargetSeries(looseBooks: {Instance}): string?
                 local available = looseCounts[series] or 0
 
                 if needed > 0 and available > 0 then
+                    local room = getShelfRoom(sh)
                     table.insert(candidates, {
                         series = series,
                         needed = needed,
                         placed = placed,
-                        available = available
+                        available = available,
+                        room = room
                     })
                 end
             end
@@ -385,10 +391,17 @@ local function getBestTargetSeries(looseBooks: {Instance}): string?
 
     if #candidates == 0 then return nil end
 
+    -- ลำดับความสำคัญ:
+    -- 1. ถ้ามีห้องเป้าหมายเดิมที่ยังไม่เสร็จ ให้เน้นตู้ในห้องเดิมก่อน (เคลียร์ทีละห้อง)
+    -- 2. เลือกตู้ที่ใกล้เต็มที่สุด (needed น้อยสุด)
     table.sort(candidates, function(a, b)
+        if currentTargetRoom and (a.room == currentTargetRoom) ~= (b.room == currentTargetRoom) then
+            return a.room == currentTargetRoom
+        end
         return a.needed < b.needed
     end)
 
+    currentTargetRoom = candidates[1].room
     return candidates[1].series
 end
 
@@ -414,7 +427,7 @@ local function processFarmStep()
         local currentShelfPlaced = carriedSeries and getPlacedForSeries(carriedSeries) or 0
         local shelfNeeded = math.max(0, targetCopies - currentShelfPlaced)
 
-        -- 1.1 ถ้าในมือยังไม่เต็มความจุ และตู้ยังต้องการหนังสือเพิ่มอีก ให้หาซีรีส์เดิมมาเก็บต่อ
+        -- 1.1 ถ้าในมือยังไม่เต็มความจุ และตู้ยังต้องการหนังสือเพิ่มอีก ให้หาซีรีส์เดิมมาเก็บต่อ (ห้ามเก็บซีรีส์อื่นปน)
         if #carried < maxCapacity and #carried < shelfNeeded and carriedSeries and not isShelfCompleted(carriedSeries) then
             local sameSeriesBook = nil
             local bestDist = math.huge
@@ -436,58 +449,49 @@ local function processFarmStep()
                     isFarming = false
                     return
                 end
-                -- หากหยิบไม่สำเร็จ (เซิร์ฟเวอร์เต็ม หรือเล่มถูกแย่ง) ให้ไหลลงไป 1.2 เพื่อไปส่งตู้ทันที
+                -- หากหยิบไม่สำเร็จ ให้ไหลลงไป 1.2 เพื่อไปส่งตู้ทันที
             end
         end
 
-        -- 1.2 วาปไปหน้าตู้และยิงวางต่อเนื่องจนหมดมือ (Ultra-Fast Shelving Pipeline)
+        -- 1.2 วาปไปหน้าตู้และส่งหนังสือเข้าตู้แบบ Synchronous Rapid Zero-Delay (เสร็จไวระดับมิลลิวินาที ไม่ข้ามตู้)
         local targetShelf = carriedSeries and findShelfBySeries(carriedSeries)
         if targetShelf then
             root.CFrame = getShelfFrontCFrame(targetShelf)
-            sweepNearbyGems(18)
+            sweepNearbyGems(25)
 
-            -- Pre-fire คำสั่งส่งเข้าตู้ทันที
-            if Network and Network.shelve then
-                pcall(function()
-                    Network.shelve.call(targetShelf)
-                end)
-            end
-
-            local maxShelveAttempts = math.max(30, #carried * 2 + 10)
+            local maxShelveAttempts = math.max(25, #carried * 3 + 10)
             local attempts = 0
             while #getCarriedBooks() > 0 and attempts < maxShelveAttempts and ScriptInstance.Running and _G.CleanMagic_CurrentToken == currentToken do
                 attempts += 1
-                task.wait(0.182)
 
                 local currentCarried = getCarriedBooks()
                 if #currentCarried == 0 then break end
 
                 local topBook = currentCarried[1]
                 local topSeries = topBook and topBook:GetAttribute("Series") or carriedSeries
-
                 local curShelf = topSeries and findShelfBySeries(topSeries) or targetShelf
+
                 if curShelf then
                     if (root.Position - curShelf.Position).Magnitude > 26 then
                         root.CFrame = getShelfFrontCFrame(curShelf)
-                        task.wait(0.08)
                     end
 
                     local ok, res = pcall(function()
                         return Network.shelve.call(curShelf)
                     end)
 
-                    -- หากส่งผิดตู้เพราะมีหนังสือคละซีรีส์ ให้สลับไปตู้ที่ถูกต้องทันที
+                    -- หากส่งผิดตู้เพราะมีเล่มคละซีรีส์หลุดมา ให้รีบย้ายไปตู้ที่ถูกต้อง
                     if ok and type(res) == "table" and res.status == "WrongShelf" and res.series then
                         local correctShelf = findShelfBySeries(res.series)
                         if correctShelf then
                             root.CFrame = getShelfFrontCFrame(correctShelf)
-                            task.wait(0.08)
                             pcall(function()
                                 Network.shelve.call(correctShelf)
                             end)
                         end
                     end
                 end
+                task.wait(0.02)
             end
 
             if carriedSeries and isShelfCompleted(carriedSeries) then
@@ -499,7 +503,7 @@ local function processFarmStep()
         return
     end
 
-    -- [กรณีที่ 2]: หากมือว่าง ให้ล็อคเป้าหมายที่ "ตู้เดิมที่ยังไม่เต็ม" หรือเลือกตู้ที่ใกล้เต็มที่สุด
+    -- [กรณีที่ 2]: หากมือว่าง ให้ล็อคเป้าหมายที่ "ตู้เดิมในห้องเดิมที่ยังไม่เต็ม"
     if not currentTargetSeries or isShelfCompleted(currentTargetSeries) then
         currentTargetSeries = getBestTargetSeries(looseBooks)
     end
@@ -528,7 +532,7 @@ local function processFarmStep()
         end
     end
 
-    -- กรณี Fallback: หากไม่มีตู้เป้าหมายที่ค้างอยู่ ให้เก็บหนังสือเล่มใดก็ได้ที่ยังไม่เต็มตู้
+    -- กรณี Fallback: เลือกเล่มที่ตู้ยังไม่เต็ม และตรงกับห้องปัจจุบันที่สุด
     if #looseBooks > 0 then
         local myPos = root.Position
         local bestBook = nil
@@ -536,10 +540,13 @@ local function processFarmStep()
 
         for _, b in ipairs(looseBooks) do
             if isBookAvailable(b) then
-                local d = (b.Position - myPos).Magnitude
-                if d < bestDist then
-                    bestDist = d
-                    bestBook = b
+                local bSeries = b:GetAttribute("Series")
+                if bSeries and not isShelfCompleted(bSeries) then
+                    local d = (b.Position - myPos).Magnitude
+                    if d < bestDist then
+                        bestDist = d
+                        bestBook = b
+                    end
                 end
             end
         end
@@ -552,7 +559,7 @@ local function processFarmStep()
         end
     end
 
-    task.wait(0.1)
+    task.wait(0.01)
     isFarming = false
 end
 
@@ -561,7 +568,7 @@ task.spawn(function()
     while ScriptInstance.Running and _G.CleanMagic_CurrentToken == currentToken do
         if Config.AutoFarm then
             pcall(processFarmStep)
-            task.wait(0.005)
+            task.wait()
         else
             task.wait(0.2)
         end
@@ -588,21 +595,17 @@ task.spawn(function()
                             -- ถ้าระยะไกล และไม่ได้กำลังฟาร์มหนังสือ ให้วาร์ปไปเก็บโดยตรง
                             if not Config.AutoFarm then
                                 root.CFrame = CFrame.new(pivotPos + Vector3.new(0, 0.8, 0))
-                                task.wait(0.08)
                             end
                             if Network and Network.collectGem then
                                 pcall(function()
                                     Network.collectGem.call(gem)
                                 end)
                             end
-                            if not Config.AutoFarm then
-                                task.wait(0.05)
-                            end
                         end
                     end
                 end
             end
-            task.wait(0.25)
+            task.wait(0.05)
         else
             task.wait(0.5)
         end
@@ -721,30 +724,34 @@ task.spawn(function()
 end)
 
 -- --------------------------------------------------------
--- 8. AUTO UPGRADES (POWER-UPS PRIORITY & SPELLS BALANCED CHECKBOX)
+-- 8. AUTO UPGRADES (POWER-UPS & SPELLS SEQUENTIAL CHECKBOX UPGRADE)
 -- --------------------------------------------------------
 task.spawn(function()
     while ScriptInstance.Running and _G.CleanMagic_CurrentToken == currentToken do
-        task.wait(0.8)
+        task.wait(0.05)
         if Config.AutoUpgrade and Network and Network.upgrade and UpgradesConfig then
             local upPoints = player:GetAttribute("UpgradePoints") or 0
             local spPoints = player:GetAttribute("SpellPoints") or 0
 
-            -- 1. อัปเกรด Power-ups ตามลำดับ Priority (PowerUpOrder)
+            -- 1. อัปเกรด Power-ups จากบนสุดลงล่าง จนเต็ม Max ก่อนค่อยอัพอันต่อไป (เฉพาะที่ Checkbox ไว้)
             if upPoints > 0 then
-                for _, upgradeId in ipairs(Config.PowerUpOrder) do
-                    local info = UpgradesConfig.ById[upgradeId]
-                    if info then
-                        local currentLevel = player:GetAttribute(UpgradesConfig.LevelAttributePrefix .. upgradeId) or 0
-                        local maxLevel = info.MaxLevel or 15
+                for _, upgradeId in ipairs(PURE_POWERUP_DEFAULT) do
+                    local isChecked = Config.PowerUpCheckboxes[upgradeId]
+                    if isChecked then
+                        local info = UpgradesConfig.ById[upgradeId]
+                        if info then
+                            local currentLevel = player:GetAttribute(UpgradesConfig.LevelAttributePrefix .. upgradeId) or 0
+                            local maxLevel = info.MaxLevel or 15
 
-                        if currentLevel < maxLevel then
-                            local ok, res = pcall(function()
-                                return Network.upgrade.call(upgradeId, false)
-                            end)
-                            if ok and res and res.status == "Ok" then
-                                print(string.format("[Clean Magic] Upgraded Power-Up: %s (Lv.%d)", info.Name, currentLevel + 1))
-                                task.wait(0.3)
+                            if currentLevel < maxLevel then
+                                local ok, res = pcall(function()
+                                    return Network.upgrade.call(upgradeId, false)
+                                end)
+                                if ok and res and res.status == "Ok" then
+                                    print(string.format("[Clean Magic] Upgraded Power-Up: %s (Lv.%d)", info.Name, currentLevel + 1))
+                                    task.wait(0.05)
+                                end
+                                -- หยุดที่รายการนี้จนกว่าจะอัปเกรดจนเต็ม Max เลเวล
                                 break
                             end
                         end
@@ -752,38 +759,260 @@ task.spawn(function()
                 end
             end
 
-            -- 2. อัปเกรด Spells แบบ "เฉลี่ยระดับ" (Balanced / Lowest Level First) เฉพาะที่ Checkbox ไว้
+            -- 2. อัปเกรด Spells จากบนสุดลงล่าง จนเต็ม Max ก่อนค่อยอัพอันต่อไป (เฉพาะที่ Checkbox ไว้)
             if spPoints > 0 then
-                local candidates = {}
-                for spellId, isChecked in pairs(Config.SpellCheckboxes) do
+                for _, spellId in ipairs(ALL_SPELL_IDS) do
+                    local isChecked = Config.SpellCheckboxes[spellId]
                     if isChecked then
                         local info = UpgradesConfig.ById[spellId]
                         if info then
                             local currentLevel = player:GetAttribute(UpgradesConfig.LevelAttributePrefix .. spellId) or 0
                             local maxLevel = info.MaxLevel or 15
+
                             if currentLevel < maxLevel then
-                                table.insert(candidates, {
-                                    id = spellId,
-                                    level = currentLevel,
-                                    name = info.Name
-                                })
+                                local ok, res = pcall(function()
+                                    return Network.upgrade.call(spellId, false)
+                                end)
+                                if ok and res and res.status == "Ok" then
+                                    print(string.format("[Clean Magic] Upgraded Spell: %s (Lv.%d)", info.Name, currentLevel + 1))
+                                    task.wait(0.05)
+                                end
+                                -- หยุดที่รายการนี้จนกว่าจะอัปเกรดจนเต็ม Max เลเวล
+                                break
                             end
                         end
                     end
                 end
+            end
+        end
+    end
+end)
 
-                table.sort(candidates, function(a, b)
-                    return a.level < b.level
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = nil
+pcall(function()
+    VirtualInputManager = game:GetService("VirtualInputManager")
+end)
+
+-- ค้นหาและดึงสกิลที่ติดตั้งอยู่ใน Loadout (Slot 1-6)
+local function getEquippedSkills(): {{ id: string, name: string, slot: number, isPassive: boolean, btn: GuiButton? }}
+    local result = {}
+    local seen = {}
+
+    -- วิธีที่ 1: ตรวจสอบจาก Charm / WizardState
+    if Charm and WizardState then
+        pcall(function()
+            for _, stateKey in ipairs({"Resolved", "Spells", "Loadout", "Equipped", "Skills"}) do
+                local s = WizardState[stateKey]
+                if s then
+                    local data = Charm.peek(s)
+                    if type(data) == "table" then
+                        local list = data.Spells or data.Equipped or data.Skills or data.Loadout or data
+                        if type(list) == "table" then
+                            local slotIdx = 1
+                            for k, v in pairs(list) do
+                                local sId = (type(v) == "string" and v) or (type(v) == "table" and (v.Id or v.Name or v.SpellId)) or (type(k) == "string" and k)
+                                if sId and not seen[sId] then
+                                    local info = UpgradesConfig and UpgradesConfig.ById[sId]
+                                    if info or table.find(ALL_SPELL_IDS, sId) then
+                                        seen[sId] = true
+                                        local isPass = (info and (info.Type == "Passive" or info.IsPassive)) or false
+                                        table.insert(result, {
+                                            id = sId,
+                                            name = info and info.Name or sId,
+                                            slot = tonumber(k) or slotIdx,
+                                            isPassive = isPass,
+                                            btn = nil
+                                        })
+                                        slotIdx += 1
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    -- วิธีที่ 2: ตรวจจับจาก PlayerGui (ตรวจดูปุ่มสกิลบนจอจริง)
+    local pGui = player:FindFirstChild("PlayerGui")
+    if pGui then
+        pcall(function()
+            for _, g in ipairs(pGui:GetDescendants()) do
+                if g:IsA("GuiButton") and g.Visible and g.Parent and g.Parent.Visible then
+                    local gName = g.Name
+                    for _, sId in ipairs(ALL_SPELL_IDS) do
+                        if (gName:lower():find(sId:lower()) or (g:FindFirstChild("TextLabel") and g.TextLabel.Text:lower():find(sId:lower()))) and not seen[sId] then
+                            seen[sId] = true
+                            local info = UpgradesConfig and UpgradesConfig.ById[sId]
+                            local isPass = (info and (info.Type == "Passive" or info.IsPassive)) or false
+                            table.insert(result, {
+                                id = sId,
+                                name = info and info.Name or sId,
+                                slot = #result + 1,
+                                isPassive = isPass,
+                                btn = g
+                            })
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    return result
+end
+
+-- กดปุ่มคีย์บอร์ดจำลองสำหรับใช้สกิล (รองรับทั้ง VirtualInputManager, Mouse Aim Raycast และ Remote)
+local function triggerSkillSlot(slot: number, spellId: string?, targetShelf: BasePart?)
+    -- 1. พยายามยิงผ่าน Remote ตรงๆ ก่อนหากมี Remote เกี่ยวกับสกิล
+    if Network and spellId then
+        pcall(function()
+            for _, fnName in ipairs({"castSpell", "useSpell", "activateSpell", "spell", "cast", "useCharm"}) do
+                if Network[fnName] and typeof(Network[fnName].call) == "function" then
+                    if targetShelf then
+                        Network[fnName].call(spellId, targetShelf)
+                        Network[fnName].call(targetShelf)
+                        Network[fnName].call(targetShelf.Position)
+                    else
+                        Network[fnName].call(spellId)
+                    end
+                    return
+                end
+            end
+        end)
+    end
+
+    -- 2. เล็ง Camera และหันเมาส์เข้าสู่กึ่งกลางตู้ เพื่อให้เกมตรวจจับ Cursor อยู่บนตู้
+    local camera = Workspace.CurrentCamera
+    if camera and targetShelf then
+        pcall(function()
+            local targetPos = targetShelf.Position + Vector3.new(0, 1.5, 0)
+            local root = getRootPart()
+            if root then
+                root.CFrame = CFrame.new(root.Position, Vector3.new(targetPos.X, root.Position.Y, targetPos.Z))
+            end
+            camera.CFrame = CFrame.new(camera.CFrame.Position, targetPos)
+            
+            -- จำลองตำแหน่งเมาส์ตรงกลางหน้าจอที่เล็งตู้
+            if VirtualInputManager then
+                local viewport = camera.ViewportSize
+                local midX = viewport.X / 2
+                local midY = viewport.Y / 2
+                VirtualInputManager:SendMouseMoveEvent(midX, midY, game)
+            end
+        end)
+    end
+
+    -- 3. จำลองการกดปุ่มตัวเลข 1-6 (หรือคลิกปุ่มบนหน้าจอ)
+    local keyCodes = {
+        [1] = Enum.KeyCode.One,
+        [2] = Enum.KeyCode.Two,
+        [3] = Enum.KeyCode.Three,
+        [4] = Enum.KeyCode.Four,
+        [5] = Enum.KeyCode.Five,
+        [6] = Enum.KeyCode.Six
+    }
+    local kc = keyCodes[slot]
+    if kc and VirtualInputManager then
+        pcall(function()
+            VirtualInputManager:SendKeyEvent(true, kc, false, game)
+            task.wait(0.03)
+            VirtualInputManager:SendKeyEvent(false, kc, false, game)
+        end)
+    end
+
+    -- 4. หากเป็นสกิลที่ต้องคลิกเป้าหมาย (เช่น Shelf Fill Charm) ให้ส่ง Mouse Click ยืนยันที่ตู้ด้วย
+    if targetShelf and VirtualInputManager and camera then
+        pcall(function()
+            task.wait(0.04)
+            local viewport = camera.ViewportSize
+            local midX = viewport.X / 2
+            local midY = viewport.Y / 2
+            VirtualInputManager:SendMouseButtonEvent(midX, midY, 0, true, game, 1)
+            task.wait(0.03)
+            VirtualInputManager:SendMouseButtonEvent(midX, midY, 0, false, game, 1)
+        end)
+    end
+end
+
+-- หาตู้ที่ยังว่าง หรือมีหนังสือน้อยที่สุดเพื่อเล็งใช้ Shelf Fill Charm
+local function getLowestShelf(): BasePart?
+    local shelves = CollectionService:GetTagged("Shelf")
+    local bestShelf = nil
+    local minPlaced = math.huge
+    local targetCopies = getTargetCopies()
+
+    for _, sh in ipairs(shelves) do
+        if sh:IsA("BasePart") then
+            local series = sh:GetAttribute("Series")
+            if series then
+                local placed = getPlacedForSeries(series)
+                if placed < targetCopies and placed < minPlaced then
+                    minPlaced = placed
+                    bestShelf = sh
+                end
+            end
+        end
+    end
+    return bestShelf
+end
+
+-- --------------------------------------------------------
+-- 9. AUTO SKILL ACTIVE THREAD
+-- --------------------------------------------------------
+task.spawn(function()
+    while ScriptInstance.Running and _G.CleanMagic_CurrentToken == currentToken do
+        task.wait(0.2)
+        if Config.AutoSkill then
+            -- ทำงานเมื่อไม่อยู่ในจังหวะถือหนังสือไปส่งตู้ (ป้องกันการวาร์ปขัดจังหวะการส่งหนังสือ)
+            local carried = getCarriedBooks()
+            if #carried == 0 then
+                local equipped = getEquippedSkills()
+                local orderMap = {}
+                for idx, id in ipairs(Config.AutoSkillOrder or {}) do
+                    orderMap[id] = idx
+                end
+
+                -- เรียงตามลำดับที่จัดไว้ใน AutoSkillOrder
+                table.sort(equipped, function(a, b)
+                    local rankA = orderMap[a.id] or 999
+                    local rankB = orderMap[b.id] or 999
+                    return rankA < rankB
                 end)
 
-                if #candidates > 0 then
-                    local targetSpell = candidates[1]
-                    local ok, res = pcall(function()
-                        return Network.upgrade.call(targetSpell.id, false)
-                    end)
-                    if ok and res and res.status == "Ok" then
-                        print(string.format("[Clean Magic] Balanced Upgrade Spell: %s (Lv.%d -> Lv.%d)", targetSpell.name, targetSpell.level, targetSpell.level + 1))
-                        task.wait(0.3)
+                for _, sk in ipairs(equipped) do
+                    if not Config.AutoSkill or not ScriptInstance.Running or _G.CleanMagic_CurrentToken ~= currentToken then break end
+                    -- ข้ามสกิลที่เป็น Passive หรือไม่ได้ Checkbox ไว้
+                    local isChecked = Config.AutoSkillCheckboxes[sk.id]
+                    if isChecked and not sk.isPassive then
+                        if sk.id == "ShelfFill" then
+                            -- กรณีสกิล Shelf Fill Charm: ต้องเล็งไปที่ตู้ว่าง/หนังสือน้อยที่สุด
+                            local targetShelf = getLowestShelf()
+                            if targetShelf then
+                                local root = getRootPart()
+                                local oldCF = root and root.CFrame
+                                if root then
+                                    -- วาร์ปไปหน้าตู้เป้าหมายเพื่อเล็งยิงสกิล
+                                    root.CFrame = getShelfFrontCFrame(targetShelf)
+                                    task.wait(0.04)
+                                end
+
+                                triggerSkillSlot(sk.slot, sk.id, targetShelf)
+                                task.wait(0.05)
+
+                                -- วาร์ปกลับตำแหน่งเดิมทันที
+                                if oldCF and root and Config.AutoFarm then
+                                    root.CFrame = oldCF
+                                end
+                                task.wait(0.15)
+                            end
+                        else
+                            -- สกิลทั่วไป: กดใช้ได้ทันที
+                            triggerSkillSlot(sk.slot, sk.id, nil)
+                            task.wait(0.08)
+                        end
                     end
                 end
             end
@@ -797,11 +1026,13 @@ end)
 local Window = Library:CreateWindow({
     Title = "CLEAN THE MAGIC",
     Name = GUI_NAME,
+    Size = UDim2.fromOffset(660, 440),
     OnUnload = function()
         ScriptInstance.Running = false
         Config.AutoFarm = false
         Config.AutoGems = false
         Config.AutoUpgrade = false
+        Config.AutoSkill = false
         saveConfig()
         local root = getRootPart()
         if root then root.Anchored = false end
@@ -816,12 +1047,12 @@ ScriptInstance.Cleanup = function()
     if root then root.Anchored = false end
 end
 
-if Window.RightColumn and Window.RightColumn.Parent and Window.RightColumn.Parent.Parent then
-    Window.RightColumn.Parent.Parent.Visible = false
-end
-
 local leftCol = Window:GetColumn("Left")
+local rightCol = Window:GetColumn("Right")
 
+-- --------------------------------------------------------
+-- คอลัมน์ซ้าย: TOGGLES & AUTOMATION CONTROLS
+-- --------------------------------------------------------
 -- 1. Main Toggle: Auto Books
 Window:CreateToggle("Left", "Auto Farm (Books)", 0, {
     On = Color3.fromRGB(0, 230, 150),
@@ -870,18 +1101,31 @@ Window:CreateToggle("Left", "Auto Upgrade (Points)", 138, {
     print("[Clean Magic] Auto Upgrade Master:", enabled and "ON" or "OFF")
 end)
 
-local function createDropdownButton(yPos: number, title: string, color: Color3)
+-- 5. Toggle: Auto Skill (Cast Equipped Skills)
+Window:CreateToggle("Left", "Auto Use Skills (Equipped)", 184, {
+    On = Color3.fromRGB(240, 90, 140),
+    Off = Color3.fromRGB(120, 120, 130)
+}, Config.AutoSkill, function(enabled)
+    Config.AutoSkill = enabled
+    saveConfig()
+    print("[Clean Magic] Auto Use Skills:", enabled and "ON" or "OFF")
+end)
+
+-- --------------------------------------------------------
+-- คอลัมน์ขวา: POPUP MENUS & CONFIGURATION DROPDOWNS
+-- --------------------------------------------------------
+local function createDropdownButton(parentCol, yPos: number, title: string, color: Color3)
     local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(1, 0, 0, 42)
+    shadow.Size = UDim2.new(1, 0, 0, 44)
     shadow.Position = UDim2.fromOffset(0, yPos)
     shadow.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
     shadow.BorderSizePixel = 0
     shadow.ZIndex = 20
-    shadow.Parent = leftCol
+    shadow.Parent = parentCol
     Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 13)
 
     local rim = Instance.new("Frame")
-    rim.Size = UDim2.new(1, 0, 0, 39)
+    rim.Size = UDim2.new(1, 0, 0, 41)
     rim.Position = UDim2.fromOffset(0, 0)
     rim.BackgroundColor3 = color
     rim.BorderSizePixel = 0
@@ -935,13 +1179,14 @@ local function createDropdownButton(yPos: number, title: string, color: Color3)
     return shadow, btn, arrow
 end
 
-local powerUpDropShadow, powerUpDropBtn, powerUpArrow = createDropdownButton(184, "Priority: Power-ups", Color3.fromRGB(75, 215, 140))
-local spellDropShadow, spellDropBtn, spellArrow = createDropdownButton(230, "Spells Upgrade (Balanced)", Color3.fromRGB(250, 180, 80))
+local powerUpDropShadow, powerUpDropBtn, powerUpArrow = createDropdownButton(rightCol, 0, "Power-ups (Sequential)", Color3.fromRGB(75, 215, 140))
+local spellDropShadow, spellDropBtn, spellArrow = createDropdownButton(rightCol, 52, "Spells (Sequential)", Color3.fromRGB(250, 180, 80))
+local autoSkillDropShadow, autoSkillDropBtn, autoSkillArrow = createDropdownButton(rightCol, 104, "Equipped Skills (Order)", Color3.fromRGB(240, 90, 140))
 
 local targetScreenGui = Window.Gui or CoreGui:FindFirstChild(GUI_NAME)
 
 -- --------------------------------------------------------
--- POPUP A: POWER-UPS PRIORITY POPUP (PURE 5 ITEMS ONLY ▲ / ▼)
+-- POPUP A: POWER-UPS CHECKBOX POPUP (UPGRADE POINTS - TOP DOWN FIRST)
 -- --------------------------------------------------------
 local powerUpPopup = Instance.new("Frame")
 powerUpPopup.Name = "PowerUpPopupDropdown"
@@ -989,105 +1234,79 @@ layoutA.Parent = scrollPowerUp
 layoutA.Padding = UDim.new(0, 4)
 layoutA.SortOrder = Enum.SortOrder.LayoutOrder
 
-local renderPowerUpList = nil
-renderPowerUpList = function()
-    for _, ch in ipairs(scrollPowerUp:GetChildren()) do
-        if ch:IsA("Frame") then ch:Destroy() end
+for _, upgradeId in ipairs(PURE_POWERUP_DEFAULT) do
+    local info = UpgradesConfig and UpgradesConfig.ById[upgradeId]
+    local displayName = info and info.Name or upgradeId
+
+    local rowBtn = Instance.new("TextButton")
+    rowBtn.Name = "PowerUpRow_" .. upgradeId
+    rowBtn.Size = UDim2.new(1, -8, 0, 34)
+    rowBtn.BackgroundColor3 = Color3.fromRGB(24, 62, 42)
+    rowBtn.BorderSizePixel = 0
+    rowBtn.AutoButtonColor = false
+    rowBtn.Text = ""
+    rowBtn.ZIndex = 854
+    rowBtn.Parent = scrollPowerUp
+    Instance.new("UICorner", rowBtn).CornerRadius = UDim.new(0, 7)
+
+    local rowStroke = Instance.new("UIStroke")
+    rowStroke.Parent = rowBtn
+    rowStroke.Thickness = 1.5
+    rowStroke.Color = Color3.fromRGB(22, 5, 36)
+
+    local isChecked = Config.PowerUpCheckboxes[upgradeId] ~= false
+
+    local boxFrame = Instance.new("Frame")
+    boxFrame.Size = UDim2.fromOffset(18, 18)
+    boxFrame.Position = UDim2.new(0, 8, 0.5, -9)
+    boxFrame.BackgroundColor3 = isChecked and Color3.fromRGB(75, 215, 140) or Color3.fromRGB(16, 42, 28)
+    boxFrame.BorderSizePixel = 0
+    boxFrame.ZIndex = 855
+    boxFrame.Parent = rowBtn
+    Instance.new("UICorner", boxFrame).CornerRadius = UDim.new(0, 5)
+
+    local boxStroke = Instance.new("UIStroke")
+    boxStroke.Parent = boxFrame
+    boxStroke.Thickness = 1.3
+    boxStroke.Color = Color3.fromRGB(22, 5, 36)
+
+    local checkMark = Instance.new("TextLabel")
+    checkMark.Size = UDim2.fromScale(1, 1)
+    checkMark.BackgroundTransparency = 1
+    checkMark.Text = isChecked and "✓" or ""
+    checkMark.TextColor3 = Color3.fromRGB(16, 3, 26)
+    checkMark.TextSize = 12
+    checkMark.Font = Enum.Font.FredokaOne
+    checkMark.ZIndex = 856
+    checkMark.Parent = boxFrame
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, -34, 1, 0)
+    nameLabel.Position = UDim2.fromOffset(32, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = displayName
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextSize = 11.5
+    nameLabel.Font = Enum.Font.FredokaOne
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    nameLabel.ZIndex = 855
+    nameLabel.Parent = rowBtn
+
+    local function toggleCheck()
+        local current = not (Config.PowerUpCheckboxes[upgradeId] ~= false)
+        Config.PowerUpCheckboxes[upgradeId] = current
+        boxFrame.BackgroundColor3 = current and Color3.fromRGB(75, 215, 140) or Color3.fromRGB(16, 42, 28)
+        checkMark.Text = current and "✓" or ""
+        saveConfig()
+        print(string.format("[Clean Magic] Power-Up %s Sequential Upgrade: %s", displayName, current and "ON" or "OFF"))
     end
 
-    for idx, upgradeId in ipairs(Config.PowerUpOrder) do
-        local info = UpgradesConfig and UpgradesConfig.ById[upgradeId]
-        local displayName = info and info.Name or upgradeId
-
-        local itemFrame = Instance.new("Frame")
-        itemFrame.Size = UDim2.new(1, -6, 0, 34)
-        itemFrame.BackgroundColor3 = Color3.fromRGB(24, 62, 42)
-        itemFrame.BorderSizePixel = 0
-        itemFrame.ZIndex = 854
-        itemFrame.Parent = scrollPowerUp
-        Instance.new("UICorner", itemFrame).CornerRadius = UDim.new(0, 7)
-
-        local itemStroke = Instance.new("UIStroke")
-        itemStroke.Parent = itemFrame
-        itemStroke.Thickness = 1.5
-        itemStroke.Color = Color3.fromRGB(22, 5, 36)
-
-        local numBadge = Instance.new("TextLabel")
-        numBadge.Size = UDim2.fromOffset(24, 34)
-        numBadge.Position = UDim2.fromOffset(4, 0)
-        numBadge.BackgroundTransparency = 1
-        numBadge.Text = string.format("#%d", idx)
-        numBadge.TextColor3 = Color3.fromRGB(255, 215, 90)
-        numBadge.TextSize = 11.5
-        numBadge.Font = Enum.Font.FredokaOne
-        numBadge.ZIndex = 855
-        numBadge.Parent = itemFrame
-
-        local nameLabel = Instance.new("TextLabel")
-        nameLabel.Size = UDim2.new(1, -84, 1, 0)
-        nameLabel.Position = UDim2.fromOffset(30, 0)
-        nameLabel.BackgroundTransparency = 1
-        nameLabel.Text = displayName
-        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-        nameLabel.TextSize = 11.5
-        nameLabel.Font = Enum.Font.FredokaOne
-        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-        nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-        nameLabel.ZIndex = 855
-        nameLabel.Parent = itemFrame
-
-        if idx > 1 then
-            local upBtn = Instance.new("TextButton")
-            upBtn.Size = UDim2.fromOffset(22, 22)
-            upBtn.Position = UDim2.new(1, -50, 0.5, -11)
-            upBtn.BackgroundColor3 = Color3.fromRGB(35, 90, 60)
-            upBtn.Text = "▲"
-            upBtn.TextColor3 = Color3.fromRGB(255, 225, 95)
-            upBtn.TextSize = 11
-            upBtn.Font = Enum.Font.FredokaOne
-            upBtn.BorderSizePixel = 0
-            upBtn.ZIndex = 856
-            upBtn.Parent = itemFrame
-            Instance.new("UICorner", upBtn).CornerRadius = UDim.new(0, 5)
-
-            upBtn.Activated:Connect(function()
-                local temp = Config.PowerUpOrder[idx]
-                Config.PowerUpOrder[idx] = Config.PowerUpOrder[idx - 1]
-                Config.PowerUpOrder[idx - 1] = temp
-                saveConfig()
-                renderPowerUpList()
-            end)
-        end
-
-        if idx < #Config.PowerUpOrder then
-            local downBtn = Instance.new("TextButton")
-            downBtn.Size = UDim2.fromOffset(22, 22)
-            downBtn.Position = UDim2.new(1, -26, 0.5, -11)
-            downBtn.BackgroundColor3 = Color3.fromRGB(35, 90, 60)
-            downBtn.Text = "▼"
-            downBtn.TextColor3 = Color3.fromRGB(255, 225, 95)
-            downBtn.TextSize = 11
-            downBtn.Font = Enum.Font.FredokaOne
-            downBtn.BorderSizePixel = 0
-            downBtn.ZIndex = 856
-            downBtn.Parent = itemFrame
-            Instance.new("UICorner", downBtn).CornerRadius = UDim.new(0, 5)
-
-            downBtn.Activated:Connect(function()
-                local temp = Config.PowerUpOrder[idx]
-                Config.PowerUpOrder[idx] = Config.PowerUpOrder[idx + 1]
-                Config.PowerUpOrder[idx + 1] = temp
-                saveConfig()
-                renderPowerUpList()
-            end)
-        end
-    end
+    rowBtn.Activated:Connect(toggleCheck)
 end
 
-renderPowerUpList()
-
 -- --------------------------------------------------------
--- POPUP B: SPELLS CHECKBOX POPUP (เฉลี่ยอัปเกรด BALANCED)
+-- POPUP B: SPELLS CHECKBOX POPUP (SPELL POINTS - TOP DOWN FIRST)
 -- --------------------------------------------------------
 local spellPopup = Instance.new("Frame")
 spellPopup.Name = "SpellPopupDropdown"
@@ -1199,18 +1418,256 @@ for _, spellId in ipairs(ALL_SPELL_IDS) do
         boxFrame.BackgroundColor3 = current and Color3.fromRGB(255, 175, 50) or Color3.fromRGB(36, 16, 10)
         checkMark.Text = current and "✓" or ""
         saveConfig()
-        print(string.format("[Clean Magic] Spell %s Balanced Upgrade: %s", displayName, current and "ON" or "OFF"))
+        print(string.format("[Clean Magic] Spell %s Sequential Upgrade: %s", displayName, current and "ON" or "OFF"))
     end
 
     rowBtn.Activated:Connect(toggleCheck)
 end
 
+-- --------------------------------------------------------
+-- POPUP C: EQUIPPED AUTO SKILLS POPUP (CHECKBOX + ARROW REORDER ▲/▼ + REFRESH)
+-- --------------------------------------------------------
+local autoSkillPopup = Instance.new("Frame")
+autoSkillPopup.Name = "AutoSkillPopupDropdown"
+autoSkillPopup.Size = UDim2.new(0, 240, 0, 270)
+autoSkillPopup.BackgroundColor3 = Color3.fromRGB(16, 3, 26)
+autoSkillPopup.BorderSizePixel = 0
+autoSkillPopup.Visible = false
+autoSkillPopup.ZIndex = 850
+autoSkillPopup.Parent = targetScreenGui
+Instance.new("UICorner", autoSkillPopup).CornerRadius = UDim.new(0, 14)
+
+local popRimC = Instance.new("Frame")
+popRimC.Size = UDim2.new(1, 0, 1, -3)
+popRimC.BackgroundColor3 = Color3.fromRGB(160, 50, 95)
+popRimC.BorderSizePixel = 0
+popRimC.ZIndex = 851
+popRimC.Parent = autoSkillPopup
+Instance.new("UICorner", popRimC).CornerRadius = UDim.new(0, 14)
+local prsC = Instance.new("UIStroke")
+prsC.Parent = popRimC
+prsC.Thickness = 3
+prsC.Color = Color3.fromRGB(22, 5, 36)
+
+local popInnerC = Instance.new("Frame")
+popInnerC.Size = UDim2.new(1, -6, 1, -6)
+popInnerC.Position = UDim2.fromOffset(3, 3)
+popInnerC.BackgroundColor3 = Color3.fromRGB(48, 16, 28)
+popInnerC.BorderSizePixel = 0
+popInnerC.ZIndex = 852
+popInnerC.Parent = popRimC
+Instance.new("UICorner", popInnerC).CornerRadius = UDim.new(0, 11)
+
+-- ปุ่ม Refresh เพื่อตรวจจับสกิลที่ใส่มาใหม่
+local refreshBtn = Instance.new("TextButton")
+refreshBtn.Size = UDim2.new(1, -12, 0, 26)
+refreshBtn.Position = UDim2.fromOffset(6, 6)
+refreshBtn.BackgroundColor3 = Color3.fromRGB(180, 55, 105)
+refreshBtn.Text = "🔄 Refresh Equipped Skills"
+refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+refreshBtn.TextSize = 11.5
+refreshBtn.Font = Enum.Font.FredokaOne
+refreshBtn.BorderSizePixel = 0
+refreshBtn.ZIndex = 854
+refreshBtn.Parent = popInnerC
+Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 6)
+local rfStroke = Instance.new("UIStroke")
+rfStroke.Parent = refreshBtn
+rfStroke.Thickness = 1.3
+rfStroke.Color = Color3.fromRGB(22, 5, 36)
+
+local scrollAutoSkill = Instance.new("ScrollingFrame")
+scrollAutoSkill.Size = UDim2.new(1, -8, 1, -44)
+scrollAutoSkill.Position = UDim2.fromOffset(4, 38)
+scrollAutoSkill.BackgroundTransparency = 1
+scrollAutoSkill.BorderSizePixel = 0
+scrollAutoSkill.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scrollAutoSkill.ScrollBarThickness = 5
+scrollAutoSkill.ZIndex = 853
+scrollAutoSkill.Parent = popInnerC
+
+local layoutC = Instance.new("UIListLayout")
+layoutC.Parent = scrollAutoSkill
+layoutC.Padding = UDim.new(0, 4)
+layoutC.SortOrder = Enum.SortOrder.LayoutOrder
+
+local renderSkillList = nil
+renderSkillList = function()
+    for _, ch in ipairs(scrollAutoSkill:GetChildren()) do
+        if ch:IsA("Frame") or ch:IsA("TextLabel") then ch:Destroy() end
+    end
+
+    local equipped = getEquippedSkills()
+
+    -- ตรวจสอบและลงทะเบียนสกิลใหม่เข้าสู่ Config
+    for _, sk in ipairs(equipped) do
+        if Config.AutoSkillCheckboxes[sk.id] == nil then
+            Config.AutoSkillCheckboxes[sk.id] = not sk.isPassive
+        end
+        if not table.find(Config.AutoSkillOrder, sk.id) then
+            table.insert(Config.AutoSkillOrder, sk.id)
+        end
+    end
+
+    local orderMap = {}
+    for idx, id in ipairs(Config.AutoSkillOrder) do
+        orderMap[id] = idx
+    end
+
+    table.sort(equipped, function(a, b)
+        local rankA = orderMap[a.id] or 999
+        local rankB = orderMap[b.id] or 999
+        return rankA < rankB
+    end)
+
+    if #equipped == 0 then
+        local emptyLbl = Instance.new("TextLabel")
+        emptyLbl.Size = UDim2.new(1, -8, 0, 40)
+        emptyLbl.Position = UDim2.fromOffset(4, 10)
+        emptyLbl.BackgroundTransparency = 1
+        emptyLbl.Text = "No skills equipped in match!\n(Click Refresh when in game)"
+        emptyLbl.TextColor3 = Color3.fromRGB(255, 180, 200)
+        emptyLbl.TextSize = 11
+        emptyLbl.Font = Enum.Font.FredokaOne
+        emptyLbl.ZIndex = 855
+        emptyLbl.Parent = scrollAutoSkill
+        return
+    end
+
+    for idx, sk in ipairs(equipped) do
+        local itemFrame = Instance.new("Frame")
+        itemFrame.Size = UDim2.new(1, -6, 0, 36)
+        itemFrame.BackgroundColor3 = Color3.fromRGB(68, 22, 38)
+        itemFrame.BorderSizePixel = 0
+        itemFrame.ZIndex = 854
+        itemFrame.Parent = scrollAutoSkill
+        Instance.new("UICorner", itemFrame).CornerRadius = UDim.new(0, 7)
+
+        local itemStroke = Instance.new("UIStroke")
+        itemStroke.Parent = itemFrame
+        itemStroke.Thickness = 1.3
+        itemStroke.Color = Color3.fromRGB(22, 5, 36)
+
+        local isChecked = Config.AutoSkillCheckboxes[sk.id] or false
+
+        -- Checkbox
+        local boxBtn = Instance.new("TextButton")
+        boxBtn.Size = UDim2.fromOffset(18, 18)
+        boxBtn.Position = UDim2.new(0, 6, 0.5, -9)
+        boxBtn.BackgroundColor3 = isChecked and Color3.fromRGB(240, 90, 140) or Color3.fromRGB(36, 12, 20)
+        boxBtn.Text = isChecked and "✓" or ""
+        boxBtn.TextColor3 = Color3.fromRGB(16, 3, 26)
+        boxBtn.TextSize = 12
+        boxBtn.Font = Enum.Font.FredokaOne
+        boxBtn.BorderSizePixel = 0
+        boxBtn.ZIndex = 856
+        boxBtn.Parent = itemFrame
+        Instance.new("UICorner", boxBtn).CornerRadius = UDim.new(0, 5)
+
+        local boxStroke = Instance.new("UIStroke")
+        boxStroke.Parent = boxBtn
+        boxStroke.Thickness = 1.2
+        boxStroke.Color = Color3.fromRGB(22, 5, 36)
+
+        boxBtn.Activated:Connect(function()
+            local cur = not (Config.AutoSkillCheckboxes[sk.id] or false)
+            Config.AutoSkillCheckboxes[sk.id] = cur
+            boxBtn.BackgroundColor3 = cur and Color3.fromRGB(240, 90, 140) or Color3.fromRGB(36, 12, 20)
+            boxBtn.Text = cur and "✓" or ""
+            saveConfig()
+        end)
+
+        -- Skill Tag: Active / Passive
+        local tagText = sk.isPassive and "[PASSIVE]" or string.format("[Slot %d]", sk.slot)
+        local tagColor = sk.isPassive and Color3.fromRGB(180, 180, 190) or Color3.fromRGB(255, 215, 90)
+
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(1, -78, 1, 0)
+        nameLabel.Position = UDim2.fromOffset(28, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = string.format("%s %s", sk.name, tagText)
+        nameLabel.TextColor3 = tagColor
+        nameLabel.TextSize = 10.5
+        nameLabel.Font = Enum.Font.FredokaOne
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+        nameLabel.ZIndex = 855
+        nameLabel.Parent = itemFrame
+
+        -- Arrow Up ▲
+        if idx > 1 then
+            local upBtn = Instance.new("TextButton")
+            upBtn.Size = UDim2.fromOffset(20, 20)
+            upBtn.Position = UDim2.new(1, -46, 0.5, -10)
+            upBtn.BackgroundColor3 = Color3.fromRGB(90, 30, 50)
+            upBtn.Text = "▲"
+            upBtn.TextColor3 = Color3.fromRGB(255, 225, 95)
+            upBtn.TextSize = 10
+            upBtn.Font = Enum.Font.FredokaOne
+            upBtn.BorderSizePixel = 0
+            upBtn.ZIndex = 856
+            upBtn.Parent = itemFrame
+            Instance.new("UICorner", upBtn).CornerRadius = UDim.new(0, 4)
+
+            upBtn.Activated:Connect(function()
+                local prevId = equipped[idx - 1].id
+                local curId = sk.id
+                local pIdx = table.find(Config.AutoSkillOrder, prevId)
+                local cIdx = table.find(Config.AutoSkillOrder, curId)
+                if pIdx and cIdx then
+                    Config.AutoSkillOrder[cIdx] = prevId
+                    Config.AutoSkillOrder[pIdx] = curId
+                    saveConfig()
+                    renderSkillList()
+                end
+            end)
+        end
+
+        -- Arrow Down ▼
+        if idx < #equipped then
+            local downBtn = Instance.new("TextButton")
+            downBtn.Size = UDim2.fromOffset(20, 20)
+            downBtn.Position = UDim2.new(1, -22, 0.5, -10)
+            downBtn.BackgroundColor3 = Color3.fromRGB(90, 30, 50)
+            downBtn.Text = "▼"
+            downBtn.TextColor3 = Color3.fromRGB(255, 225, 95)
+            downBtn.TextSize = 10
+            downBtn.Font = Enum.Font.FredokaOne
+            downBtn.BorderSizePixel = 0
+            downBtn.ZIndex = 856
+            downBtn.Parent = itemFrame
+            Instance.new("UICorner", downBtn).CornerRadius = UDim.new(0, 4)
+
+            downBtn.Activated:Connect(function()
+                local nextId = equipped[idx + 1].id
+                local curId = sk.id
+                local nIdx = table.find(Config.AutoSkillOrder, nextId)
+                local cIdx = table.find(Config.AutoSkillOrder, curId)
+                if nIdx and cIdx then
+                    Config.AutoSkillOrder[cIdx] = nextId
+                    Config.AutoSkillOrder[nIdx] = curId
+                    saveConfig()
+                    renderSkillList()
+                end
+            end)
+        end
+    end
+end
+
+refreshBtn.Activated:Connect(function()
+    renderSkillList()
+end)
+
+renderSkillList()
+
 -- จัดการการเปิด/ปิด Popups สลับกันอย่างอิสระ
 local function closeAllPopups()
     powerUpPopup.Visible = false
     spellPopup.Visible = false
+    autoSkillPopup.Visible = false
     powerUpArrow.Text = "▼"
     spellArrow.Text = "▼"
+    autoSkillArrow.Text = "▼"
 end
 
 powerUpDropBtn.Activated:Connect(function()
@@ -1234,6 +1691,19 @@ spellDropBtn.Activated:Connect(function()
         local pos = spellDropShadow.AbsolutePosition
         local size = spellDropShadow.AbsoluteSize
         spellPopup.Position = UDim2.fromOffset(pos.X, pos.Y + size.Y + 4)
+    end
+end)
+
+autoSkillDropBtn.Activated:Connect(function()
+    local isOpening = not autoSkillPopup.Visible
+    closeAllPopups()
+    if isOpening then
+        renderSkillList()
+        autoSkillPopup.Visible = true
+        autoSkillArrow.Text = "▲"
+        local pos = autoSkillDropShadow.AbsolutePosition
+        local size = autoSkillDropShadow.AbsoluteSize
+        autoSkillPopup.Position = UDim2.fromOffset(pos.X, pos.Y + size.Y + 4)
     end
 end)
 
